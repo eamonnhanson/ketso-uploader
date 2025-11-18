@@ -31,18 +31,25 @@ document.getElementById("uploadForm").addEventListener("submit", async function 
     const formData = new FormData();
     formData.append("file", file);
 
-    const res = await fetch("/upload", {
-      method: "POST",
-      body: formData
-    });
+const res = await fetch("/upload", {
+  method: "POST",
+  body: formData
+});
 
-    const data = await res.json();
+const contentType = res.headers.get("content-type") || "";
 
-    if (!res.ok) {
-      status.textContent = "Upload failed: " + (data.error || res.status);
-      return;
-    }
+let data;
+if (contentType.includes("application/json")) {
+  data = await res.json();
+} else {
+  const text = await res.text();
+  throw new Error("Server returned non-JSON response: " + text.slice(0, 200));
+}
 
+if (!res.ok) {
+  status.textContent = "Upload failed: " + (data.error || res.status);
+  return;
+}
     status.textContent = "Uploaded as: " + data.key;
 
   } catch (err) {
