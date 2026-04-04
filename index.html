@@ -4,8 +4,7 @@
   <meta charset="UTF-8">
   <title>KETSO crop and upload</title>
 
-  <link rel="stylesheet" href="https://unpkg.com/cropperjs/dist/cropper.min.css">
-  <script src="https://unpkg.com/cropperjs/dist/cropper.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
 
   <style>
     body {
@@ -13,6 +12,10 @@
       padding: 20px;
       max-width: 1000px;
       margin: 0 auto;
+    }
+
+    h2 {
+      margin-bottom: 16px;
     }
 
     #image {
@@ -30,6 +33,11 @@
       padding: 10px 14px;
       margin: 5px 5px 0 0;
       cursor: pointer;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
     }
 
     #status {
@@ -58,10 +66,10 @@
   2. Drag the image to position it<br>
   3. Adjust the crop box<br>
   4. Click "Crop to 600 px"<br>
-  5. Click "Upload"
+  5. Click "Upload original + cropped"
 </div>
 
-<img id="image">
+<img id="image" alt="Preview">
 
 <div class="controls">
   <button id="zoomIn" disabled>Zoom in</button>
@@ -74,6 +82,8 @@
 </div>
 
 <p id="status"></p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
 
 <script>
 let cropper = null;
@@ -93,31 +103,41 @@ fileInput.addEventListener("change", function (event) {
 
   croppedBlob = null;
   uploadBtn.disabled = true;
+  cropBtn.disabled = true;
+  zoomIn.disabled = true;
+  zoomOut.disabled = true;
+  status.textContent = "";
 
   const reader = new FileReader();
   reader.onload = function () {
     image.src = reader.result;
     image.style.display = "block";
 
-    if (cropper) {
-      cropper.destroy();
+    try {
+      if (cropper) {
+        cropper.destroy();
+      }
+
+      cropper = new Cropper(image, {
+        viewMode: 1,
+        dragMode: "move",
+        autoCropArea: 0.6,
+        responsive: true,
+        background: false,
+        zoomable: true,
+        guides: true,
+        center: true,
+        highlight: true
+      });
+
+      cropBtn.disabled = false;
+      zoomIn.disabled = false;
+      zoomOut.disabled = false;
+      status.textContent = "Image loaded. You can now zoom and crop.";
+
+    } catch (err) {
+      status.textContent = "Cropper failed to load: " + err.message;
     }
-
-    cropper = new Cropper(image, {
-      viewMode: 1,
-      dragMode: "move",
-      autoCropArea: 0.6,
-      responsive: true,
-      background: false,
-      zoomable: true,
-      guides: true,
-      center: true,
-      highlight: true
-    });
-
-    cropBtn.disabled = false;
-    zoomIn.disabled = false;
-    zoomOut.disabled = false;
   };
 
   reader.readAsDataURL(file);
@@ -138,25 +158,40 @@ cropBtn.addEventListener("click", function () {
     width: 600
   });
 
+  if (!canvas) {
+    status.textContent = "Cropping failed.";
+    return;
+  }
+
   canvas.toBlob(function (blob) {
+    if (!blob) {
+      status.textContent = "Could not create cropped image.";
+      return;
+    }
+
     croppedBlob = blob;
     uploadBtn.disabled = false;
-    status.textContent = "Cropped image ready";
+    status.textContent = "Cropped image ready. You can now upload both versions.";
   }, "image/jpeg", 0.82);
 });
 
 uploadBtn.addEventListener("click", async function () {
   const originalFile = fileInput.files[0];
 
-  if (!originalFile || !croppedBlob) {
-    status.textContent = "Please crop first";
+  if (!originalFile) {
+    status.textContent = "No original file selected.";
+    return;
+  }
+
+  if (!croppedBlob) {
+    status.textContent = "Please crop the image first.";
     return;
   }
 
   try {
-    status.textContent = "Uploading original...";
+    status.textContent = "Uploading original image...";
 
-    // upload original
+    // Upload original
     const fd1 = new FormData();
     fd1.append("file", originalFile);
 
@@ -165,24 +200,26 @@ uploadBtn.addEventListener("click", async function () {
       body: fd1
     });
 
-    const data1 = await res1.json();
+    const contentType1 = res1.headers.get("content-type") || "";
+    let data1;
+
+    if (contentType1.includes("application/json")) {
+      data1 = await res1.json();
+    } else {
+      const text = await res1.text();
+      throw new Error("Original upload returned non-JSON response: " + text.slice(0, 200));
+    }
 
     if (!res1.ok) {
-      status.textContent = "Original upload failed";
+      status.textContent = "Original upload failed: " + (data1.error || res1.status);
       return;
     }
 
-    status.textContent = "Uploading cropped...";
+    status.textContent = "Uploading cropped 600 px version...";
 
-    // upload cropped
-    const name =
-      originalFile.name.replace(/\.[^/.]+$/, "") + "_600px.jpg";
-
-    const croppedFile = new File(
-      [croppedBlob],
-      name,
-      { type: "image/jpeg" }
-    );
+    // Upload cropped
+    const croppedName = originalFile.name.replace(/\.[^/.]+$/, "") + "_600px.jpg";
+    const croppedFile = new File([croppedBlob], croppedName, { type: "image/jpeg" });
 
     const fd2 = new FormData();
     fd2.append("file", croppedFile);
@@ -192,16 +229,25 @@ uploadBtn.addEventListener("click", async function () {
       body: fd2
     });
 
-    const data2 = await res2.json();
+    const contentType2 = res2.headers.get("content-type") || "";
+    let data2;
+
+    if (contentType2.includes("application/json")) {
+      data2 = await res2.json();
+    } else {
+      const text = await res2.text();
+      throw new Error("Cropped upload returned non-JSON response: " + text.slice(0, 200));
+    }
 
     if (!res2.ok) {
-      status.textContent = "Cropped upload failed";
+      status.textContent = "Cropped upload failed: " + (data2.error || res2.status);
       return;
     }
 
     status.textContent =
-      "Done\nOriginal: " + data1.key +
-      "\nCropped: " + data2.key;
+      "Done.\n" +
+      "Original uploaded as: " + data1.key + "\n" +
+      "Cropped uploaded as: " + data2.key;
 
   } catch (err) {
     status.textContent = "Error: " + err.message;
