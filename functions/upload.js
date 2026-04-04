@@ -4,70 +4,97 @@ export async function onRequestPost({ request, env }) {
     const file = formData.get("file");
 
     if (!file || typeof file === "string") {
-      return new Response(JSON.stringify({
+      return jsonResponse({
         ok: false,
         error: "No file uploaded"
-      }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
+      }, 400);
     }
 
     const allowedMimeTypes = [
+      // images
       "image/jpeg",
       "image/png",
       "image/webp",
       "image/gif",
       "image/heic",
-      "image/heif"
+      "image/heif",
+
+      // videos
+      "video/mp4",
+      "video/quicktime", // .mov
+      "video/webm"
     ];
 
     const allowedExtensions = [
+      // images
       ".jpg",
       ".jpeg",
       ".png",
       ".webp",
       ".gif",
       ".heic",
-      ".heif"
+      ".heif",
+
+      // videos
+      ".mp4",
+      ".mov",
+      ".webm"
     ];
 
-    const originalName = file.name || "upload";
+    const originalName = (file.name || "upload").trim();
     const lowerName = originalName.toLowerCase();
 
     const hasAllowedExtension = allowedExtensions.some(ext => lowerName.endsWith(ext));
     const hasAllowedMimeType = allowedMimeTypes.includes(file.type);
 
     if (!hasAllowedExtension || !hasAllowedMimeType) {
-      return new Response(JSON.stringify({
+      return jsonResponse({
         ok: false,
-        error: "Only image files are allowed (jpg, jpeg, png, webp, gif, heic, heif)"
-      }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
+        error: "Only image and video files are allowed (jpg, jpeg, png, webp, gif, heic, heif, mp4, mov, webm)"
+      }, 400);
     }
 
-    if (originalName.includes("/") || originalName.includes("\\") || originalName.includes("..")) {
-      return new Response(JSON.stringify({
+    // block path tricks and weird names
+    if (
+      originalName.includes("/") ||
+      originalName.includes("\\") ||
+      originalName.includes("..")
+    ) {
+      return jsonResponse({
         ok: false,
         error: "Invalid filename"
-      }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
+      }, 400);
+    }
+
+    const isVideo = file.type.startsWith("video/");
+    const maxImageSize = 10 * 1024 * 1024;   // 10 MB
+    const maxVideoSize = 100 * 1024 * 1024;  // 100 MB
+
+    if (!isVideo && file.size > maxImageSize) {
+      return jsonResponse({
+        ok: false,
+        error: "Image too large. Maximum size is 10 MB."
+      }, 400);
+    }
+
+    if (isVideo && file.size > maxVideoSize) {
+      return jsonResponse({
+        ok: false,
+        error: "Video too large. Maximum size is 100 MB."
+      }, 400);
     }
 
     const extension = lowerName.substring(lowerName.lastIndexOf("."));
 
     const safeBaseName = originalName
-      .replace(/\.[^/.]+$/, "")
-      .replace(/[^a-zA-Z0-9._-]/g, "_")
-      .replace(/_+/g, "_")
-      .replace(/^_+|_+$/g, "")
-      .slice(0, 80) || "image";
+      .replace(/\.[^/.]+$/, "")          // remove extension
+      .replace(/[^a-zA-Z0-9._-]/g, "_")  // only safe chars
+      .replace(/_+/g, "_")               // collapse __
+      .replace(/^_+|_+$/g, "")           // trim _
+      .slice(0, 80) || "upload";
 
-    const key = `${Date.now()}_${safeBaseName}${extension}`;
+    const prefix = isVideo ? "video" : "image";
+    const key = `${prefix}_${Date.now()}_${safeBaseName}${extension}`;
 
     await env.KETSO_BUCKET.put(key, file.stream(), {
       httpMetadata: {
@@ -75,21 +102,24 @@ export async function onRequestPost({ request, env }) {
       }
     });
 
-    return new Response(JSON.stringify({
+    return jsonResponse({
       ok: true,
       key
-    }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" }
-    });
+    }, 200);
 
   } catch (err) {
-    return new Response(JSON.stringify({
+    return jsonResponse({
       ok: false,
       error: err && err.message ? err.message : String(err)
-    }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
+    }, 500);
   }
+}
+
+function jsonResponse(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      "Content-Type": "application/json"
+    }
+  });
 }
