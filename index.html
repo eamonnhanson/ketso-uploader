@@ -2,55 +2,224 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>KETSO upload</title>
+  <title>KETSO crop and upload</title>
+  <link rel="stylesheet" href="https://unpkg.com/cropperjs/dist/cropper.min.css">
+  <script src="https://unpkg.com/cropperjs/dist/cropper.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    h2 {
+      margin-bottom: 16px;
+    }
+
+    #preview-container {
+      margin-top: 20px;
+      max-width: 100%;
+    }
+
+    #image {
+      display: none;
+      max-width: 100%;
+      max-height: 600px;
+    }
+
+    .controls {
+      margin-top: 15px;
+    }
+
+    button {
+      margin-right: 10px;
+      margin-top: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+
+    #status {
+      margin-top: 20px;
+      font-weight: bold;
+      white-space: pre-line;
+    }
+
+    .note {
+      margin-top: 10px;
+      color: #444;
+      font-size: 14px;
+    }
+  </style>
 </head>
 <body>
   <h2>KETSO tree photo upload</h2>
 
-  <form id="uploadForm">
-    <input type="file" id="fileInput" name="file" required />
-    <button type="submit">Upload</button>
-  </form>
+  <input type="file" id="fileInput" name="file" accept="image/*" required />
+
+  <div class="note">
+    Select a photo, zoom and crop the relevant part, then click "Crop to 600 px" and "Upload".
+    The system will store both the original and the cropped version.
+  </div>
+
+  <div id="preview-container">
+    <img id="image" alt="Preview">
+  </div>
+
+  <div class="controls">
+    <button id="cropBtn" disabled>Crop to 600 px</button>
+    <button id="uploadBtn" disabled>Upload original + cropped</button>
+  </div>
 
   <p id="status"></p>
 
 <script>
-document.getElementById("uploadForm").addEventListener("submit", async function (e) {
-  e.preventDefault();
+let cropper = null;
+let croppedBlob = null;
 
-  const fileInput = document.getElementById("fileInput");
-  const file = fileInput.files[0];
-  if (!file) {
+const fileInput = document.getElementById("fileInput");
+const image = document.getElementById("image");
+const cropBtn = document.getElementById("cropBtn");
+const uploadBtn = document.getElementById("uploadBtn");
+const status = document.getElementById("status");
+
+fileInput.addEventListener("change", function (event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  croppedBlob = null;
+  uploadBtn.disabled = true;
+  status.textContent = "";
+
+  const reader = new FileReader();
+  reader.onload = function () {
+    image.src = reader.result;
+    image.style.display = "block";
+
+    if (cropper) {
+      cropper.destroy();
+    }
+
+    cropper = new Cropper(image, {
+      viewMode: 1,
+      dragMode: "move",
+      autoCropArea: 1,
+      responsive: true,
+      background: false,
+      zoomable: true,
+      scalable: false,
+      rotatable: false
+    });
+
+    cropBtn.disabled = false;
+  };
+
+  reader.readAsDataURL(file);
+});
+
+cropBtn.addEventListener("click", function () {
+  if (!cropper) return;
+
+  const canvas = cropper.getCroppedCanvas({
+    width: 600
+  });
+
+  if (!canvas) {
+    status.textContent = "Cropping failed.";
     return;
   }
 
-  const status = document.getElementById("status");
-  status.textContent = "Uploading...";
+  canvas.toBlob(function (blob) {
+    if (!blob) {
+      status.textContent = "Could not create cropped image.";
+      return;
+    }
 
-  try {
-    const formData = new FormData();
-    formData.append("file", file);
-
-const res = await fetch("/upload", {
-  method: "POST",
-  body: formData
+    croppedBlob = blob;
+    uploadBtn.disabled = false;
+    status.textContent = "Cropped image is ready. You can now upload both files.";
+  }, "image/jpeg", 0.82);
 });
 
-const contentType = res.headers.get("content-type") || "";
+uploadBtn.addEventListener("click", async function () {
+  const originalFile = fileInput.files[0];
 
-let data;
-if (contentType.includes("application/json")) {
-  data = await res.json();
-} else {
-  const text = await res.text();
-  throw new Error("Server returned non-JSON response: " + text.slice(0, 200));
-}
+  if (!originalFile) {
+    status.textContent = "No original file selected.";
+    return;
+  }
 
-if (!res.ok) {
-  status.textContent = "Upload failed: " + (data.error || res.status);
-  return;
-}
-    status.textContent = "Uploaded as: " + data.key;
+  if (!croppedBlob) {
+    status.textContent = "Please crop the image first.";
+    return;
+  }
+
+  try {
+    // 1. Upload original
+    status.textContent = "Uploading original image...";
+
+    const formDataOriginal = new FormData();
+    formDataOriginal.append("file", originalFile);
+
+    const resOriginal = await fetch("/upload", {
+      method: "POST",
+      body: formDataOriginal
+    });
+
+    const contentTypeOriginal = resOriginal.headers.get("content-type") || "";
+
+    let dataOriginal;
+    if (contentTypeOriginal.includes("application/json")) {
+      dataOriginal = await resOriginal.json();
+    } else {
+      const text = await resOriginal.text();
+      throw new Error("Original upload returned non-JSON response: " + text.slice(0, 200));
+    }
+
+    if (!resOriginal.ok) {
+      status.textContent = "Original upload failed: " + (dataOriginal.error || resOriginal.status);
+      return;
+    }
+
+    // 2. Upload cropped version
+    status.textContent = "Uploading cropped 600 px version...";
+
+    const croppedName =
+      originalFile.name.replace(/\.[^/.]+$/, "") + "_600px.jpg";
+
+    const croppedFile = new File(
+      [croppedBlob],
+      croppedName,
+      { type: "image/jpeg" }
+    );
+
+    const formDataCropped = new FormData();
+    formDataCropped.append("file", croppedFile);
+
+    const resCropped = await fetch("/upload", {
+      method: "POST",
+      body: formDataCropped
+    });
+
+    const contentTypeCropped = resCropped.headers.get("content-type") || "";
+
+    let dataCropped;
+    if (contentTypeCropped.includes("application/json")) {
+      dataCropped = await resCropped.json();
+    } else {
+      const text = await resCropped.text();
+      throw new Error("Cropped upload returned non-JSON response: " + text.slice(0, 200));
+    }
+
+    if (!resCropped.ok) {
+      status.textContent = "Cropped upload failed: " + (dataCropped.error || resCropped.status);
+      return;
+    }
+
+    status.textContent =
+      "Done.\n" +
+      "Original uploaded as: " + dataOriginal.key + "\n" +
+      "Cropped uploaded as: " + dataCropped.key;
 
   } catch (err) {
     status.textContent = "Error: " + err.message;
