@@ -10,39 +10,52 @@
   </style>
 </head>
 <body>
-  <h2>KETSO uploaded images</h2>
-  <div id="gallery">Loading...</div>
+
+<h2>KETSO uploaded images</h2>
+<div id="gallery">Loading...</div>
 
 <script>
 async function loadImages() {
-  const res = await fetch("/list");
-  const files = await res.json();
-
   const container = document.getElementById("gallery");
-  container.innerHTML = "";
 
-  if (!files.length) {
-    container.textContent = "No images uploaded yet.";
-    return;
+  try {
+    const res = await fetch("/list");
+
+    if (!res.ok) {
+      container.textContent = "Error loading images";
+      return;
+    }
+
+    const files = await res.json();
+    container.innerHTML = "";
+
+    if (!files.length) {
+      container.textContent = "No images uploaded yet.";
+      return;
+    }
+
+    files.forEach(file => {
+      const div = document.createElement("div");
+      div.className = "item";
+
+      const img = document.createElement("img");
+      img.src = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/" + encodeURIComponent(file.key);
+
+      const name = document.createElement("p");
+      name.textContent = file.key;
+
+      div.appendChild(img);
+      div.appendChild(name);
+      container.appendChild(div);
+    });
+
+  } catch (err) {
+    container.textContent = "Failed to load images: " + err.message;
   }
-
-  files.forEach(file => {
-    const div = document.createElement("div");
-    div.className = "item";
-
-    const img = document.createElement("img");
-    img.src = "https://pub-REPLACE_THIS_WITH_YOUR_R2_PUBLIC_URL.r2.dev/" + encodeURIComponent(file.key);
-
-    const name = document.createElement("p");
-    name.textContent = file.key;
-
-    div.appendChild(img);
-    div.appendChild(name);
-    container.appendChild(div);
-  });
 }
 
 loadImages();
 </script>
+
 </body>
 </html>
