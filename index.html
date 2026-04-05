@@ -151,14 +151,15 @@
 </div>
 
 <label for="fileInput">Photo</label>
-<input type="file" id="fileInput" accept="image/*">
+<input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.webp">
 
 <div class="note">
   1. Use the zoom buttons to zoom in<br>
   2. Drag the image to position it<br>
   3. Adjust the crop box<br>
   4. Click "Crop to 600 px"<br>
-  5. Click "Upload original + cropped"
+  5. Click "Upload original + cropped"<br>
+  6. For this uploader, use JPG, PNG or WebP. HEIC is not reliable in browser preview/crop.
 </div>
 
 <img id="image" alt="Preview">
@@ -183,8 +184,9 @@ let croppedBlob = null;
 let selectedLink = null;
 let searchTimeout = null;
 
-// IMPORTANT: use your Render backend here
 const SEARCH_API_BASE = "https://ptb-tree-map.onrender.com";
+const REVIEW_API_URL = "https://ptb-tree-map.onrender.com/api/save-photo-review";
+const R2_PUBLIC_BASE = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/";
 
 const fileInput = document.getElementById("fileInput");
 const image = document.getElementById("image");
@@ -208,6 +210,7 @@ category.addEventListener("change", () => {
   selectedHero.style.display = "none";
   selectedHero.innerHTML = "";
   searchResults.innerHTML = "";
+  forestHeroSearch.value = "";
 
   if (category.value === "forest_hero") {
     forestHeroSection.style.display = "block";
@@ -292,6 +295,19 @@ fileInput.addEventListener("change", function (event) {
   const file = event.target.files[0];
   if (!file) return;
 
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+  if (!allowedTypes.includes(file.type)) {
+    status.textContent = "Unsupported image format. Please use JPG, PNG or WebP.";
+    fileInput.value = "";
+    image.style.display = "none";
+    croppedBlob = null;
+    uploadBtn.disabled = true;
+    cropBtn.disabled = true;
+    zoomIn.disabled = true;
+    zoomOut.disabled = true;
+    return;
+  }
+
   croppedBlob = null;
   uploadBtn.disabled = true;
   cropBtn.disabled = true;
@@ -367,7 +383,7 @@ cropBtn.addEventListener("click", function () {
 });
 
 // -----------------------------
-// upload original + cropped
+// upload original + cropped + save review
 // -----------------------------
 uploadBtn.addEventListener("click", async function () {
   const originalFile = fileInput.files[0];
@@ -382,12 +398,20 @@ uploadBtn.addEventListener("click", async function () {
     return;
   }
 
+  if (!category.value) {
+    status.textContent = "Please select a category before uploading.";
+    return;
+  }
+
   if (category.value === "forest_hero" && !selectedLink) {
     status.textContent = "Please select a Forest Hero before uploading.";
     return;
   }
 
+  uploadBtn.disabled = true;
+
   try {
+    // 1. upload original
     status.textContent = "Uploading original image...";
 
     const fd1 = new FormData();
@@ -410,9 +434,11 @@ uploadBtn.addEventListener("click", async function () {
 
     if (!res1.ok) {
       status.textContent = "Original upload failed: " + (data1.error || res1.status);
+      uploadBtn.disabled = false;
       return;
     }
 
+    // 2. upload cropped
     status.textContent = "Uploading cropped 600 px version...";
 
     const croppedName = originalFile.name.replace(/\.[^/.]+$/, "") + "_600px.jpg";
@@ -438,18 +464,63 @@ uploadBtn.addEventListener("click", async function () {
 
     if (!res2.ok) {
       status.textContent = "Cropped upload failed: " + (data2.error || res2.status);
+      uploadBtn.disabled = false;
       return;
     }
 
+    // 3. show upload success
     status.textContent =
       "Done.\n" +
-      "Category: " + (category.value || "none") + "\n" +
+      "Category: " + category.value + "\n" +
       (selectedLink ? "Selected link: " + selectedLink.display_label + "\n" : "") +
       "Original uploaded as: " + data1.key + "\n" +
       "Cropped uploaded as: " + data2.key;
 
+    // 4. save review record
+    const payload = {
+      category: category.value || null,
+      file_url: R2_PUBLIC_BASE + data2.key,
+      original_file_url: R2_PUBLIC_BASE + data1.key,
+      user_id: selectedLink ? selectedLink.user_id : null,
+      tree_id: selectedLink ? selectedLink.tree_id : null,
+      linked_entity_type: category.value === "forest_hero" ? "forest_hero" : "general",
+      linked_entity_name: selectedLink
+        ? `${selectedLink.first_name || ""} ${selectedLink.last_name || ""}`.trim()
+        : category.value,
+      uploader_name: null,
+      uploader_email: null
+    };
+
+    const res3 = await fetch(REVIEW_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const contentType3 = res3.headers.get("content-type") || "";
+    let data3;
+
+    if (contentType3.includes("application/json")) {
+      data3 = await res3.json();
+    } else {
+      const text = await res3.text();
+      throw new Error("Review save returned non-JSON response: " + text.slice(0, 200));
+    }
+
+    if (!res3.ok) {
+      status.textContent += "\nReview save failed: " + (data3.error || res3.status);
+      uploadBtn.disabled = false;
+      return;
+    }
+
+    status.textContent += "\nSaved for review (ID: " + data3.review_id + ")";
+
   } catch (err) {
     status.textContent = "Error: " + err.message;
+  } finally {
+    uploadBtn.disabled = false;
   }
 });
 </script>
