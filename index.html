@@ -18,6 +18,21 @@
       margin-bottom: 16px;
     }
 
+    label {
+      display: block;
+      margin-top: 12px;
+      margin-bottom: 6px;
+      font-weight: bold;
+    }
+
+    input[type="text"],
+    select {
+      width: 100%;
+      max-width: 500px;
+      padding: 8px;
+      font-size: 14px;
+    }
+
     #image {
       max-width: 100%;
       max-height: 600px;
@@ -52,6 +67,48 @@
       font-size: 14px;
       line-height: 1.5;
     }
+
+    #forestHeroSection {
+      margin-top: 20px;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      display: none;
+      background: #fafafa;
+    }
+
+    #searchResults {
+      margin-top: 10px;
+      max-width: 700px;
+    }
+
+    .result-item {
+      padding: 10px;
+      border: 1px solid #ddd;
+      margin-top: 8px;
+      cursor: pointer;
+      background: white;
+      border-radius: 6px;
+    }
+
+    .result-item:hover {
+      background: #f0f6ff;
+    }
+
+    .selected-item {
+      margin-top: 12px;
+      padding: 10px;
+      border: 1px solid #2a6df4;
+      background: #eef4ff;
+      border-radius: 6px;
+      max-width: 700px;
+    }
+
+    .small {
+      font-size: 13px;
+      color: #555;
+      margin-top: 6px;
+    }
   </style>
 </head>
 
@@ -59,6 +116,41 @@
 
 <h2>KETSO tree photo upload</h2>
 
+<label for="category">Category</label>
+<select id="category">
+  <option value="">Select category</option>
+  <option value="forest_hero">Forest Hero</option>
+  <option value="nursery">Nursery</option>
+  <option value="training">Training</option>
+  <option value="vocational_training">Vocational training</option>
+  <option value="charcoal_making">Charcoal making</option>
+  <option value="truck">Truck</option>
+  <option value="wilde_ganzen">Wilde Ganzen</option>
+  <option value="hoorn_foundation">Hoorn Foundation</option>
+  <option value="josephina_foundation">Josephina Foundation</option>
+  <option value="care_international">Care International</option>
+  <option value="woord_en_daad">Woord en Daad</option>
+  <option value="plant_een_boom">Plant een Boom</option>
+  <option value="other">Other</option>
+</select>
+
+<div id="forestHeroSection">
+  <label for="forestHeroSearch">Search Forest Hero / tree</label>
+  <input
+    type="text"
+    id="forestHeroSearch"
+    placeholder="Type name, tree type, area, or tree code"
+  >
+
+  <div class="small">
+    Example: Amara, mango, Makombeh, or tree code
+  </div>
+
+  <div id="searchResults"></div>
+  <div id="selectedHero" class="selected-item" style="display:none;"></div>
+</div>
+
+<label for="fileInput">Photo</label>
 <input type="file" id="fileInput" accept="image/*">
 
 <div class="note">
@@ -88,6 +180,11 @@
 <script>
 let cropper = null;
 let croppedBlob = null;
+let selectedLink = null;
+let searchTimeout = null;
+
+// IMPORTANT: use your Render backend here
+const SEARCH_API_BASE = "https://ptb-tree-map.onrender.com";
 
 const fileInput = document.getElementById("fileInput");
 const image = document.getElementById("image");
@@ -97,6 +194,100 @@ const zoomIn = document.getElementById("zoomIn");
 const zoomOut = document.getElementById("zoomOut");
 const status = document.getElementById("status");
 
+const category = document.getElementById("category");
+const forestHeroSection = document.getElementById("forestHeroSection");
+const forestHeroSearch = document.getElementById("forestHeroSearch");
+const searchResults = document.getElementById("searchResults");
+const selectedHero = document.getElementById("selectedHero");
+
+// -----------------------------
+// category logic
+// -----------------------------
+category.addEventListener("change", () => {
+  selectedLink = null;
+  selectedHero.style.display = "none";
+  selectedHero.innerHTML = "";
+  searchResults.innerHTML = "";
+
+  if (category.value === "forest_hero") {
+    forestHeroSection.style.display = "block";
+  } else {
+    forestHeroSection.style.display = "none";
+  }
+});
+
+// -----------------------------
+// forest hero search
+// -----------------------------
+forestHeroSearch.addEventListener("input", () => {
+  const q = forestHeroSearch.value.trim();
+
+  selectedLink = null;
+  selectedHero.style.display = "none";
+  selectedHero.innerHTML = "";
+
+  if (searchTimeout) {
+    clearTimeout(searchTimeout);
+  }
+
+  if (q.length < 2) {
+    searchResults.innerHTML = "";
+    return;
+  }
+
+  searchTimeout = setTimeout(() => {
+    runForestHeroSearch(q);
+  }, 300);
+});
+
+async function runForestHeroSearch(q) {
+  searchResults.innerHTML = "Searching...";
+
+  try {
+    const url = `${SEARCH_API_BASE}/api/forest-hero-search?q=${encodeURIComponent(q)}`;
+    const res = await fetch(url);
+
+    if (!res.ok) {
+      searchResults.innerHTML = "Search failed.";
+      return;
+    }
+
+    const results = await res.json();
+
+    if (!Array.isArray(results) || results.length === 0) {
+      searchResults.innerHTML = "No matching Forest Heroes found.";
+      return;
+    }
+
+    searchResults.innerHTML = "";
+
+    results.forEach(item => {
+      const div = document.createElement("div");
+      div.className = "result-item";
+      div.textContent = item.display_label;
+
+      div.addEventListener("click", () => {
+        selectedLink = item;
+        selectedHero.style.display = "block";
+        selectedHero.innerHTML = `
+          <strong>Selected Forest Hero</strong><br>
+          ${item.display_label}<br>
+          <span class="small">user_id: ${item.user_id}, tree_id: ${item.tree_id}</span>
+        `;
+        searchResults.innerHTML = "";
+      });
+
+      searchResults.appendChild(div);
+    });
+
+  } catch (err) {
+    searchResults.innerHTML = "Search error: " + err.message;
+  }
+}
+
+// -----------------------------
+// image load + cropper
+// -----------------------------
 fileInput.addEventListener("change", function (event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -175,6 +366,9 @@ cropBtn.addEventListener("click", function () {
   }, "image/jpeg", 0.82);
 });
 
+// -----------------------------
+// upload original + cropped
+// -----------------------------
 uploadBtn.addEventListener("click", async function () {
   const originalFile = fileInput.files[0];
 
@@ -188,10 +382,14 @@ uploadBtn.addEventListener("click", async function () {
     return;
   }
 
+  if (category.value === "forest_hero" && !selectedLink) {
+    status.textContent = "Please select a Forest Hero before uploading.";
+    return;
+  }
+
   try {
     status.textContent = "Uploading original image...";
 
-    // Upload original
     const fd1 = new FormData();
     fd1.append("file", originalFile);
 
@@ -217,7 +415,6 @@ uploadBtn.addEventListener("click", async function () {
 
     status.textContent = "Uploading cropped 600 px version...";
 
-    // Upload cropped
     const croppedName = originalFile.name.replace(/\.[^/.]+$/, "") + "_600px.jpg";
     const croppedFile = new File([croppedBlob], croppedName, { type: "image/jpeg" });
 
@@ -246,6 +443,8 @@ uploadBtn.addEventListener("click", async function () {
 
     status.textContent =
       "Done.\n" +
+      "Category: " + (category.value || "none") + "\n" +
+      (selectedLink ? "Selected link: " + selectedLink.display_label + "\n" : "") +
       "Original uploaded as: " + data1.key + "\n" +
       "Cropped uploaded as: " + data2.key;
 
