@@ -618,10 +618,12 @@ uploadBtn.addEventListener("click", async function () {
       "Original uploaded as: " + data1.key + "\n" +
       "Cropped uploaded as: " + data2.key;
 
-    const payload = {
+ const payload = {
       category: category.value || null,
       file_url: R2_PUBLIC_BASE + data2.key,
       original_file_url: R2_PUBLIC_BASE + data1.key,
+      original_file_size_bytes: originalFile.size,
+      cropped_file_size_bytes: croppedBlob.size,
       user_id: selectedLink ? selectedLink.user_id : null,
       tree_id: selectedLink ? selectedLink.tree_id : null,
       linked_entity_type: category.value === "forest_hero" ? "forest_hero" : "general",
