@@ -44,8 +44,27 @@ img {
     <option value="forest_hero">Forest Hero</option>
     <option value="other">Other</option>
   </select>
+<select id="filterYear">
+  <option value="">All years</option>
+  <option value="2026">2026</option>
+  <option value="2025">2025</option>
+</select>
 
-  <input type="date" id="dateFrom">
+<select id="filterMonth">
+  <option value="">All months</option>
+  <option value="01">January</option>
+  <option value="02">February</option>
+  <option value="03">March</option>
+  <option value="04">April</option>
+  <option value="05">May</option>
+  <option value="06">June</option>
+  <option value="07">July</option>
+  <option value="08">August</option>
+  <option value="09">September</option>
+  <option value="10">October</option>
+  <option value="11">November</option>
+  <option value="12">December</option>
+</select>
   <input type="text" id="searchBox" placeholder="Search...">
 
   <button onclick="loadGallery()">Filter</button>
@@ -59,15 +78,31 @@ const API = "https://ptb-tree-map.onrender.com/api/photo-review-gallery";
 async function loadGallery() {
   const container = document.getElementById("gallery");
 
-  const category = document.getElementById("filterCategory").value;
-  const dateFrom = document.getElementById("dateFrom").value;
-  const search = document.getElementById("searchBox").value;
+const category = document.getElementById("filterCategory").value;
+const year = document.getElementById("filterYear").value;
+const month = document.getElementById("filterMonth").value;
+const search = document.getElementById("searchBox").value;
 
-  let url = API + "?";
+const params = new URLSearchParams();
 
-  if (category !== "all") url += `category=${category}&`;
-  if (dateFrom) url += `date_from=${dateFrom}&`;
-  if (search) url += `search=${encodeURIComponent(search)}&`;
+if (category !== "all") {
+  params.set("category", category);
+}
+
+if (year && month) {
+  const lastDay = new Date(Number(year), Number(month), 0).getDate();
+  params.set("date_from", `${year}-${month}-01`);
+  params.set("date_to", `${year}-${month}-${String(lastDay).padStart(2, "0")}`);
+} else if (year) {
+  params.set("date_from", `${year}-01-01`);
+  params.set("date_to", `${year}-12-31`);
+}
+
+if (search.trim()) {
+  params.set("search", search.trim());
+}
+
+const url = `${API}?${params.toString()}`;
 
   try {
     const res = await fetch(url);
