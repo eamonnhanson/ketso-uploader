@@ -181,12 +181,17 @@
 <script>
 let cropper = null;
 let croppedBlob = null;
+let processedOriginalFile = null;
 let selectedLink = null;
 let searchTimeout = null;
 
 const SEARCH_API_BASE = "https://ptb-tree-map.onrender.com";
 const REVIEW_API_URL = "https://ptb-tree-map.onrender.com/api/save-photo-review";
 const R2_PUBLIC_BASE = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/";
+
+const MAX_ORIGINAL_BYTES = 8 * 1024 * 1024;
+const MAX_CROPPED_BYTES = 500 * 1024;
+const HARD_MAX_INPUT_BYTES = 25 * 1024 * 1024;
 
 const fileInput = document.getElementById("fileInput");
 const image = document.getElementById("image");
@@ -202,6 +207,93 @@ const forestHeroSearch = document.getElementById("forestHeroSearch");
 const searchResults = document.getElementById("searchResults");
 const selectedHero = document.getElementById("selectedHero");
 
+function safeFileBaseName(name) {
+  return name
+    .replace(/\.[^/.]+$/, "")
+    .replace(/[^a-zA-Z0-9-_]/g, "_")
+    .toLowerCase();
+}
+
+function blobFromCanvas(canvas, type, quality) {
+  return new Promise((resolve) => {
+    canvas.toBlob(resolve, type, quality);
+  });
+}
+
+async function compressCanvasToMaxBytes(canvas, maxBytes, options = {}) {
+  const type = options.type || "image/jpeg";
+  let quality = options.startQuality || 0.86;
+  const minQuality = options.minQuality || 0.45;
+
+  let blob = await blobFromCanvas(canvas, type, quality);
+
+  while (blob && blob.size > maxBytes && quality > minQuality) {
+    quality -= 0.06;
+    blob = await blobFromCanvas(canvas, type, quality);
+  }
+
+  return blob;
+}
+
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not load image."));
+    };
+
+    img.src = url;
+  });
+}
+
+async function resizeOriginalIfNeeded(file) {
+  if (file.size <= MAX_ORIGINAL_BYTES) {
+    return file;
+  }
+
+  status.textContent = "Original image is larger than 8 MB. Resizing before upload...";
+
+  const img = await loadImageFromFile(file);
+
+  let scale = 0.9;
+  let blob = null;
+
+  while (scale > 0.25) {
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(img.naturalWidth * scale);
+    canvas.height = Math.round(img.naturalHeight * scale);
+
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    blob = await compressCanvasToMaxBytes(canvas, MAX_ORIGINAL_BYTES, {
+      startQuality: 0.86,
+      minQuality: 0.45
+    });
+
+    if (blob && blob.size <= MAX_ORIGINAL_BYTES) {
+      break;
+    }
+
+    scale -= 0.1;
+  }
+
+  if (!blob || blob.size > MAX_ORIGINAL_BYTES) {
+    throw new Error("Could not reduce original image below 8 MB.");
+  }
+
+  const newName = safeFileBaseName(file.name) + "_original.jpg";
+  return new File([blob], newName, { type: "image/jpeg" });
+}
+
 // -----------------------------
 // category logic
 // -----------------------------
@@ -212,11 +304,7 @@ category.addEventListener("change", () => {
   searchResults.innerHTML = "";
   forestHeroSearch.value = "";
 
-  if (category.value === "forest_hero") {
-    forestHeroSection.style.display = "block";
-  } else {
-    forestHeroSection.style.display = "none";
-  }
+  forestHeroSection.style.display = category.value === "forest_hero" ? "block" : "none";
 });
 
 // -----------------------------
@@ -229,9 +317,7 @@ forestHeroSearch.addEventListener("input", () => {
   selectedHero.style.display = "none";
   selectedHero.innerHTML = "";
 
-  if (searchTimeout) {
-    clearTimeout(searchTimeout);
-  }
+  if (searchTimeout) clearTimeout(searchTimeout);
 
   if (q.length < 2) {
     searchResults.innerHTML = "";
@@ -291,16 +377,31 @@ async function runForestHeroSearch(q) {
 // -----------------------------
 // image load + cropper
 // -----------------------------
-fileInput.addEventListener("change", function (event) {
+fileInput.addEventListener("change", async function (event) {
   const file = event.target.files[0];
   if (!file) return;
 
   const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
   if (!allowedTypes.includes(file.type)) {
     status.textContent = "Unsupported image format. Please use JPG, PNG or WebP.";
     fileInput.value = "";
     image.style.display = "none";
     croppedBlob = null;
+    processedOriginalFile = null;
+    uploadBtn.disabled = true;
+    cropBtn.disabled = true;
+    zoomIn.disabled = true;
+    zoomOut.disabled = true;
+    return;
+  }
+
+  if (file.size > HARD_MAX_INPUT_BYTES) {
+    status.textContent = "File too large. Please use an image below 25 MB.";
+    fileInput.value = "";
+    image.style.display = "none";
+    croppedBlob = null;
+    processedOriginalFile = null;
     uploadBtn.disabled = true;
     cropBtn.disabled = true;
     zoomIn.disabled = true;
@@ -309,45 +410,57 @@ fileInput.addEventListener("change", function (event) {
   }
 
   croppedBlob = null;
+  processedOriginalFile = null;
   uploadBtn.disabled = true;
   cropBtn.disabled = true;
   zoomIn.disabled = true;
   zoomOut.disabled = true;
   status.textContent = "";
 
-  const reader = new FileReader();
-  reader.onload = function () {
-    image.src = reader.result;
-    image.style.display = "block";
+  try {
+    processedOriginalFile = await resizeOriginalIfNeeded(file);
 
-    try {
-      if (cropper) {
-        cropper.destroy();
+    const reader = new FileReader();
+
+    reader.onload = function () {
+      image.src = reader.result;
+      image.style.display = "block";
+
+      try {
+        if (cropper) cropper.destroy();
+
+        cropper = new Cropper(image, {
+          viewMode: 1,
+          dragMode: "move",
+          autoCropArea: 0.6,
+          responsive: true,
+          background: false,
+          zoomable: true,
+          guides: true,
+          center: true,
+          highlight: true
+        });
+
+        cropBtn.disabled = false;
+        zoomIn.disabled = false;
+        zoomOut.disabled = false;
+
+        status.textContent =
+          "Image loaded.\n" +
+          "Original ready for upload: " +
+          Math.round(processedOriginalFile.size / 1024) +
+          " KB.";
+
+      } catch (err) {
+        status.textContent = "Cropper failed to load: " + err.message;
       }
+    };
 
-      cropper = new Cropper(image, {
-        viewMode: 1,
-        dragMode: "move",
-        autoCropArea: 0.6,
-        responsive: true,
-        background: false,
-        zoomable: true,
-        guides: true,
-        center: true,
-        highlight: true
-      });
+    reader.readAsDataURL(processedOriginalFile);
 
-      cropBtn.disabled = false;
-      zoomIn.disabled = false;
-      zoomOut.disabled = false;
-      status.textContent = "Image loaded. You can now zoom and crop.";
-
-    } catch (err) {
-      status.textContent = "Cropper failed to load: " + err.message;
-    }
-  };
-
-  reader.readAsDataURL(file);
+  } catch (err) {
+    status.textContent = "Image processing failed: " + err.message;
+  }
 });
 
 zoomIn.addEventListener("click", () => {
@@ -358,11 +471,14 @@ zoomOut.addEventListener("click", () => {
   if (cropper) cropper.zoom(-0.2);
 });
 
-cropBtn.addEventListener("click", function () {
+cropBtn.addEventListener("click", async function () {
   if (!cropper) return;
 
   const canvas = cropper.getCroppedCanvas({
-    width: 600
+    width: 600,
+    height: 600,
+    imageSmoothingEnabled: true,
+    imageSmoothingQuality: "high"
   });
 
   if (!canvas) {
@@ -370,31 +486,60 @@ cropBtn.addEventListener("click", function () {
     return;
   }
 
-  canvas.toBlob(function (blob) {
+  try {
+    const blob = await compressCanvasToMaxBytes(canvas, MAX_CROPPED_BYTES, {
+      startQuality: 0.86,
+      minQuality: 0.45
+    });
+
     if (!blob) {
       status.textContent = "Could not create cropped image.";
       return;
     }
 
+    if (blob.size > MAX_CROPPED_BYTES) {
+      status.textContent = "Cropped image is still above 500 KB. Please crop a smaller area or use another image.";
+      return;
+    }
+
     croppedBlob = blob;
     uploadBtn.disabled = false;
-    status.textContent = "Cropped image ready. You can now upload both versions.";
-  }, "image/jpeg", 0.82);
+
+    status.textContent =
+      "Cropped image ready.\n" +
+      "Cropped size: " +
+      Math.round(croppedBlob.size / 1024) +
+      " KB.\n" +
+      "You can now upload both versions.";
+
+  } catch (err) {
+    status.textContent = "Crop compression failed: " + err.message;
+  }
 });
 
 // -----------------------------
 // upload original + cropped + save review
 // -----------------------------
 uploadBtn.addEventListener("click", async function () {
-  const originalFile = fileInput.files[0];
+  const originalFile = processedOriginalFile || fileInput.files[0];
 
   if (!originalFile) {
     status.textContent = "No original file selected.";
     return;
   }
 
+  if (originalFile.size > MAX_ORIGINAL_BYTES) {
+    status.textContent = "Original file is still larger than 8 MB. Upload blocked.";
+    return;
+  }
+
   if (!croppedBlob) {
     status.textContent = "Please crop the image first.";
+    return;
+  }
+
+  if (croppedBlob.size > MAX_CROPPED_BYTES) {
+    status.textContent = "Cropped file is larger than 500 KB. Upload blocked.";
     return;
   }
 
@@ -411,7 +556,6 @@ uploadBtn.addEventListener("click", async function () {
   uploadBtn.disabled = true;
 
   try {
-    // 1. upload original
     status.textContent = "Uploading original image...";
 
     const fd1 = new FormData();
@@ -438,10 +582,9 @@ uploadBtn.addEventListener("click", async function () {
       return;
     }
 
-    // 2. upload cropped
     status.textContent = "Uploading cropped 600 px version...";
 
-    const croppedName = originalFile.name.replace(/\.[^/.]+$/, "") + "_600px.jpg";
+    const croppedName = safeFileBaseName(originalFile.name) + "_600px.jpg";
     const croppedFile = new File([croppedBlob], croppedName, { type: "image/jpeg" });
 
     const fd2 = new FormData();
@@ -468,7 +611,6 @@ uploadBtn.addEventListener("click", async function () {
       return;
     }
 
-    // 3. show upload success
     status.textContent =
       "Done.\n" +
       "Category: " + category.value + "\n" +
@@ -476,7 +618,6 @@ uploadBtn.addEventListener("click", async function () {
       "Original uploaded as: " + data1.key + "\n" +
       "Cropped uploaded as: " + data2.key;
 
-    // 4. save review record
     const payload = {
       category: category.value || null,
       file_url: R2_PUBLIC_BASE + data2.key,
