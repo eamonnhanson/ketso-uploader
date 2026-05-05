@@ -139,6 +139,7 @@ function renderGallery(photos) {
       <div class="small">${p.linked_entity_name || "-"}</div>
       <div class="small">Original: ${p.original_kb || "-"} KB</div>
       <div class="small">Cropped: ${p.cropped_kb || "-"} KB</div>
+      <div class="small"><em>${(p.ai_description || "").slice(0,120)}</em></div>
       <div class="small">${p.created_at_utc}</div>
     `;
 
