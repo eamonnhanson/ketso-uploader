@@ -1,60 +1,118 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>KETSO uploads</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    .item { margin-bottom: 20px; }
-    img { max-width: 180px; display: block; margin-bottom: 8px; }
-  </style>
+<meta charset="UTF-8">
+<title>KETSO gallery</title>
+
+<style>
+body {
+  font-family: Arial;
+  padding: 20px;
+}
+
+.controls {
+  margin-bottom: 20px;
+}
+
+.item {
+  display: inline-block;
+  width: 220px;
+  margin: 10px;
+  vertical-align: top;
+}
+
+img {
+  width: 200px;
+  height: auto;
+}
+
+.small {
+  font-size: 12px;
+  color: #555;
+}
+</style>
 </head>
+
 <body>
 
-<h2>KETSO uploaded images</h2>
+<h2>KETSO gallery</h2>
+
+<div class="controls">
+  <select id="filterCategory">
+    <option value="all">All</option>
+    <option value="plant_een_boom">Plant een Boom</option>
+    <option value="forest_hero">Forest Hero</option>
+    <option value="other">Other</option>
+  </select>
+
+  <input type="date" id="dateFrom">
+  <input type="text" id="searchBox" placeholder="Search...">
+
+  <button onclick="loadGallery()">Filter</button>
+</div>
+
 <div id="gallery">Loading...</div>
 
 <script>
-async function loadImages() {
+const API = "https://ptb-tree-map.onrender.com/api/photo-review-gallery";
+
+async function loadGallery() {
   const container = document.getElementById("gallery");
 
+  const category = document.getElementById("filterCategory").value;
+  const dateFrom = document.getElementById("dateFrom").value;
+  const search = document.getElementById("searchBox").value;
+
+  let url = API + "?";
+
+  if (category !== "all") url += `category=${category}&`;
+  if (dateFrom) url += `date_from=${dateFrom}&`;
+  if (search) url += `search=${encodeURIComponent(search)}&`;
+
   try {
-    const res = await fetch("/list");
+    const res = await fetch(url);
+    const data = await res.json();
 
-    if (!res.ok) {
-      container.textContent = "Error loading images";
+    if (!data.ok) {
+      container.textContent = "Error loading data";
       return;
     }
 
-    const files = await res.json();
-    container.innerHTML = "";
-
-    if (!files.length) {
-      container.textContent = "No images uploaded yet.";
-      return;
-    }
-
-    files.forEach(file => {
-      const div = document.createElement("div");
-      div.className = "item";
-
-      const img = document.createElement("img");
-      img.src = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/" + encodeURIComponent(file.key);
-
-      const name = document.createElement("p");
-      name.textContent = file.key;
-
-      div.appendChild(img);
-      div.appendChild(name);
-      container.appendChild(div);
-    });
+    renderGallery(data.photos);
 
   } catch (err) {
-    container.textContent = "Failed to load images: " + err.message;
+    container.textContent = "Failed: " + err.message;
   }
 }
 
-loadImages();
+function renderGallery(photos) {
+  const container = document.getElementById("gallery");
+  container.innerHTML = "";
+
+  if (!photos.length) {
+    container.textContent = "No images found.";
+    return;
+  }
+
+  photos.forEach(p => {
+    const div = document.createElement("div");
+    div.className = "item";
+
+    div.innerHTML = `
+      <img src="${p.cropped_file_url}">
+      <div><strong>${p.category}</strong></div>
+      <div class="small">${p.linked_entity_name || "-"}</div>
+      <div class="small">Original: ${p.original_kb || "-"} KB</div>
+      <div class="small">Cropped: ${p.cropped_kb || "-"} KB</div>
+      <div class="small">${p.created_at_utc}</div>
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+// initial load
+loadGallery();
 </script>
 
 </body>
