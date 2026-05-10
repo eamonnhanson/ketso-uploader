@@ -2,6 +2,7 @@ export async function onRequestPost({ request, env }) {
   try {
     const formData = await request.formData();
     const file = formData.get("file");
+    const rawFolder = formData.get("folder");
 
     if (!file || typeof file === "string") {
       return jsonResponse({
@@ -21,7 +22,7 @@ export async function onRequestPost({ request, env }) {
 
       // videos
       "video/mp4",
-      "video/quicktime", // .mov
+      "video/quicktime",
       "video/webm"
     ];
 
@@ -54,7 +55,6 @@ export async function onRequestPost({ request, env }) {
       }, 400);
     }
 
-    // block path tricks and weird names
     if (
       originalName.includes("/") ||
       originalName.includes("\\") ||
@@ -67,8 +67,8 @@ export async function onRequestPost({ request, env }) {
     }
 
     const isVideo = file.type.startsWith("video/");
-    const maxImageSize = 10 * 1024 * 1024;   // 10 MB
-    const maxVideoSize = 100 * 1024 * 1024;  // 100 MB
+    const maxImageSize = 10 * 1024 * 1024;
+    const maxVideoSize = 100 * 1024 * 1024;
 
     if (!isVideo && file.size > maxImageSize) {
       return jsonResponse({
@@ -87,14 +87,20 @@ export async function onRequestPost({ request, env }) {
     const extension = lowerName.substring(lowerName.lastIndexOf("."));
 
     const safeBaseName = originalName
-      .replace(/\.[^/.]+$/, "")          // remove extension
-      .replace(/[^a-zA-Z0-9._-]/g, "_")  // only safe chars
-      .replace(/_+/g, "_")               // collapse __
-      .replace(/^_+|_+$/g, "")           // trim _
+      .replace(/\.[^/.]+$/, "")
+      .replace(/[^a-zA-Z0-9._-]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "")
       .slice(0, 80) || "upload";
 
     const prefix = isVideo ? "video" : "image";
-    const key = `${prefix}_${Date.now()}_${safeBaseName}${extension}`;
+    const fileName = `${prefix}_${Date.now()}_${safeBaseName}${extension}`;
+
+    const folder = sanitizeFolder(rawFolder);
+
+    const key = folder
+      ? `${folder}/${fileName}`
+      : fileName;
 
     await env.KETSO_BUCKET.put(key, file.stream(), {
       httpMetadata: {
@@ -113,6 +119,23 @@ export async function onRequestPost({ request, env }) {
       error: err && err.message ? err.message : String(err)
     }, 500);
   }
+}
+
+function sanitizeFolder(value) {
+  if (!value || typeof value !== "string") return "";
+
+  return value
+    .trim()
+    .replace(/^\/+|\/+$/g, "")
+    .split("/")
+    .map(part =>
+      part
+        .replace(/[^a-zA-Z0-9._-]/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-+|-+$/g, "")
+    )
+    .filter(Boolean)
+    .join("/");
 }
 
 function jsonResponse(data, status = 200) {
