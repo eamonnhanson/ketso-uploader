@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>KETSO Academy onboarding upload</title>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    h2 {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      margin-top: 12px;
+      margin-bottom: 6px;
+      font-weight: bold;
+    }
+
+    input[type="text"],
+    input[type="email"],
+    select {
+      width: 100%;
+      max-width: 500px;
+      padding: 8px;
+      font-size: 14px;
+    }
+
+    input[type="checkbox"] {
+      margin-right: 8px;
+    }
+
+    #image {
+      max-width: 100%;
+      max-height: 600px;
+      display: none;
+      margin-top: 20px;
+    }
+
+    .controls {
+      margin-top: 15px;
+    }
+
+    button {
+      padding: 10px 14px;
+      margin: 5px 5px 0 0;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    #status {
+      margin-top: 20px;
+      white-space: pre-line;
+      font-weight: bold;
+    }
+
+    .note {
+      margin-top: 10px;
+      color: #444;
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 700px;
+    }
+
+    .consent-label {
+      font-weight: normal;
+      max-width: 700px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+
+<body>
+
+<h2>KETSO Academy onboarding</h2>
+
+<p class="note">
+  Upload a selfie or a favourite object so we can verify your Forest Heroes registration.
+  If you do not want to show your face, choose "Favourite object".
+</p>
+
+<input type="hidden" id="category" value="academy_onboarding">
+
+<label for="fullName">Full name</label>
+<input type="text" id="fullName" placeholder="Your full name" required>
+
+<label for="email">Email</label>
+<input type="email" id="email" placeholder="Your email address" required>
+
+<label for="whatsapp">WhatsApp number</label>
+<input type="text" id="whatsapp" placeholder="Your WhatsApp number" required>
+
+<label for="track">Track</label>
+<select id="track" required>
+  <option value="">Select track</option>
+  <option value="forest_heroes">Forest Heroes</option>
+  <option value="digital_certificate">Digital certificate track</option>
+  <option value="green_makombeh">Green Makombeh</option>
+  <option value="not_sure">Not sure yet</option>
+</select>
+
+<label for="uploadType">Upload type</label>
+<select id="uploadType" required>
+  <option value="">Select upload type</option>
+  <option value="selfie">Selfie</option>
+  <option value="favourite_object">Favourite object</option>
+</select>
+
+<label class="consent-label">
+  <input type="checkbox" id="consent">
+  I allow KETSO to store this upload for academy registration and internal verification.
+  I understand that it will not be shown publicly without review or permission.
+</label>
+
+<label for="fileInput">Photo</label>
+<input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.webp">
+
+<div class="note">
+  1. Use the zoom buttons to zoom in<br>
+  2. Drag the image to position it<br>
+  3. Adjust the crop box<br>
+  4. Click "Crop to 600 px"<br>
+  5. Click "Upload original + cropped"<br>
+  6. Use JPG, PNG or WebP. HEIC is not reliable in browser preview/crop.
+</div>
+
+<img id="image" alt="Preview">
+
+<div class="controls">
+  <button id="zoomIn" disabled>Zoom in</button>
+  <button id="zoomOut" disabled>Zoom out</button>
+</div>
+
+<div class="controls">
+  <button id="cropBtn" disabled>Crop to 600 px</button>
+  <button id="uploadBtn" disabled>Upload original + cropped</button>
+</div>
+
+<p id="status"></p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+
+<script>
+let cropper = null;
+let croppedBlob = null;
+let processedOriginalFile = null;
+
+const REVIEW_API_URL = "https://ptb-tree-map.onrender.com/api/save-photo-review";
+const R2_PUBLIC_BASE = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/";
+const UPLOAD_FOLDER = "ketso-academy/onboarding";
+
+const MAX_ORIGINAL_BYTES = 8 * 1024 * 1024;
+const MAX_CROPPED_BYTES = 500 * 1024;
+const HARD_MAX_INPUT_BYTES = 25 * 1024 * 1024;
+
+const fileInput = document.getElementById("fileInput");
+const image = document.getElementById("image");
+const cropBtn = document.getElementById("cropBtn");
+const uploadBtn = document.getElementById("uploadBtn");
+const zoomIn = document.getElementById("zoomIn");
+const zoomOut = document.getElementById("zoomOut");
+const status = document.getElementById("status");
+
+const category = document.getElementById("category");
+const fullName = document.getElementById("fullName");
+const email = document.getElementById("email");
+const whatsapp = document.getElementById("whatsapp");
+const track = document.getElementById("track");
+const uploadType = document.getElementById("uploadType");
+const consent = document.getElementById("consent");
+
+function safeFileBaseName(name) {
+  return name
+    .replace(/\.[^/.]+$/, "")
+    .replace(/[^a-zA-Z0-9-_]/g, "_")
+    .toLowerCase();
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function blobFromCanvas(canvas, type, quality) {
+  return new Promise((resolve) => {
+    canvas.toBlob(resolve, type, quality);
+  });
+}
+
+async function compressCanvasToMaxBytes(canvas, maxBytes, options = {}) {
+  const type = options.type || "image/jpeg";
+  let quality = options.startQuality || 0.86;
+  const minQuality = options.minQuality || 0.45;
+
+  let blob = await blobFromCanvas(canvas, type, quality);
+
+  while (blob && blob.size > maxBytes && quality > minQuality) {
+    quality -= 0.06;
+    blob = await blobFromCanvas(canvas, type, quality);
+  }
+
+  return blob;
+}
+
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not load image."));
+    };
+
+    img.src = url;
+  });
+}
+
+async function resizeOriginalIfNeeded(file) {
+  if (file.size <= MAX_ORIGINAL_BYTES) {
+    return file;
+  }
+
+  status.textContent = "Original image is larger than 8 MB. Resizing before upload...";
+
+  const img = await loadImageFromFile(file);
+
+  let scale = 0.9;
+  let blob = null;
+
+  while (scale > 0.25) {
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(img.naturalWidth * scale);
+    canvas.height = Math.round(img.naturalHeight * scale);
+
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    blob = await compressCanvasToMaxBytes(canvas, MAX_ORIGINAL_BYTES, {
+      startQuality: 0.86,
+      minQuality: 0.45
+    });
+
+    if (blob && blob.size <= MAX_ORIGINAL_BYTES) {
+      break;
+    }
+
+    scale -= 0.1;
+  }
+
+  if (!blob || blob.size > MAX_ORIGINAL_BYTES) {
+    throw new Error("Could not reduce original image below 8 MB.");
+  }
+
+  const newName = safeFileBaseName(file.name) + "_original.jpg";
+  return new File([blob], newName, { type: "image/jpeg" });
+}
+
+fileInput.addEventListener("change", async function (event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+  if (!allowedTypes.includes(file.type)) {
+    status.textContent = "Unsupported image format. Please use JPG, PNG or WebP.";
+    fileInput.value = "";
+    image.style.display = "none";
+    croppedBlob = null;
+    processedOriginalFile = null;
+    uploadBtn.disabled = true;
+    cropBtn.disabled = true;
+    zoomIn.disabled = true;
+    zoomOut.disabled = true;
+    return;
+  }
+
+  if (file.size > HARD_MAX_INPUT_BYTES) {
+    status.textContent = "File too large. Please use an image below 25 MB.";
+    fileInput.value = "";
+    image.style.display = "none";
+    croppedBlob = null;
+    processedOriginalFile = null;
+    uploadBtn.disabled = true;
+    cropBtn.disabled = true;
+    zoomIn.disabled = true;
+    zoomOut.disabled = true;
+    return;
+  }
+
+  croppedBlob = null;
+  processedOriginalFile = null;
+  uploadBtn.disabled = true;
+  cropBtn.disabled = true;
+  zoomIn.disabled = true;
+  zoomOut.disabled = true;
+  status.textContent = "";
+
+  try {
+    processedOriginalFile = await resizeOriginalIfNeeded(file);
+
+    const reader = new FileReader();
+
+    reader.onload = function () {
+      image.src = reader.result;
+      image.style.display = "block";
+
+      try {
+        if (cropper) cropper.destroy();
+
+        cropper = new Cropper(image, {
+          viewMode: 1,
+          dragMode: "move",
+          autoCropArea: 0.6,
+          responsive: true,
+          background: false,
+          zoomable: true,
+          guides: true,
+          center: true,
+          highlight: true
+        });
+
+        cropBtn.disabled = false;
+        zoomIn.disabled = false;
+        zoomOut.disabled = false;
+
+        status.textContent =
+          "Image loaded.\n" +
+          "Original ready for upload: " +
+          Math.round(processedOriginalFile.size / 1024) +
+          " KB.";
+
+      } catch (err) {
+        status.textContent = "Cropper failed to load: " + err.message;
+      }
+    };
+
+    reader.readAsDataURL(processedOriginalFile);
+
+  } catch (err) {
+    status.textContent = "Image processing failed: " + err.message;
+  }
+});
+
+zoomIn.addEventListener("click", () => {
+  if (cropper) cropper.zoom(0.2);
+});
+
+zoomOut.addEventListener("click", () => {
+  if (cropper) cropper.zoom(-0.2);
+});
+
+cropBtn.addEventListener("click", async function () {
+  if (!cropper) return;
+
+  const canvas = cropper.getCroppedCanvas({
+    width: 600,
+    height: 600,
+    imageSmoothingEnabled: true,
+    imageSmoothingQuality: "high"
+  });
+
+  if (!canvas) {
+    status.textContent = "Cropping failed.";
+    return;
+  }
+
+  try {
+    const blob = await compressCanvasToMaxBytes(canvas, MAX_CROPPED_BYTES, {
+      startQuality: 0.86,
+      minQuality: 0.45
+    });
+
+    if (!blob) {
+      status.textContent = "Could not create cropped image.";
+      return;
+    }
+
+    if (blob.size > MAX_CROPPED_BYTES) {
+      status.textContent = "Cropped image is still above 500 KB. Please crop a smaller area or use another image.";
+      return;
+    }
+
+    croppedBlob = blob;
+    uploadBtn.disabled = false;
+
+    status.textContent =
+      "Cropped image ready.\n" +
+      "Cropped size: " +
+      Math.round(croppedBlob.size / 1024) +
+      " KB.\n" +
+      "You can now upload both versions.";
+
+  } catch (err) {
+    status.textContent = "Crop compression failed: " + err.message;
+  }
+});
+
+uploadBtn.addEventListener("click", async function () {
+  const originalFile = processedOriginalFile || fileInput.files[0];
+
+  if (!originalFile) {
+    status.textContent = "No original file selected.";
+    return;
+  }
+
+  if (!fullName.value.trim()) {
+    status.textContent = "Please enter your full name.";
+    return;
+  }
+
+  if (!email.value.trim() || !isValidEmail(email.value.trim())) {
+    status.textContent = "Please enter a valid email address.";
+    return;
+  }
+
+  if (!whatsapp.value.trim()) {
+    status.textContent = "Please enter your WhatsApp number.";
+    return;
+  }
+
+  if (!track.value) {
+    status.textContent = "Please select a track.";
+    return;
+  }
+
+  if (!uploadType.value) {
+    status.textContent = "Please select selfie or favourite object.";
+    return;
+  }
+
+  if (!consent.checked) {
+    status.textContent = "Please give permission before uploading.";
+    return;
+  }
+
+  if (originalFile.size > MAX_ORIGINAL_BYTES) {
+    status.textContent = "Original file is still larger than 8 MB. Upload blocked.";
+    return;
+  }
+
+  if (!croppedBlob) {
+    status.textContent = "Please crop the image first.";
+    return;
+  }
+
+  if (croppedBlob.size > MAX_CROPPED_BYTES) {
+    status.textContent = "Cropped file is larger than 500 KB. Upload blocked.";
+    return;
+  }
+
+  if (!category.value) {
+    status.textContent = "Category missing. Upload blocked.";
+    return;
+  }
+
+  uploadBtn.disabled = true;
+
+  try {
+    status.textContent = "Uploading original image...";
+
+    const fd1 = new FormData();
+    fd1.append("file", originalFile);
+    fd1.append("folder", UPLOAD_FOLDER);
+
+    const res1 = await fetch("/upload", {
+      method: "POST",
+      body: fd1
+    });
+
+    const contentType1 = res1.headers.get("content-type") || "";
+    let data1;
+
+    if (contentType1.includes("application/json")) {
+      data1 = await res1.json();
+    } else {
+      const text = await res1.text();
+      throw new Error("Original upload returned non-JSON response: " + text.slice(0, 200));
+    }
+
+    if (!res1.ok) {
+      status.textContent = "Original upload failed: " + (data1.error || res1.status);
+      uploadBtn.disabled = false;
+      return;
+    }
+
+    status.textContent = "Uploading cropped 600 px version...";
+
+    const croppedName = safeFileBaseName(originalFile.name) + "_600px.jpg";
+    const croppedFile = new File([croppedBlob], croppedName, { type: "image/jpeg" });
+
+    const fd2 = new FormData();
+    fd2.append("file", croppedFile);
+    fd2.append("folder", UPLOAD_FOLDER);
+
+    const res2 = await fetch("/upload", {
+      method: "POST",
+      body: fd2
+    });
+
+    const contentType2 = res2.headers.get("content-type") || "";
+    let data2;
+
+    if (contentType2.includes("application/json")) {
+      data2 = await res2.json();
+    } else {
+      const text = await res2.text();
+      throw new Error("Cropped upload returned non-JSON response: " + text.slice(0, 200));
+    }
+
+    if (!res2.ok) {
+      status.textContent = "Cropped upload failed: " + (data2.error || res2.status);
+      uploadBtn.disabled = false;
+      return;
+    }
+
+    status.textContent =
+      "Images uploaded.\n" +
+      "Saving onboarding record...";
+
+    const payload = {
+      category: category.value,
+      file_url: R2_PUBLIC_BASE + data2.key,
+      original_file_url: R2_PUBLIC_BASE + data1.key,
+      original_file_size_bytes: originalFile.size,
+      cropped_file_size_bytes: croppedBlob.size,
+
+      user_id: null,
+      tree_id: null,
+      linked_entity_type: "academy_onboarding",
+      linked_entity_name: fullName.value.trim(),
+
+      uploader_name: fullName.value.trim(),
+      uploader_email: email.value.trim(),
+
+      academy_whatsapp: whatsapp.value.trim(),
+      academy_track: track.value,
+      upload_type: uploadType.value,
+      consent_given: consent.checked,
+
+      verification_status: "pending",
+      ai_status: "not_checked"
+    };
+
+    const res3 = await fetch(REVIEW_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const contentType3 = res3.headers.get("content-type") || "";
+    let data3;
+
+    if (contentType3.includes("application/json")) {
+      data3 = await res3.json();
+    } else {
+      const text = await res3.text();
+      throw new Error("Review save returned non-JSON response: " + text.slice(0, 200));
+    }
+
+    if (!res3.ok) {
+      status.textContent =
+        "Images uploaded, but onboarding record was not saved.\n" +
+        "Review save failed: " + (data3.error || res3.status);
+      uploadBtn.disabled = false;
+      return;
+    }
+
+    status.textContent =
+      "Done.\n" +
+      "Your KETSO Academy onboarding upload has been received.\n" +
+      "Review ID: " + data3.review_id;
+
+  } catch (err) {
+    status.textContent = "Error: " + err.message;
+  } finally {
+    uploadBtn.disabled = false;
+  }
+});
+</script>
+
+</body>
+</html>
