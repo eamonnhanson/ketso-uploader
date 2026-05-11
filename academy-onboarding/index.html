@@ -224,6 +224,8 @@ async function loadStudentFromToken() {
     }
 
     const s = data.student;
+    
+    window.loadedStudent = s;
 
     fullName.value = s.full_name || "";
     email.value = s.email || "";
@@ -597,29 +599,32 @@ uploadBtn.addEventListener("click", async function () {
       "Images uploaded.\n" +
       "Saving onboarding record...";
 
-    const payload = {
-      category: category.value,
-      file_url: R2_PUBLIC_BASE + data2.key,
-      original_file_url: R2_PUBLIC_BASE + data1.key,
-      original_file_size_bytes: originalFile.size,
-      cropped_file_size_bytes: croppedBlob.size,
+  const payload = {
+  category: category.value,
+  academy_student_id: window.loadedStudent?.id || null,
+  academy_cohort: window.loadedStudent?.cohort || null,
 
-      user_id: null,
-      tree_id: null,
-      linked_entity_type: "academy_onboarding",
-      linked_entity_name: fullName.value.trim(),
+  file_url: R2_PUBLIC_BASE + data2.key,
+  original_file_url: R2_PUBLIC_BASE + data1.key,
+  original_file_size_bytes: originalFile.size,
+  cropped_file_size_bytes: croppedBlob.size,
 
-      uploader_name: fullName.value.trim(),
-      uploader_email: email.value.trim(),
+  user_id: null,
+  tree_id: null,
+  linked_entity_type: "academy_onboarding",
+  linked_entity_name: fullName.value.trim(),
 
-      academy_whatsapp: whatsapp.value.trim(),
-      academy_track: track.value,
-      upload_type: uploadType.value,
-      consent_given: consent.checked,
+  uploader_name: fullName.value.trim(),
+  uploader_email: email.value.trim(),
 
-      verification_status: "pending",
-      ai_status: "not_checked"
-    };
+  academy_whatsapp: whatsapp.value.trim(),
+  academy_track: window.loadedStudent?.track || track.options[track.selectedIndex]?.text || track.value,
+  upload_type: uploadType.value,
+  consent_given: consent.checked,
+
+  verification_status: "pending",
+  ai_status: "not_checked"
+};
 
     const res3 = await fetch(REVIEW_API_URL, {
       method: "POST",
