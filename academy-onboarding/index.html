@@ -180,7 +180,52 @@ const whatsapp = document.getElementById("whatsapp");
 const track = document.getElementById("track");
 const uploadType = document.getElementById("uploadType");
 const consent = document.getElementById("consent");
+  
+async function loadStudentFromToken() {
+  const token = new URLSearchParams(window.location.search).get("token");
 
+  if (!token) {
+    console.warn("No onboarding token found in URL.");
+    return;
+  }
+
+  try {
+    status.textContent = "Loading your onboarding details...";
+
+    const res = await fetch(
+      `https://ptb-tree-map.onrender.com/api/academy-student?token=${encodeURIComponent(token)}`
+    );
+
+    const data = await res.json();
+
+    console.log("Academy student API response:", data);
+
+    if (!res.ok || !data.ok || !data.student) {
+      status.textContent = "Could not find your onboarding record. Please check your link.";
+      return;
+    }
+
+    const s = data.student;
+
+    fullName.value = s.full_name || "";
+    email.value = s.email || "";
+    whatsapp.value = s.whatsapp || "";
+
+    if (s.track === "Forest Heroes") {
+      track.value = "forest_heroes";
+    } else if (s.track) {
+      track.value = s.track;
+    }
+
+    status.textContent = "Your details have been loaded. Please upload your photo.";
+
+  } catch (err) {
+    console.error("loadStudentFromToken error:", err);
+    status.textContent = "Could not load your onboarding details.";
+  }
+}
+
+loadStudentFromToken();
 function safeFileBaseName(name) {
   return name
     .replace(/\.[^/.]+$/, "")
