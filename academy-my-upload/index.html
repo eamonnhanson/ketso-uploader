@@ -96,7 +96,7 @@ async function loadUpload() {
         <strong>Name:</strong> ${u.uploader_name || ""}<br>
         <strong>Online session:</strong> ${u.academy_track || ""}<br>
         <strong>Cohort:</strong> ${u.academy_cohort || ""}<br>
-        <strong>Status:</strong> ${u.verification_status || "pending"}<br>
+       <strong>Status:</strong> <span id="uploadStatus">${u.verification_status || "pending"}</span><br>
 
         <img src="${u.file_url}" alt="Your uploaded image">
 
@@ -137,9 +137,14 @@ async function submitForApproval() {
     }
 
     statusEl.textContent =
-      "Your upload has been submitted for approval.\n" +
-      "KETSO Academy will review it before it appears in the public student gallery.";
-
+  "Your upload has been submitted for approval.\n" +
+  "KETSO Academy will review it before it appears in the public student gallery.";
+btn.style.display = "none";
+    
+const statusLine = document.getElementById("uploadStatus");
+if (statusLine) {
+  statusLine.textContent = "submitted for review";
+}
   } catch (err) {
     console.error(err);
     statusEl.textContent = "Error while submitting for approval.";
