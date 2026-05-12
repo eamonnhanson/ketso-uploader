@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Your KETSO Academy upload</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    img {
+      max-width: 100%;
+      width: 360px;
+      border-radius: 12px;
+      margin-top: 16px;
+      display: block;
+    }
+
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      padding: 18px;
+      margin-top: 20px;
+      background: #fafafa;
+    }
+
+    button {
+      background: #1f7a3f;
+      color: white;
+      border: none;
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 18px;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    #status {
+      margin-top: 18px;
+      font-weight: bold;
+      white-space: pre-line;
+    }
+  </style>
+</head>
+
+<body>
+
+<h2>Your KETSO Academy upload</h2>
+
+<p>
+  Review your uploaded image below. If you are happy with it, send it for approval.
+</p>
+
+<div id="content">Loading...</div>
+
+<p id="status"></p>
+
+<script>
+const API_BASE = "https://ptb-tree-map.onrender.com";
+
+const params = new URLSearchParams(window.location.search);
+const reviewId = params.get("review_id");
+
+const content = document.getElementById("content");
+const statusEl = document.getElementById("status");
+
+async function loadUpload() {
+  if (!reviewId) {
+    content.innerHTML = "<p>Missing review ID.</p>";
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/academy-upload-review?review_id=${encodeURIComponent(reviewId)}`);
+    const data = await res.json();
+
+    console.log("Upload review response:", data);
+
+    if (!res.ok || !data.ok || !data.upload) {
+      content.innerHTML = "<p>Upload not found.</p>";
+      return;
+    }
+
+    const u = data.upload;
+
+    content.innerHTML = `
+      <div class="card">
+        <strong>Name:</strong> ${u.uploader_name || ""}<br>
+        <strong>Online session:</strong> ${u.academy_track || ""}<br>
+        <strong>Cohort:</strong> ${u.academy_cohort || ""}<br>
+        <strong>Status:</strong> ${u.verification_status || "pending"}<br>
+
+        <img src="${u.file_url}" alt="Your uploaded image">
+
+        <button id="submitBtn">Submit for approval</button>
+      </div>
+    `;
+
+    document.getElementById("submitBtn").addEventListener("click", submitForApproval);
+
+  } catch (err) {
+    console.error(err);
+    content.innerHTML = "<p>Could not load your upload.</p>";
+  }
+}
+
+async function submitForApproval() {
+  const btn = document.getElementById("submitBtn");
+  btn.disabled = true;
+  statusEl.textContent = "Submitting for approval...";
+
+  try {
+    const res = await fetch(`${API_BASE}/api/academy-submit-upload`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        review_id: reviewId
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || !data.ok) {
+      statusEl.textContent = "Could not submit for approval.";
+      btn.disabled = false;
+      return;
+    }
+
+    statusEl.textContent =
+      "Your upload has been submitted for approval.\n" +
+      "KETSO Academy will review it before it appears in the public student gallery.";
+
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = "Error while submitting for approval.";
+    btn.disabled = false;
+  }
+}
+
+loadUpload();
+</script>
+
+</body>
+</html>
