@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>KETSO Academy student gallery</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+      background: #ffffff;
+      color: #222;
+    }
+
+    h1 {
+      margin-bottom: 8px;
+    }
+
+    .intro {
+      max-width: 720px;
+      margin-bottom: 24px;
+      line-height: 1.5;
+      color: #444;
+    }
+
+    .cta {
+      background: #f2f7f1;
+      border-left: 5px solid #1f7a3f;
+      padding: 14px 16px;
+      margin-bottom: 24px;
+      max-width: 760px;
+      line-height: 1.5;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 18px;
+    }
+
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 14px;
+      padding: 12px;
+      background: #fafafa;
+    }
+
+    .card img {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      object-fit: cover;
+      border-radius: 10px;
+      display: block;
+      margin-bottom: 10px;
+      background: #eee;
+    }
+
+    .name {
+      font-weight: bold;
+      font-size: 16px;
+      margin-bottom: 4px;
+    }
+
+    .meta {
+      color: #555;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    #status {
+      font-weight: bold;
+      margin-top: 20px;
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 14px;
+      }
+
+      .grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+      }
+
+      .card {
+        padding: 10px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>KETSO Academy student gallery</h1>
+
+<p class="intro">
+  Meet students joining the KETSO Academy online tree planting session.
+  Only approved student uploads are shown here.
+</p>
+
+<div class="cta">
+  Want to introduce yourself to the group?
+  Post a short TikTok video and use the hashtag <strong>#KETSOAcademy</strong>.
+</div>
+
+<div id="status">Loading student gallery...</div>
+<div id="gallery" class="grid"></div>
+
+<script>
+const API_URL = "https://ptb-tree-map.onrender.com/api/student-gallery";
+
+async function loadGallery() {
+  const status = document.getElementById("status");
+  const gallery = document.getElementById("gallery");
+
+  try {
+    const res = await fetch(API_URL);
+    const data = await res.json();
+
+    console.log("Student gallery response:", data);
+
+    if (!res.ok || !data.ok) {
+      status.textContent = "Could not load gallery.";
+      return;
+    }
+
+    const photos = data.photos || [];
+
+    if (!photos.length) {
+      status.textContent = "No approved student uploads yet.";
+      return;
+    }
+
+    status.textContent = "";
+
+    gallery.innerHTML = photos.map(photo => {
+      const displayName = getFirstName(photo.uploader_name || photo.linked_entity_name || "Student");
+      const session = displaySession(photo.academy_track);
+      const imageUrl = photo.cropped_file_url || "";
+
+      return `
+        <div class="card">
+          <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(displayName)}">
+          <div class="name">${escapeHtml(displayName)}</div>
+          <div class="meta">${escapeHtml(session)}</div>
+        </div>
+      `;
+    }).join("");
+
+  } catch (err) {
+    console.error("Student gallery error:", err);
+    status.textContent = "Error loading gallery.";
+  }
+}
+
+function getFirstName(name) {
+  return String(name || "Student").trim().split(/\s+/)[0];
+}
+
+function displaySession(value) {
+  if (!value) return "KETSO Academy";
+  if (value === "forest_heroes") return "Online tree planting session";
+  if (value === "Forest Heroes") return "Online tree planting session";
+  return value;
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+loadGallery();
+</script>
+
+</body>
+</html>
