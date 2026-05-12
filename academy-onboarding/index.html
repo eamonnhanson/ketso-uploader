@@ -90,7 +90,24 @@
   Upload a selfie or a favourite object so we can verify your Forest Heroes registration.
   If you do not want to show your face, choose "Favourite object".
 </p>
-
+<p>
+  <a
+    href="/student-gallery/"
+    target="_blank"
+    style="
+      display:inline-block;
+      background:#f2f7f1;
+      color:#1f7a3f;
+      padding:10px 16px;
+      border-left:5px solid #1f7a3f;
+      text-decoration:none;
+      font-weight:bold;
+      margin-top:10px;
+    "
+  >
+    View the KETSO Academy student gallery
+  </a>
+</p>
 <input type="hidden" id="category" value="academy_onboarding">
 
 <label for="fullName">Full name</label>
@@ -657,8 +674,11 @@ status.innerHTML =
   "Your KETSO Academy onboarding upload has been received.<br>" +
   "Review ID: " + data3.review_id + "<br><br>" +
   '<a href="/academy-my-upload/?review_id=' + encodeURIComponent(data3.review_id) + '" ' +
-  'style="display:inline-block;background:#1f7a3f;color:white;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:bold;">' +
-  'View my upload</a>';
+  'style="display:inline-block;background:#1f7a3f;color:white;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:bold;margin-right:8px;">' +
+  'View my upload</a>' +
+  '<a href="/student-gallery/" target="_blank" ' +
+  'style="display:inline-block;background:#f2f7f1;color:#1f7a3f;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:bold;">' +
+  'View student gallery</a>';
 
   } catch (err) {
     status.textContent = "Error: " + err.message;
