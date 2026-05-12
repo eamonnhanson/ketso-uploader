@@ -652,10 +652,13 @@ uploadBtn.addEventListener("click", async function () {
       return;
     }
 
-    status.textContent =
-      "Done.\n" +
-      "Your KETSO Academy onboarding upload has been received.\n" +
-      "Review ID: " + data3.review_id;
+status.innerHTML =
+  "Done.<br>" +
+  "Your KETSO Academy onboarding upload has been received.<br>" +
+  "Review ID: " + data3.review_id + "<br><br>" +
+  '<a href="/academy-my-upload/?review_id=' + encodeURIComponent(data3.review_id) + '" ' +
+  'style="display:inline-block;background:#1f7a3f;color:white;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:bold;">' +
+  'View my upload</a>';
 
   } catch (err) {
     status.textContent = "Error: " + err.message;
