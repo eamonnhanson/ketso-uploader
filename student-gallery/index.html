@@ -168,7 +168,7 @@ async function loadGallery() {
           <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(displayName)}">
           <div class="name">${escapeHtml(displayName)}</div>
           <div class="meta">${escapeHtml(session)}</div>
-          <div class="points">⭐ ${photo.total_points || 0} point(s)</div>
+          <div class="points">⭐ ${formatPoints(photo.total_points || 0)}</div>
           ${renderBadges(photo.badges)}
         </div>
       `;
@@ -179,7 +179,10 @@ async function loadGallery() {
     status.textContent = "Error loading gallery.";
   }
 }
-
+function formatPoints(points) {
+  points = Number(points || 0);
+  return points === 1 ? "1 point" : `${points} points`;
+}
 function getFirstName(name) {
   return String(name || "Student").trim().split(/\s+/)[0];
 }
