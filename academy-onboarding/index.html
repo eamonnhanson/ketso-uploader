@@ -248,11 +248,22 @@ async function loadStudentFromToken() {
     email.value = s.email || "";
     whatsapp.value = s.whatsapp || "";
 
-    if (s.track === "Forest Heroes") {
-      track.value = "forest_heroes";
-    } else if (s.track) {
-      track.value = s.track;
-    }
+   const normalizedTrack = String(s.track || "").trim().toLowerCase();
+
+if (
+  normalizedTrack === "forest heroes" ||
+  normalizedTrack === "forest_heroes" ||
+  normalizedTrack.includes("forest")
+) {
+  track.value = "forest_heroes";
+} else if (normalizedTrack.includes("digital")) {
+  track.value = "digital_certificate";
+} else if (normalizedTrack.includes("makombeh")) {
+  track.value = "green_makombeh";
+} else if (s.track) {
+  console.warn("Unknown track value:", s.track);
+  track.value = "not_sure";
+}
 
     status.textContent = "Your details have been loaded. Please upload your photo.";
 
