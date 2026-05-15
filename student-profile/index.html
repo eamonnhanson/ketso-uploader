@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>KETSO Academy student profile</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin-bottom: 6px;
+    }
+
+    .profile-box {
+      background: #f1f8f3;
+      border-left: 5px solid #1f7a3f;
+      padding: 16px;
+      margin-bottom: 24px;
+    }
+
+    .points {
+      font-size: 22px;
+      font-weight: bold;
+      color: #1f7a3f;
+      margin-top: 10px;
+    }
+
+    .upload-card {
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 16px;
+      max-width: 720px;
+      background: #fff;
+    }
+
+    .upload-card img {
+      max-width: 100%;
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+
+    video {
+      max-width: 100%;
+      margin-top: 10px;
+      border-radius: 8px;
+    }
+
+    .meta {
+      font-size: 13px;
+      color: #555;
+      margin-top: 6px;
+    }
+
+    .feedback {
+      margin-top: 10px;
+      padding: 10px;
+      background: #f6f6f6;
+      border-left: 4px solid #ccc;
+      white-space: pre-line;
+    }
+
+    a.button {
+      display: inline-block;
+      background: #1f7a3f;
+      color: white;
+      padding: 10px 14px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+
+<body>
+
+<a href="/student-gallery/">← Back to student gallery</a>
+
+<div id="app">
+  Loading profile...
+</div>
+
+<script>
+const API_BASE = "https://ptb-tree-map.onrender.com";
+
+const params = new URLSearchParams(window.location.search);
+const studentId = params.get("student_id");
+
+const app = document.getElementById("app");
+
+if (!studentId) {
+  app.innerHTML = "Missing student_id.";
+} else {
+  loadProfile(studentId);
+}
+
+async function loadProfile(id) {
+  try {
+    const res = await fetch(`${API_BASE}/api/student-profile/${encodeURIComponent(id)}`);
+    const data = await res.json();
+
+    if (!res.ok || !data.ok) {
+      app.innerHTML = "Could not load student profile.";
+      return;
+    }
+
+    renderProfile(data.student, data.uploads || []);
+  } catch (err) {
+    app.innerHTML = "Error loading profile: " + err.message;
+  }
+}
+
+function renderProfile(student, uploads) {
+  app.innerHTML = `
+    <div class="profile-box">
+      <h1>${escapeHtml(student.full_name || "Student")}</h1>
+      <div class="meta">Cohort: ${escapeHtml(student.cohort || "Not set")}</div>
+      <div class="meta">Stream / track: ${escapeHtml(student.track || "Not set")}</div>
+      <div class="points">⭐ ${student.total_points || 0} point(s)</div>
+    </div>
+
+    <h2>Approved uploads</h2>
+    ${uploads.length ? uploads.map(renderUpload).join("") : "<p>No approved uploads yet.</p>"}
+  `;
+}
+
+function renderUpload(upload) {
+  const lesson = labelLesson(upload.lesson_key);
+  const uploadType = upload.upload_type || upload.file_type || "upload";
+  const fileUrl = upload.cropped_file_url || upload.original_file_url;
+
+  let mediaHtml = "";
+
+  if (upload.file_type === "image" || upload.upload_type === "image_photo") {
+    mediaHtml = `<img src="${escapeAttr(fileUrl)}" alt="Student upload">`;
+  } else if (upload.file_type === "video" || upload.upload_type === "video") {
+    mediaHtml = `<video controls src="${escapeAttr(fileUrl)}"></video>`;
+  } else {
+    mediaHtml = `<a class="button" href="${escapeAttr(fileUrl)}" target="_blank">Open upload</a>`;
+  }
+
+  return `
+    <div class="upload-card">
+      <strong>${escapeHtml(lesson)}</strong>
+      <div class="meta">Upload type: ${escapeHtml(uploadType)}</div>
+      <div class="meta">Points: +${upload.points_awarded || 0}</div>
+      ${mediaHtml}
+      ${
+        upload.ai_feedback || upload.ai_description
+          ? `<div class="feedback"><strong>AI feedback</strong><br>${escapeHtml(upload.ai_feedback || upload.ai_description)}</div>`
+          : ""
+      }
+    </div>
+  `;
+}
+
+function labelLesson(value) {
+  const map = {
+    onboarding: "Onboarding",
+    lesson_1_climate_change: "Lesson 1 Climate Change",
+    lesson_2_tree_health: "Lesson 2 Tree Health",
+    lesson_3_tree_planting: "Lesson 3 Tree Planting",
+    lesson_4_co2_increase: "Lesson 4 We cause Carbon Dioxide Increase",
+    evaluation: "Evaluation"
+  };
+
+  return map[value] || value || "Lesson";
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value);
+}
+</script>
+
+</body>
+</html>
