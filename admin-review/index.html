@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>KETSO Academy admin review</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+      background: #fff;
+      color: #222;
+    }
+
+    h1 { margin-bottom: 8px; }
+
+    .intro {
+      color: #555;
+      max-width: 760px;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 20px;
+      align-items: center;
+    }
+
+    input[type="text"], select {
+      padding: 8px;
+      font-size: 14px;
+      min-width: 260px;
+    }
+
+    button {
+      padding: 9px 13px;
+      cursor: pointer;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      background: #f7f7f7;
+      font-weight: bold;
+    }
+
+    button.approve {
+      background: #1f7a3f;
+      color: white;
+      border-color: #1f7a3f;
+    }
+
+    button.reject {
+      background: #b42318;
+      color: white;
+      border-color: #b42318;
+    }
+
+    #status {
+      font-weight: bold;
+      margin: 16px 0;
+    }
+
+    .upload-card {
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 16px;
+      background: #fafafa;
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 18px;
+    }
+
+    .preview img {
+      width: 100%;
+      max-height: 220px;
+      object-fit: cover;
+      border-radius: 8px;
+      background: #eee;
+    }
+
+    .preview video {
+      width: 100%;
+      max-height: 220px;
+      border-radius: 8px;
+      background: #000;
+    }
+
+    .file-link {
+      display: inline-block;
+      background: #1f7a3f;
+      color: white;
+      padding: 10px 14px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    .meta {
+      font-size: 14px;
+      color: #444;
+      line-height: 1.5;
+      margin-bottom: 8px;
+    }
+
+    .feedback {
+      background: white;
+      border-left: 4px solid #ccc;
+      padding: 10px;
+      margin-top: 10px;
+      white-space: pre-line;
+      font-size: 14px;
+    }
+
+    .actions {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 800px) {
+      .upload-card { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>KETSO Academy admin review</h1>
+
+<p class="intro">
+  Review KETSO Academy uploads. Approving an upload makes it visible in the student gallery and gives the student 1 point.
+</p>
+
+<div class="controls">
+  <input type="text" id="adminKey" placeholder="Admin key">
+  <select id="statusFilter">
+    <option value="pending">Pending</option>
+    <option value="approved">Approved</option>
+    <option value="rejected">Rejected</option>
+    <option value="all">All</option>
+  </select>
+  <button id="loadBtn">Load uploads</button>
+</div>
+
+<div id="status">Enter admin key and load uploads.</div>
+<div id="uploads"></div>
+
+<script>
+const API_BASE = "https://ptb-tree-map.onrender.com";
+
+const adminKeyInput = document.getElementById("adminKey");
+const statusFilter = document.getElementById("statusFilter");
+const loadBtn = document.getElementById("loadBtn");
+const statusBox = document.getElementById("status");
+const uploadsBox = document.getElementById("uploads");
+
+loadBtn.addEventListener("click", loadUploads);
+
+async function loadUploads() {
+  const adminKey = adminKeyInput.value.trim();
+  const status = statusFilter.value;
+
+  if (!adminKey) {
+    statusBox.textContent = "Please enter admin key.";
+    return;
+  }
+
+  statusBox.textContent = "Loading uploads...";
+  uploadsBox.innerHTML = "";
+
+  try {
+    const url = `${API_BASE}/api/academy-moderation-queue?status=${encodeURIComponent(status)}&admin_key=${encodeURIComponent(adminKey)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!res.ok || !data.ok) {
+      statusBox.textContent = data.error || "Could not load uploads.";
+      return;
+    }
+
+    const uploads = data.uploads || [];
+
+    if (!uploads.length) {
+      statusBox.textContent = "No uploads found.";
+      return;
+    }
+
+    statusBox.textContent = `${uploads.length} upload(s) found.`;
+    uploadsBox.innerHTML = uploads.map(renderUpload).join("");
+
+    document.querySelectorAll("[data-action='approve']").forEach(button => {
+      button.addEventListener("click", () => approveUpload(button.dataset.id));
+    });
+
+    document.querySelectorAll("[data-action='reject']").forEach(button => {
+      button.addEventListener("click", () => rejectUpload(button.dataset.id));
+    });
+
+  } catch (err) {
+    statusBox.textContent = "Error loading uploads: " + err.message;
+  }
+}
+
+function renderUpload(upload) {
+  const fileUrl = upload.cropped_file_url || upload.original_file_url || "";
+  const preview = renderPreview(upload, fileUrl);
+
+  return `
+    <div class="upload-card">
+      <div class="preview">${preview}</div>
+      <div>
+        <h3>${escapeHtml(upload.uploader_name || "Student")}</h3>
+
+        <div class="meta">
+          <strong>Email:</strong> ${escapeHtml(upload.uploader_email || "")}<br>
+          <strong>Student ID:</strong> ${escapeHtml(upload.academy_student_id || "")}<br>
+          <strong>Cohort:</strong> ${escapeHtml(upload.academy_cohort || "")}<br>
+          <strong>Interest:</strong> ${escapeHtml(labelInterest(upload.interest_area || upload.academy_track))}<br>
+          <strong>Lesson:</strong> ${escapeHtml(labelLesson(upload.lesson_key))}<br>
+          <strong>Upload type:</strong> ${escapeHtml(upload.upload_type || upload.file_type || "")}<br>
+          <strong>Status:</strong> ${escapeHtml(upload.verification_status || "")}<br>
+          <strong>Points:</strong> ${escapeHtml(upload.points_awarded || 0)}
+        </div>
+
+        <div class="feedback">
+          <strong>AI feedback</strong><br>
+          ${escapeHtml(upload.ai_feedback || upload.ai_description || "No AI feedback available.")}
+        </div>
+
+        <div class="actions">
+          <button class="approve" data-action="approve" data-id="${escapeAttr(upload.id)}">Approve + 1 point</button>
+          <button class="reject" data-action="reject" data-id="${escapeAttr(upload.id)}">Reject</button>
+          ${
+            upload.academy_student_id
+              ? `<a class="file-link" href="/student-profile/?student_id=${encodeURIComponent(upload.academy_student_id)}" target="_blank">Open student profile</a>`
+              : ""
+          }
+        </div>
+
+        <div class="meta">Upload ID: ${escapeHtml(upload.id)}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderPreview(upload, fileUrl) {
+  if (!fileUrl) return "<p>No file URL.</p>";
+
+  const fileType = upload.file_type || upload.upload_type || "";
+
+  if (fileType === "image" || fileType === "image_photo") {
+    return `<img src="${escapeAttr(fileUrl)}" alt="Upload preview">`;
+  }
+
+  if (fileType === "video") {
+    return `<video controls src="${escapeAttr(fileUrl)}"></video>`;
+  }
+
+  return `<a class="file-link" href="${escapeAttr(fileUrl)}" target="_blank">Open file</a>`;
+}
+
+async function approveUpload(id) {
+  const adminKey = adminKeyInput.value.trim();
+
+  if (!confirm("Approve this upload and award 1 point?")) return;
+
+  const res = await fetch(`${API_BASE}/api/academy-approve-upload?admin_key=${encodeURIComponent(adminKey)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      review_id: id,
+      reviewed_by: "eamonn"
+    })
+  });
+
+  const data = await res.json();
+
+  if (!res.ok || !data.ok) {
+    alert(data.error || "Approval failed.");
+    return;
+  }
+
+  await loadUploads();
+}
+
+async function rejectUpload(id) {
+  const adminKey = adminKeyInput.value.trim();
+  const reason = prompt("Reason for rejection?", "Needs clearer upload");
+
+  if (reason === null) return;
+
+  const res = await fetch(`${API_BASE}/api/academy-reject-upload?admin_key=${encodeURIComponent(adminKey)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      review_id: id,
+      reviewed_by: "eamonn",
+      rejected_reason: reason
+    })
+  });
+
+  const data = await res.json();
+
+  if (!res.ok || !data.ok) {
+    alert(data.error || "Rejection failed.");
+    return;
+  }
+
+  await loadUploads();
+}
+
+function labelLesson(value) {
+  const map = {
+    onboarding: "Onboarding",
+    lesson_1_climate_change: "Lesson 1 Climate Change",
+    lesson_2_tree_health: "Lesson 2 Tree Health",
+    lesson_3_tree_planting: "Lesson 3 Tree Planting",
+    lesson_4_co2_increase: "Lesson 4 We cause Carbon Dioxide Increase",
+    evaluation: "Evaluation"
+  };
+
+  return map[value] || value || "Not set";
+}
+
+function labelInterest(value) {
+  const map = {
+    online_tree_planting: "Online tree planting",
+    distance_certificate_course: "Distance certificate course",
+    donor_investor_funding: "Donor and investor funding",
+    networking_advocacy: "Networking & Advocacy"
+  };
+
+  return map[value] || value || "Not set";
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value);
+}
+</script>
+
+</body>
+</html>
