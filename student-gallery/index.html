@@ -45,6 +45,19 @@
       border-radius: 14px;
       padding: 12px;
       background: #fafafa;
+      cursor: pointer;
+      transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+      border-color: #1f7a3f;
+    }
+
+    .card:focus {
+      outline: 3px solid #b7dfbd;
+      outline-offset: 3px;
     }
 
     .card img {
@@ -69,9 +82,40 @@
       line-height: 1.4;
     }
 
+    .view-profile {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #1f7a3f;
+      font-weight: bold;
+    }
+
     #status {
       font-weight: bold;
       margin-top: 20px;
+    }
+
+    .points {
+      margin-top: 6px;
+      font-size: 14px;
+      font-weight: bold;
+      color: #1f7a3f;
+    }
+
+    .badges {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 7px;
+      border-radius: 999px;
+      background: #eaf5e8;
+      color: #1f7a3f;
+      font-size: 12px;
+      font-weight: bold;
     }
 
     @media (max-width: 600px) {
@@ -88,29 +132,6 @@
         padding: 10px;
       }
     }
-    .points {
-  margin-top: 6px;
-  font-size: 14px;
-  font-weight: bold;
-  color: #1f7a3f;
-}
-
-.badges {
-  margin-top: 8px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-
-.badge {
-  display: inline-block;
-  padding: 4px 7px;
-  border-radius: 999px;
-  background: #eaf5e8;
-  color: #1f7a3f;
-  font-size: 12px;
-  font-weight: bold;
-}
   </style>
 </head>
 
@@ -159,49 +180,81 @@ async function loadGallery() {
     status.textContent = "";
 
     gallery.innerHTML = photos.map(photo => {
-      const displayName = getFirstName(photo.uploader_name || photo.linked_entity_name || "Student");
-      const session = displaySession(photo.academy_track);
-      const imageUrl = photo.cropped_file_url || "";
+      const studentId = photo.academy_student_id || photo.student_id || photo.id;
+      const displayName = getFirstName(photo.uploader_name || photo.linked_entity_name || photo.full_name || "Student");
+      const session = displaySession(photo.academy_track || photo.interest_area || photo.track);
+      const imageUrl = photo.cropped_file_url || photo.file_url || "";
+      const profileUrl = studentId
+        ? `/student-profile/?student_id=${encodeURIComponent(studentId)}`
+        : "#";
 
       return `
-        <div class="card">
-          <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(displayName)}">
+        <div
+          class="card"
+          role="link"
+          tabindex="0"
+          data-profile-url="${escapeAttr(profileUrl)}"
+          aria-label="Open profile for ${escapeAttr(displayName)}"
+        >
+          <img src="${escapeAttr(imageUrl)}" alt="${escapeAttr(displayName)}">
           <div class="name">${escapeHtml(displayName)}</div>
           <div class="meta">${escapeHtml(session)}</div>
           <div class="points">⭐ ${formatPoints(photo.total_points || 0)}</div>
           ${renderBadges(photo.badges)}
+          <div class="view-profile">View profile →</div>
         </div>
       `;
     }).join("");
+
+    document.querySelectorAll(".card").forEach(card => {
+      card.addEventListener("click", () => {
+        const url = card.getAttribute("data-profile-url");
+        if (url && url !== "#") {
+          window.location.href = url;
+        }
+      });
+
+      card.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          const url = card.getAttribute("data-profile-url");
+          if (url && url !== "#") {
+            window.location.href = url;
+          }
+        }
+      });
+    });
 
   } catch (err) {
     console.error("Student gallery error:", err);
     status.textContent = "Error loading gallery.";
   }
 }
+
 function formatPoints(points) {
   points = Number(points || 0);
   return points === 1 ? "1 point" : `${points} points`;
 }
+
 function getFirstName(name) {
   return String(name || "Student").trim().split(/\s+/)[0];
 }
 
 function displaySession(value) {
   if (!value) return "KETSO Academy";
-  if (value === "forest_heroes") return "Online tree planting session";
-  if (value === "Forest Heroes") return "Online tree planting session";
+
+  const normalized = String(value).trim().toLowerCase();
+
+  if (normalized === "forest_heroes") return "Online tree planting session";
+  if (normalized === "forest heroes") return "Online tree planting session";
+  if (normalized === "online_tree_planting") return "Online tree planting";
+  if (normalized === "distance_certificate_course") return "Distance certificate course";
+  if (normalized === "donor_investor_funding") return "Donor and investor funding";
+  if (normalized === "networking_advocacy") return "Networking & Advocacy";
+
   return value;
 }
 
-function escapeHtml(value) {
-  return String(value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
 function renderBadges(badges) {
   if (!badges) {
     return "";
@@ -233,6 +286,20 @@ function renderBadges(badges) {
     </div>
   `;
 }
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value);
+}
+
 loadGallery();
 </script>
 
