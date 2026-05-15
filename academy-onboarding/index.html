@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>KETSO Academy onboarding upload</title>
+  <title>KETSO Academy uploads</title>
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
 
@@ -27,11 +27,17 @@
 
     input[type="text"],
     input[type="email"],
-    select {
+    select,
+    textarea {
       width: 100%;
       max-width: 500px;
       padding: 8px;
       font-size: 14px;
+    }
+
+    textarea {
+      min-height: 160px;
+      resize: vertical;
     }
 
     input[type="checkbox"] {
@@ -79,58 +85,75 @@
       max-width: 700px;
       line-height: 1.5;
     }
-    .academy-info-box {
-  margin: 18px 0;
-  padding: 14px 16px;
-  border-left: 4px solid #1f7a3a;
-  background: #f1f8f3;
-  max-width: 720px;
-  font-size: 14px;
-  line-height: 1.5;
-}
 
-.academy-info-box a {
-  color: #1f7a3a;
-  font-weight: bold;
-  text-decoration: underline;
-}
+    .academy-info-box {
+      margin: 18px 0;
+      padding: 14px 16px;
+      border-left: 4px solid #1f7a3a;
+      background: #f1f8f3;
+      max-width: 720px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .academy-info-box a {
+      color: #1f7a3a;
+      font-weight: bold;
+      text-decoration: underline;
+    }
+
+    .button-link {
+      display: inline-block;
+      background: #1f7a3f;
+      color: white;
+      padding: 10px 18px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    .secondary-link {
+      display: inline-block;
+      background: #f2f7f1;
+      color: #1f7a3f;
+      padding: 10px 16px;
+      border-left: 5px solid #1f7a3f;
+      text-decoration: none;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    .hidden {
+      display: none;
+    }
   </style>
 </head>
 
 <body>
 
-<h2>KETSO Academy onboarding</h2>
+<h2>KETSO Academy uploads</h2>
 
 <p class="note">
-  Upload a selfie or a favourite object so we can verify your Forest Heroes registration.
-  If you do not want to show your face, choose "Favourite object".
+  Upload your work for a KETSO Academy topic or lesson. Your upload will be reviewed first.
+  After approval it can appear under your student profile in the gallery.
 </p>
+
 <p>
-  <a
-    href="/student-gallery/"
-    target="_blank"
-    style="
-      display:inline-block;
-      background:#f2f7f1;
-      color:#1f7a3f;
-      padding:10px 16px;
-      border-left:5px solid #1f7a3f;
-      text-decoration:none;
-      font-weight:bold;
-      margin-top:10px;
-    "
-  >
+  <a href="/student-gallery/" target="_blank" class="secondary-link">
     View the KETSO Academy student gallery
   </a>
 </p>
-  <div class="academy-info-box">
+
+<div class="academy-info-box">
   <strong>Want to know more about the KETSO Academy course?</strong><br>
   Read the course information, streams, dates and registration details here:<br>
   <a href="https://www.ketso.nl/academy" target="_blank" rel="noopener">
     Open KETSO Academy course information
   </a>
 </div>
-<input type="hidden" id="category" value="academy_onboarding">
+
+<input type="hidden" id="category" value="academy_upload">
 
 <label for="fullName">Full name</label>
 <input type="text" id="fullName" placeholder="Your full name" required>
@@ -141,68 +164,81 @@
 <label for="whatsapp">WhatsApp number</label>
 <input type="text" id="whatsapp" placeholder="Your WhatsApp number" required>
 
-<label for="track">Online session</label>
-<select id="track" required>
-  <option value="">Select your online session</option>
-  <option value="forest_heroes">
-  Online tree planting session</option>
-  <option value="digital_certificate">Digital certificate track</option>
-  <option value="green_makombeh">Green Makombeh</option>
-  <option value="not_sure">Not sure yet</option>
+<label for="interestArea">My interests</label>
+<select id="interestArea" required>
+  <option value="">Select your interest</option>
+  <option value="online_tree_planting">Online tree planting</option>
+  <option value="distance_certificate_course">Distance certificate course</option>
+  <option value="donor_investor_funding">Donor and investor funding</option>
+  <option value="networking_advocacy">Networking & Advocacy</option>
+</select>
+
+<label for="lessonKey">Topic / lesson</label>
+<select id="lessonKey" required>
+  <option value="">Select topic</option>
+  <option value="onboarding">Onboarding</option>
+  <option value="lesson_1_climate_change">Lesson 1 Climate Change</option>
+  <option value="lesson_2_tree_health">Lesson 2 Tree Health</option>
+  <option value="lesson_3_tree_planting">Lesson 3 Tree Planting</option>
+  <option value="lesson_4_co2_increase">Lesson 4 We cause Carbon Dioxide Increase</option>
+  <option value="evaluation">Evaluation</option>
 </select>
 
 <label for="uploadType">Upload type</label>
 <select id="uploadType" required>
   <option value="">Select upload type</option>
-  <option value="selfie">Selfie</option>
-  <option value="favourite_object">Favourite object</option>
+  <option value="image_photo">Image or photo</option>
+  <option value="text">Text</option>
+  <option value="document">Document</option>
+  <option value="video">Video</option>
 </select>
+
+<div id="textUploadSection" class="hidden">
+  <label for="textInput">Write your answer</label>
+  <textarea id="textInput" placeholder="Write your answer here. It will be saved as a text file."></textarea>
+</div>
+
+<div id="fileUploadSection">
+  <label for="fileInput">Upload file</label>
+  <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.txt,.mp4,.mov,.webm">
+</div>
 
 <label class="consent-label">
   <input type="checkbox" id="consent">
-  I allow KETSO to store this upload for academy registration and internal verification.
+  I allow KETSO to store this upload for academy registration, review and learning feedback.
   I understand that it will not be shown publicly without review or permission.
 </label>
+
 <p>
-  <a
-    href="https://youtube.com/shorts/Prr-WLKFDwY?feature=share"
-    target="_blank"
-    style="
-      display:inline-block;
-      background:#1f7a3f;
-      color:white;
-      padding:10px 18px;
-      border-radius:8px;
-      text-decoration:none;
-      font-weight:bold;
-      margin-top:10px;
-    "
-  >
+  <a href="https://youtube.com/shorts/Prr-WLKFDwY?feature=share" target="_blank" class="button-link">
     ▶ Watch instruction video
   </a>
 </p>
-<label for="fileInput">Photo</label>
-<input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.webp">
 
-<div class="note">
+<div id="imageInstructions" class="note hidden">
+  Image/photo upload:<br>
   1. Use the zoom buttons to zoom in<br>
   2. Drag the image to position it<br>
   3. Adjust the crop box<br>
   4. Click "Crop to 600 px"<br>
-  5. Click "Upload original + cropped"<br>
+  5. Click "Upload work"<br>
   6. Use JPG, PNG or WebP. HEIC is not reliable in browser preview/crop.
+</div>
+
+<div id="generalInstructions" class="note">
+  Document, text and video uploads will be stored for review. Large videos should be kept short.
 </div>
 
 <img id="image" alt="Preview">
 
-<div class="controls">
+<div id="imageControls" class="controls hidden">
   <button id="zoomIn" disabled>Zoom in</button>
   <button id="zoomOut" disabled>Zoom out</button>
 </div>
 
 <div class="controls">
-  <button id="cropBtn" disabled>Crop to 600 px</button>
-  <button id="uploadBtn" disabled>Upload original + cropped</button>
+  <button id="cropBtn" disabled class="hidden">Crop to 600 px</button>
+  <button id="uploadBtn" disabled>Upload work</button>
 </div>
 
 <p id="status"></p>
@@ -213,14 +249,18 @@
 let cropper = null;
 let croppedBlob = null;
 let processedOriginalFile = null;
+let selectedFile = null;
 
 const REVIEW_API_URL = "https://ptb-tree-map.onrender.com/api/save-photo-review";
 const R2_PUBLIC_BASE = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/";
-const UPLOAD_FOLDER = "ketso-academy/onboarding";
+const UPLOAD_FOLDER = "ketso-academy/uploads";
 
-const MAX_ORIGINAL_BYTES = 8 * 1024 * 1024;
+const MAX_IMAGE_ORIGINAL_BYTES = 8 * 1024 * 1024;
 const MAX_CROPPED_BYTES = 500 * 1024;
-const HARD_MAX_INPUT_BYTES = 25 * 1024 * 1024;
+const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
+const MAX_TEXT_BYTES = 1 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+const HARD_MAX_INPUT_BYTES = 100 * 1024 * 1024;
 
 const fileInput = document.getElementById("fileInput");
 const image = document.getElementById("image");
@@ -234,20 +274,28 @@ const category = document.getElementById("category");
 const fullName = document.getElementById("fullName");
 const email = document.getElementById("email");
 const whatsapp = document.getElementById("whatsapp");
-const track = document.getElementById("track");
+const interestArea = document.getElementById("interestArea");
+const lessonKey = document.getElementById("lessonKey");
 const uploadType = document.getElementById("uploadType");
 const consent = document.getElementById("consent");
-  
+
+const textUploadSection = document.getElementById("textUploadSection");
+const textInput = document.getElementById("textInput");
+const fileUploadSection = document.getElementById("fileUploadSection");
+const imageInstructions = document.getElementById("imageInstructions");
+const generalInstructions = document.getElementById("generalInstructions");
+const imageControls = document.getElementById("imageControls");
+
 async function loadStudentFromToken() {
   const token = new URLSearchParams(window.location.search).get("token");
 
   if (!token) {
-    console.warn("No onboarding token found in URL.");
+    console.warn("No academy token found in URL.");
     return;
   }
 
   try {
-    status.textContent = "Loading your onboarding details...";
+    status.textContent = "Loading your details...";
 
     const res = await fetch(
       `https://ptb-tree-map.onrender.com/api/academy-student?token=${encodeURIComponent(token)}`
@@ -255,47 +303,40 @@ async function loadStudentFromToken() {
 
     const data = await res.json();
 
-    console.log("Academy student API response:", data);
-
     if (!res.ok || !data.ok || !data.student) {
-      status.textContent = "Could not find your onboarding record. Please check your link.";
+      status.textContent = "Could not find your academy record. Please check your link.";
       return;
     }
 
     const s = data.student;
-    
     window.loadedStudent = s;
 
     fullName.value = s.full_name || "";
     email.value = s.email || "";
     whatsapp.value = s.whatsapp || "";
 
-   const normalizedTrack = String(s.track || "").trim().toLowerCase();
+    const normalizedInterest = String(s.track || s.stream || "").trim().toLowerCase();
 
-if (
-  normalizedTrack === "forest heroes" ||
-  normalizedTrack === "forest_heroes" ||
-  normalizedTrack.includes("forest")
-) {
-  track.value = "forest_heroes";
-} else if (normalizedTrack.includes("digital")) {
-  track.value = "digital_certificate";
-} else if (normalizedTrack.includes("makombeh")) {
-  track.value = "green_makombeh";
-} else if (s.track) {
-  console.warn("Unknown track value:", s.track);
-  track.value = "not_sure";
-}
+    if (normalizedInterest.includes("forest") || normalizedInterest.includes("tree")) {
+      interestArea.value = "online_tree_planting";
+    } else if (normalizedInterest.includes("certificate")) {
+      interestArea.value = "distance_certificate_course";
+    } else if (normalizedInterest.includes("donor") || normalizedInterest.includes("investor") || normalizedInterest.includes("fund")) {
+      interestArea.value = "donor_investor_funding";
+    } else if (normalizedInterest.includes("network") || normalizedInterest.includes("advocacy") || normalizedInterest.includes("climate")) {
+      interestArea.value = "networking_advocacy";
+    }
 
-    status.textContent = "Your details have been loaded. Please upload your photo.";
+    status.textContent = "Your details have been loaded. Please choose a topic and upload your work.";
 
   } catch (err) {
     console.error("loadStudentFromToken error:", err);
-    status.textContent = "Could not load your onboarding details.";
+    status.textContent = "Could not load your academy details.";
   }
 }
 
 loadStudentFromToken();
+
 function safeFileBaseName(name) {
   return name
     .replace(/\.[^/.]+$/, "")
@@ -305,6 +346,14 @@ function safeFileBaseName(name) {
 
 function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function isImageUpload() {
+  return uploadType.value === "image_photo";
+}
+
+function isTextUpload() {
+  return uploadType.value === "text";
 }
 
 function blobFromCanvas(canvas, type, quality) {
@@ -348,7 +397,7 @@ function loadImageFromFile(file) {
 }
 
 async function resizeOriginalIfNeeded(file) {
-  if (file.size <= MAX_ORIGINAL_BYTES) {
+  if (file.size <= MAX_IMAGE_ORIGINAL_BYTES) {
     return file;
   }
 
@@ -367,19 +416,19 @@ async function resizeOriginalIfNeeded(file) {
     const ctx = canvas.getContext("2d");
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-    blob = await compressCanvasToMaxBytes(canvas, MAX_ORIGINAL_BYTES, {
+    blob = await compressCanvasToMaxBytes(canvas, MAX_IMAGE_ORIGINAL_BYTES, {
       startQuality: 0.86,
       minQuality: 0.45
     });
 
-    if (blob && blob.size <= MAX_ORIGINAL_BYTES) {
+    if (blob && blob.size <= MAX_IMAGE_ORIGINAL_BYTES) {
       break;
     }
 
     scale -= 0.1;
   }
 
-  if (!blob || blob.size > MAX_ORIGINAL_BYTES) {
+  if (!blob || blob.size > MAX_IMAGE_ORIGINAL_BYTES) {
     throw new Error("Could not reduce original image below 8 MB.");
   }
 
@@ -387,89 +436,179 @@ async function resizeOriginalIfNeeded(file) {
   return new File([blob], newName, { type: "image/jpeg" });
 }
 
-fileInput.addEventListener("change", async function (event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-
-  if (!allowedTypes.includes(file.type)) {
-    status.textContent = "Unsupported image format. Please use JPG, PNG or WebP.";
-    fileInput.value = "";
-    image.style.display = "none";
-    croppedBlob = null;
-    processedOriginalFile = null;
-    uploadBtn.disabled = true;
-    cropBtn.disabled = true;
-    zoomIn.disabled = true;
-    zoomOut.disabled = true;
-    return;
-  }
-
-  if (file.size > HARD_MAX_INPUT_BYTES) {
-    status.textContent = "File too large. Please use an image below 25 MB.";
-    fileInput.value = "";
-    image.style.display = "none";
-    croppedBlob = null;
-    processedOriginalFile = null;
-    uploadBtn.disabled = true;
-    cropBtn.disabled = true;
-    zoomIn.disabled = true;
-    zoomOut.disabled = true;
-    return;
-  }
-
+function resetUploadState() {
+  selectedFile = null;
   croppedBlob = null;
   processedOriginalFile = null;
   uploadBtn.disabled = true;
   cropBtn.disabled = true;
   zoomIn.disabled = true;
   zoomOut.disabled = true;
+  image.style.display = "none";
+
+  if (cropper) {
+    cropper.destroy();
+    cropper = null;
+  }
+}
+
+uploadType.addEventListener("change", () => {
+  resetUploadState();
+  fileInput.value = "";
+  textInput.value = "";
   status.textContent = "";
 
-  try {
-    processedOriginalFile = await resizeOriginalIfNeeded(file);
+  if (isTextUpload()) {
+    textUploadSection.classList.remove("hidden");
+    fileUploadSection.classList.add("hidden");
+    imageInstructions.classList.add("hidden");
+    generalInstructions.classList.remove("hidden");
+    imageControls.classList.add("hidden");
+    cropBtn.classList.add("hidden");
+    uploadBtn.disabled = false;
+  } else {
+    textUploadSection.classList.add("hidden");
+    fileUploadSection.classList.remove("hidden");
+    generalInstructions.classList.remove("hidden");
 
-    const reader = new FileReader();
+    if (isImageUpload()) {
+      fileInput.accept = ".jpg,.jpeg,.png,.webp";
+      imageInstructions.classList.remove("hidden");
+      imageControls.classList.remove("hidden");
+      cropBtn.classList.remove("hidden");
+      generalInstructions.classList.add("hidden");
+    } else if (uploadType.value === "document") {
+      fileInput.accept = ".pdf,.doc,.docx,.txt";
+      imageInstructions.classList.add("hidden");
+      imageControls.classList.add("hidden");
+      cropBtn.classList.add("hidden");
+    } else if (uploadType.value === "video") {
+      fileInput.accept = ".mp4,.mov,.webm";
+      imageInstructions.classList.add("hidden");
+      imageControls.classList.add("hidden");
+      cropBtn.classList.add("hidden");
+    }
+  }
+});
 
-    reader.onload = function () {
-      image.src = reader.result;
-      image.style.display = "block";
+textInput.addEventListener("input", () => {
+  if (isTextUpload()) {
+    uploadBtn.disabled = textInput.value.trim().length === 0;
+  }
+});
 
-      try {
-        if (cropper) cropper.destroy();
+fileInput.addEventListener("change", async function (event) {
+  const file = event.target.files[0];
+  if (!file) return;
 
-        cropper = new Cropper(image, {
-          viewMode: 1,
-          dragMode: "move",
-          autoCropArea: 0.6,
-          responsive: true,
-          background: false,
-          zoomable: true,
-          guides: true,
-          center: true,
-          highlight: true
-        });
+  resetUploadState();
+  selectedFile = file;
 
-        cropBtn.disabled = false;
-        zoomIn.disabled = false;
-        zoomOut.disabled = false;
+  if (file.size > HARD_MAX_INPUT_BYTES) {
+    status.textContent = "File too large. Please use a smaller file.";
+    fileInput.value = "";
+    return;
+  }
 
-        status.textContent =
-          "Image loaded.\n" +
-          "Original ready for upload: " +
-          Math.round(processedOriginalFile.size / 1024) +
-          " KB.";
+  if (isImageUpload()) {
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
 
-      } catch (err) {
-        status.textContent = "Cropper failed to load: " + err.message;
-      }
-    };
+    if (!allowedTypes.includes(file.type)) {
+      status.textContent = "Unsupported image format. Please use JPG, PNG or WebP.";
+      fileInput.value = "";
+      return;
+    }
 
-    reader.readAsDataURL(processedOriginalFile);
+    try {
+      processedOriginalFile = await resizeOriginalIfNeeded(file);
 
-  } catch (err) {
-    status.textContent = "Image processing failed: " + err.message;
+      const reader = new FileReader();
+
+      reader.onload = function () {
+        image.src = reader.result;
+        image.style.display = "block";
+
+        try {
+          if (cropper) cropper.destroy();
+
+          cropper = new Cropper(image, {
+            viewMode: 1,
+            dragMode: "move",
+            autoCropArea: 0.6,
+            responsive: true,
+            background: false,
+            zoomable: true,
+            guides: true,
+            center: true,
+            highlight: true
+          });
+
+          cropBtn.disabled = false;
+          zoomIn.disabled = false;
+          zoomOut.disabled = false;
+
+          status.textContent =
+            "Image loaded.\n" +
+            "Original ready for upload: " +
+            Math.round(processedOriginalFile.size / 1024) +
+            " KB.";
+
+        } catch (err) {
+          status.textContent = "Cropper failed to load: " + err.message;
+        }
+      };
+
+      reader.readAsDataURL(processedOriginalFile);
+
+    } catch (err) {
+      status.textContent = "Image processing failed: " + err.message;
+    }
+
+    return;
+  }
+
+  if (uploadType.value === "document") {
+    const allowedDocumentTypes = [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "text/plain"
+    ];
+
+    if (!allowedDocumentTypes.includes(file.type)) {
+      status.textContent = "Unsupported document format. Use PDF, DOC, DOCX or TXT.";
+      fileInput.value = "";
+      return;
+    }
+
+    if (file.size > MAX_DOCUMENT_BYTES) {
+      status.textContent = "Document too large. Maximum size is 10 MB.";
+      fileInput.value = "";
+      return;
+    }
+
+    uploadBtn.disabled = false;
+    status.textContent = "Document ready for upload.";
+    return;
+  }
+
+  if (uploadType.value === "video") {
+    const allowedVideoTypes = ["video/mp4", "video/quicktime", "video/webm"];
+
+    if (!allowedVideoTypes.includes(file.type)) {
+      status.textContent = "Unsupported video format. Use MP4, MOV or WebM.";
+      fileInput.value = "";
+      return;
+    }
+
+    if (file.size > MAX_VIDEO_BYTES) {
+      status.textContent = "Video too large. Maximum size is 100 MB.";
+      fileInput.value = "";
+      return;
+    }
+
+    uploadBtn.disabled = false;
+    status.textContent = "Video ready for upload.";
   }
 });
 
@@ -520,163 +659,177 @@ cropBtn.addEventListener("click", async function () {
       "Cropped size: " +
       Math.round(croppedBlob.size / 1024) +
       " KB.\n" +
-      "You can now upload both versions.";
+      "You can now upload your work.";
 
   } catch (err) {
     status.textContent = "Crop compression failed: " + err.message;
   }
 });
 
-uploadBtn.addEventListener("click", async function () {
-  const originalFile = processedOriginalFile || fileInput.files[0];
+async function uploadFileToR2(file) {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("folder", UPLOAD_FOLDER);
 
-  if (!originalFile) {
-    status.textContent = "No original file selected.";
-    return;
+  const res = await fetch("/upload", {
+    method: "POST",
+    body: fd
+  });
+
+  const contentType = res.headers.get("content-type") || "";
+  let data;
+
+  if (contentType.includes("application/json")) {
+    data = await res.json();
+  } else {
+    const text = await res.text();
+    throw new Error("Upload returned non-JSON response: " + text.slice(0, 200));
   }
 
+  if (!res.ok) {
+    throw new Error(data.error || res.status);
+  }
+
+  return data;
+}
+
+function validateBeforeUpload() {
   if (!fullName.value.trim()) {
-    status.textContent = "Please enter your full name.";
-    return;
+    return "Please enter your full name.";
   }
 
   if (!email.value.trim() || !isValidEmail(email.value.trim())) {
-    status.textContent = "Please enter a valid email address.";
-    return;
+    return "Please enter a valid email address.";
   }
 
   if (!whatsapp.value.trim()) {
-    status.textContent = "Please enter your WhatsApp number.";
-    return;
+    return "Please enter your WhatsApp number.";
   }
 
-  if (!track.value) {
-    status.textContent = "Please select a track.";
-    return;
+  if (!interestArea.value) {
+    return "Please select your interest.";
+  }
+
+  if (!lessonKey.value) {
+    return "Please select a topic or lesson.";
   }
 
   if (!uploadType.value) {
-    status.textContent = "Please select selfie or favourite object.";
-    return;
+    return "Please select upload type.";
   }
 
   if (!consent.checked) {
-    status.textContent = "Please give permission before uploading.";
-    return;
+    return "Please give permission before uploading.";
   }
 
-  if (originalFile.size > MAX_ORIGINAL_BYTES) {
-    status.textContent = "Original file is still larger than 8 MB. Upload blocked.";
-    return;
+  if (isTextUpload() && !textInput.value.trim()) {
+    return "Please write your answer before uploading.";
   }
 
-  if (!croppedBlob) {
-    status.textContent = "Please crop the image first.";
-    return;
+  if (!isTextUpload() && !selectedFile) {
+    return "Please select a file.";
   }
 
-  if (croppedBlob.size > MAX_CROPPED_BYTES) {
-    status.textContent = "Cropped file is larger than 500 KB. Upload blocked.";
-    return;
+  if (isImageUpload() && !croppedBlob) {
+    return "Please crop the image first.";
   }
 
-  if (!category.value) {
-    status.textContent = "Category missing. Upload blocked.";
+  return null;
+}
+
+uploadBtn.addEventListener("click", async function () {
+  const validationError = validateBeforeUpload();
+
+  if (validationError) {
+    status.textContent = validationError;
     return;
   }
 
   uploadBtn.disabled = true;
 
   try {
-    status.textContent = "Uploading original image...";
+    let mainFile = null;
+    let originalFile = null;
+    let originalUploadData = null;
+    let mainUploadData = null;
 
-    const fd1 = new FormData();
-    fd1.append("file", originalFile);
-    fd1.append("folder", UPLOAD_FOLDER);
+    if (isTextUpload()) {
+      const textBlob = new Blob([textInput.value.trim()], { type: "text/plain" });
+      const textFileName = `academy_text_${Date.now()}_${safeFileBaseName(fullName.value)}.txt`;
+      mainFile = new File([textBlob], textFileName, { type: "text/plain" });
 
-    const res1 = await fetch("/upload", {
-      method: "POST",
-      body: fd1
-    });
+      if (mainFile.size > MAX_TEXT_BYTES) {
+        throw new Error("Text upload too large. Maximum size is 1 MB.");
+      }
 
-    const contentType1 = res1.headers.get("content-type") || "";
-    let data1;
-
-    if (contentType1.includes("application/json")) {
-      data1 = await res1.json();
-    } else {
-      const text = await res1.text();
-      throw new Error("Original upload returned non-JSON response: " + text.slice(0, 200));
+      status.textContent = "Uploading text answer...";
+      mainUploadData = await uploadFileToR2(mainFile);
     }
 
-    if (!res1.ok) {
-      status.textContent = "Original upload failed: " + (data1.error || res1.status);
-      uploadBtn.disabled = false;
-      return;
+    if (isImageUpload()) {
+      originalFile = processedOriginalFile || selectedFile;
+
+      if (originalFile.size > MAX_IMAGE_ORIGINAL_BYTES) {
+        throw new Error("Original file is still larger than 8 MB. Upload blocked.");
+      }
+
+      status.textContent = "Uploading original image...";
+      originalUploadData = await uploadFileToR2(originalFile);
+
+      const croppedName = safeFileBaseName(originalFile.name) + "_600px.jpg";
+      mainFile = new File([croppedBlob], croppedName, { type: "image/jpeg" });
+
+      status.textContent = "Uploading cropped 600 px version...";
+      mainUploadData = await uploadFileToR2(mainFile);
     }
 
-    status.textContent = "Uploading cropped 600 px version...";
+    if (uploadType.value === "document" || uploadType.value === "video") {
+      mainFile = selectedFile;
 
-    const croppedName = safeFileBaseName(originalFile.name) + "_600px.jpg";
-    const croppedFile = new File([croppedBlob], croppedName, { type: "image/jpeg" });
-
-    const fd2 = new FormData();
-    fd2.append("file", croppedFile);
-    fd2.append("folder", UPLOAD_FOLDER);
-
-    const res2 = await fetch("/upload", {
-      method: "POST",
-      body: fd2
-    });
-
-    const contentType2 = res2.headers.get("content-type") || "";
-    let data2;
-
-    if (contentType2.includes("application/json")) {
-      data2 = await res2.json();
-    } else {
-      const text = await res2.text();
-      throw new Error("Cropped upload returned non-JSON response: " + text.slice(0, 200));
+      status.textContent = "Uploading file...";
+      mainUploadData = await uploadFileToR2(mainFile);
     }
 
-    if (!res2.ok) {
-      status.textContent = "Cropped upload failed: " + (data2.error || res2.status);
-      uploadBtn.disabled = false;
-      return;
-    }
+    status.textContent = "File uploaded. Saving Academy record...";
 
-    status.textContent =
-      "Images uploaded.\n" +
-      "Saving onboarding record...";
+    const payload = {
+      category: category.value,
 
-  const payload = {
-  category: category.value,
-  academy_student_id: window.loadedStudent?.id || null,
-  academy_cohort: window.loadedStudent?.cohort || null,
+      academy_student_id: window.loadedStudent?.id || null,
+      academy_cohort: window.loadedStudent?.cohort || null,
 
-  file_url: R2_PUBLIC_BASE + data2.key,
-  original_file_url: R2_PUBLIC_BASE + data1.key,
-  original_file_size_bytes: originalFile.size,
-  cropped_file_size_bytes: croppedBlob.size,
+      file_url: R2_PUBLIC_BASE + mainUploadData.key,
+      cropped_file_url: R2_PUBLIC_BASE + mainUploadData.key,
+      original_file_url: originalUploadData ? R2_PUBLIC_BASE + originalUploadData.key : null,
 
-  user_id: null,
-  tree_id: null,
-  linked_entity_type: "academy_onboarding",
-  linked_entity_name: fullName.value.trim(),
+      original_file_size_bytes: originalFile ? originalFile.size : null,
+      cropped_file_size_bytes: mainFile ? mainFile.size : null,
 
-  uploader_name: fullName.value.trim(),
-  uploader_email: email.value.trim(),
+      user_id: null,
+      tree_id: null,
 
-  academy_whatsapp: whatsapp.value.trim(),
-  academy_track: window.loadedStudent?.track || track.options[track.selectedIndex]?.text || track.value,
-  upload_type: uploadType.value,
-  consent_given: consent.checked,
+      linked_entity_type: "academy_upload",
+      linked_entity_name: fullName.value.trim(),
 
-  verification_status: "pending",
-  ai_status: "not_checked"
-};
+      uploader_name: fullName.value.trim(),
+      uploader_email: email.value.trim(),
 
-    const res3 = await fetch(REVIEW_API_URL, {
+      academy_whatsapp: whatsapp.value.trim(),
+      academy_track: interestArea.value,
+      interest_area: interestArea.value,
+      lesson_key: lessonKey.value,
+      upload_type: uploadType.value,
+
+      consent_given: consent.checked,
+
+      verification_status: "pending",
+      review_status: "pending",
+      ai_status: "not_checked",
+      upload_context: "academy_upload",
+      points_awarded: 0
+    };
+
+    const res = await fetch(REVIEW_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -684,34 +837,30 @@ uploadBtn.addEventListener("click", async function () {
       body: JSON.stringify(payload)
     });
 
-    const contentType3 = res3.headers.get("content-type") || "";
-    let data3;
+    const contentType = res.headers.get("content-type") || "";
+    let data;
 
-    if (contentType3.includes("application/json")) {
-      data3 = await res3.json();
+    if (contentType.includes("application/json")) {
+      data = await res.json();
     } else {
-      const text = await res3.text();
+      const text = await res.text();
       throw new Error("Review save returned non-JSON response: " + text.slice(0, 200));
     }
 
-    if (!res3.ok) {
-      status.textContent =
-        "Images uploaded, but onboarding record was not saved.\n" +
-        "Review save failed: " + (data3.error || res3.status);
-      uploadBtn.disabled = false;
-      return;
+    if (!res.ok) {
+      throw new Error(data.error || res.status);
     }
 
-status.innerHTML =
-  "Done.<br>" +
-  "Your KETSO Academy onboarding upload has been received.<br>" +
-  "Review ID: " + data3.review_id + "<br><br>" +
-  '<a href="/academy-my-upload/?review_id=' + encodeURIComponent(data3.review_id) + '" ' +
-  'style="display:inline-block;background:#1f7a3f;color:white;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:bold;margin-right:8px;">' +
-  'View my upload</a>' +
-  '<a href="/student-gallery/" target="_blank" ' +
-  'style="display:inline-block;background:#f2f7f1;color:#1f7a3f;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:bold;">' +
-  'View student gallery</a>';
+    status.innerHTML =
+      "Done.<br>" +
+      "Your KETSO Academy upload has been received for review.<br>" +
+      "Review ID: " + data.review_id + "<br><br>" +
+      '<a href="/academy-my-upload/?review_id=' + encodeURIComponent(data.review_id) + '" ' +
+      'style="display:inline-block;background:#1f7a3f;color:white;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:bold;margin-right:8px;">' +
+      'View my upload</a>' +
+      '<a href="/student-gallery/" target="_blank" ' +
+      'style="display:inline-block;background:#f2f7f1;color:#1f7a3f;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:bold;">' +
+      'View student gallery</a>';
 
   } catch (err) {
     status.textContent = "Error: " + err.message;
