@@ -20,6 +20,12 @@ export async function onRequestPost({ request, env }) {
       "image/heic",
       "image/heif",
 
+      // documents
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "text/plain",
+
       // videos
       "video/mp4",
       "video/quicktime",
@@ -36,6 +42,12 @@ export async function onRequestPost({ request, env }) {
       ".heic",
       ".heif",
 
+      // documents
+      ".pdf",
+      ".doc",
+      ".docx",
+      ".txt",
+
       // videos
       ".mp4",
       ".mov",
@@ -51,7 +63,7 @@ export async function onRequestPost({ request, env }) {
     if (!hasAllowedExtension || !hasAllowedMimeType) {
       return jsonResponse({
         ok: false,
-        error: "Only image and video files are allowed (jpg, jpeg, png, webp, gif, heic, heif, mp4, mov, webm)"
+        error: "Only supported image, document and video files are allowed (jpg, jpeg, png, webp, gif, heic, heif, pdf, doc, docx, txt, mp4, mov, webm)"
       }, 400);
     }
 
@@ -66,14 +78,29 @@ export async function onRequestPost({ request, env }) {
       }, 400);
     }
 
+    const isImage = file.type.startsWith("image/");
     const isVideo = file.type.startsWith("video/");
+    const isDocument =
+      file.type === "application/pdf" ||
+      file.type === "application/msword" ||
+      file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      file.type === "text/plain";
+
     const maxImageSize = 10 * 1024 * 1024;
+    const maxDocumentSize = 10 * 1024 * 1024;
     const maxVideoSize = 100 * 1024 * 1024;
 
-    if (!isVideo && file.size > maxImageSize) {
+    if (isImage && file.size > maxImageSize) {
       return jsonResponse({
         ok: false,
         error: "Image too large. Maximum size is 10 MB."
+      }, 400);
+    }
+
+    if (isDocument && file.size > maxDocumentSize) {
+      return jsonResponse({
+        ok: false,
+        error: "Document too large. Maximum size is 10 MB."
       }, 400);
     }
 
@@ -93,7 +120,12 @@ export async function onRequestPost({ request, env }) {
       .replace(/^_+|_+$/g, "")
       .slice(0, 80) || "upload";
 
-    const prefix = isVideo ? "video" : "image";
+    let prefix = "file";
+
+    if (isImage) prefix = "image";
+    if (isDocument) prefix = "document";
+    if (isVideo) prefix = "video";
+
     const fileName = `${prefix}_${Date.now()}_${safeBaseName}${extension}`;
 
     const folder = sanitizeFolder(rawFolder);
@@ -110,7 +142,10 @@ export async function onRequestPost({ request, env }) {
 
     return jsonResponse({
       ok: true,
-      key
+      key,
+      file_type: prefix,
+      size_bytes: file.size,
+      content_type: file.type || "application/octet-stream"
     }, 200);
 
   } catch (err) {
