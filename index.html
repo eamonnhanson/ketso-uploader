@@ -395,7 +395,10 @@
     let searchTimeout = null;
 
     const SEARCH_API_BASE = "https://ptb-tree-map.onrender.com";
-    const UPLOAD_API_URL = `${SEARCH_API_BASE}/upload`;
+    const UPLOAD_API_URLS = [
+      `${SEARCH_API_BASE}/api/upload`,
+      `${SEARCH_API_BASE}/upload`
+    ];
     const REVIEW_API_URL = "https://ptb-tree-map.onrender.com/api/save-photo-review";
     const R2_PUBLIC_BASE = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/";
 
@@ -936,7 +939,7 @@
       }
     });
 
-    async function uploadFileToR2(file, label) {
+    async function uploadFileToR2AtUrl(file, label, uploadUrl) {
       const fd = new FormData();
       fd.append("file", file);
 
@@ -945,17 +948,17 @@
       let res;
 
       try {
-        res = await fetch(UPLOAD_API_URL, {
+        res = await fetch(uploadUrl, {
           method: "POST",
           body: fd,
           signal: controller.signal
         });
       } catch (err) {
         if (err.name === "AbortError") {
-          throw new Error(label + " upload timed out. Please check your internet connection and try again.");
+          throw new Error(label + " upload timed out at " + uploadUrl + ".");
         }
 
-        throw new Error(label + " upload could not reach the upload server. Check that the upload API is online and allows this page to upload.");
+        throw new Error(label + " upload could not reach " + uploadUrl + ".");
       } finally {
         clearTimeout(timeoutId);
       }
@@ -967,14 +970,34 @@
         data = await res.json();
       } else {
         const text = await res.text();
-        throw new Error(label + " upload returned non-JSON response: " + text.slice(0, 200));
+        throw new Error(label + " upload at " + uploadUrl + " returned non-JSON response: " + text.slice(0, 200));
       }
 
       if (!res.ok) {
-        throw new Error(label + " upload failed: " + (data.error || res.status));
+        throw new Error(label + " upload at " + uploadUrl + " failed: " + (data.error || res.status));
       }
 
       return data;
+    }
+
+    async function uploadFileToR2(file, label) {
+      const errors = [];
+
+      for (const uploadUrl of UPLOAD_API_URLS) {
+        try {
+          return await uploadFileToR2AtUrl(file, label, uploadUrl);
+        } catch (err) {
+          errors.push(err.message);
+        }
+      }
+
+      throw new Error(
+        label +
+        " upload failed. Tried these upload URLs: " +
+        UPLOAD_API_URLS.join(", ") +
+        ". Last error: " +
+        errors[errors.length - 1]
+      );
     }
 
     async function saveReview(payload) {
