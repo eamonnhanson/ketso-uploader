@@ -46,14 +46,17 @@
     #image {
       display: none;
       max-width: 100%;
+      width: auto;
       height: auto;
       max-height: 600px;
       margin-top: 20px;
+      object-fit: contain;
     }
 
     .cropper-container {
       margin-top: 20px;
       max-width: 100% !important;
+      max-height: 600px !important;
     }
 
     .cropper-wrap-box,
@@ -262,12 +265,21 @@
         display: grid;
         grid-template-columns: 1fr;
         gap: 8px;
+        position: sticky;
+        bottom: 0;
+        z-index: 20;
+        padding: 8px 0;
+        background: white;
       }
 
       #image {
-        width: 100%;
+        width: auto;
         max-width: 100%;
-        max-height: 55vh;
+        max-height: 42vh;
+      }
+
+      .cropper-container {
+        max-height: 42vh !important;
       }
 
       .note,
@@ -414,6 +426,19 @@
 
     function appendStatus(line) {
       status.textContent += "\n" + line;
+    }
+
+    function applyPreviewSize() {
+      const isMobile = window.matchMedia("(max-width: 768px)").matches;
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 700;
+      const maxHeight = isMobile
+        ? Math.max(260, Math.min(380, Math.round(viewportHeight * 0.42)))
+        : 600;
+
+      image.style.maxHeight = maxHeight + "px";
+      image.style.maxWidth = "100%";
+      image.style.width = "auto";
+      image.style.height = "auto";
     }
 
     function safeFileBaseName(name) {
@@ -622,6 +647,7 @@
           try {
             if (cropper) cropper.destroy();
 
+            applyPreviewSize();
             image.style.display = "block";
 
             cropper = new Cropper(image, {
