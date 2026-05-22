@@ -12,9 +12,18 @@
     body {
       font-family: Arial, sans-serif;
       padding: 20px;
+      width: 100%;
       max-width: 1000px;
       margin: 0 auto;
       color: #111;
+      box-sizing: border-box;
+      overflow-x: hidden;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
     }
 
     h2 {
@@ -33,15 +42,25 @@
       width: 100%;
       max-width: 500px;
       padding: 8px;
-      font-size: 14px;
+      font-size: 16px;
       box-sizing: border-box;
     }
 
     #image {
+      width: 100%;
       max-width: 100%;
       max-height: 600px;
       display: none;
       margin-top: 20px;
+    }
+
+    .cropper-container,
+    .cropper-wrap-box,
+    .cropper-canvas,
+    .cropper-drag-box,
+    .cropper-crop-box,
+    .cropper-view-box {
+      max-width: 100% !important;
     }
 
     .controls {
@@ -109,6 +128,7 @@
       border: 1px solid #ddd;
       border-radius: 10px;
       background: #f8fbf7;
+      width: 100%;
       max-width: 760px;
     }
 
@@ -191,32 +211,72 @@
       color: #8a4b00;
     }
 
-    @media (max-width: 600px) {
+    @media (max-width: 768px) {
       body {
-        padding: 14px;
+        padding: 12px;
+        max-width: 100%;
+        font-size: 15px;
       }
 
       h2 {
         font-size: 22px;
+        margin-bottom: 12px;
+      }
+
+      label {
+        margin-top: 10px;
+      }
+
+      input[type="text"],
+      select {
+        width: 100%;
+        max-width: 100%;
+        font-size: 16px;
+      }
+
+      .upload-box,
+      .note,
+      .file-summary,
+      #forestHeroSection,
+      #searchResults,
+      .selected-item {
+        width: 100%;
+        max-width: 100%;
+      }
+
+      .upload-buttons {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
       }
 
       button,
       .upload-action {
         width: 100%;
-        margin-right: 0;
+        margin: 0;
+        padding: 12px 14px;
+        font-size: 15px;
       }
 
-      .upload-buttons {
-        flex-direction: column;
-      }
-
-      input[type="text"],
-      select {
-        max-width: 100%;
+      .controls {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
       }
 
       #image {
-        max-height: 420px;
+        width: 100%;
+        max-width: 100%;
+        max-height: 55vh;
+      }
+
+      .note {
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .upload-hint {
+        font-size: 13px;
       }
     }
   </style>
@@ -622,10 +682,12 @@ async function handleImageSelected(event, sourceLabel) {
         directUploadBtn.disabled = true;
 
         status.textContent =
-          "Image loaded.\n" +
+          "Image loaded.
+" +
           "Original ready for upload: " +
           Math.round(processedOriginalFile.size / 1024) +
-          " KB.\n" +
+          " KB.
+" +
           "Now crop the image to 600 px.";
 
       } catch (err) {
@@ -830,10 +892,12 @@ cropBtn.addEventListener("click", async function () {
     uploadBtn.disabled = false;
 
     status.textContent =
-      "Cropped image ready.\n" +
+      "Cropped image ready.
+" +
       "Cropped size: " +
       Math.round(croppedBlob.size / 1024) +
-      " KB.\n" +
+      " KB.
+" +
       "You can now upload both versions.";
 
   } catch (err) {
@@ -982,11 +1046,16 @@ uploadBtn.addEventListener("click", async function () {
     const data3 = await saveReview(payload);
 
     status.textContent =
-      "Done.\n" +
-      "Category: " + category.value + "\n" +
-      (selectedLink ? "Selected link: " + selectedLink.display_label + "\n" : "") +
-      "Original uploaded as: " + data1.key + "\n" +
-      "Cropped uploaded as: " + data2.key + "\n" +
+      "Done.
+" +
+      "Category: " + category.value + "
+" +
+      (selectedLink ? "Selected link: " + selectedLink.display_label + "
+" : "") +
+      "Original uploaded as: " + data1.key + "
+" +
+      "Cropped uploaded as: " + data2.key + "
+" +
       "Saved for review (ID: " + data3.review_id + ")";
 
   } catch (err) {
@@ -1036,10 +1105,14 @@ directUploadBtn.addEventListener("click", async function () {
     const data2 = await saveReview(payload);
 
     status.textContent =
-      "Done.\n" +
-      "Category: " + category.value + "\n" +
-      "File type: " + fileKind + "\n" +
-      "Uploaded as: " + data1.key + "\n" +
+      "Done.
+" +
+      "Category: " + category.value + "
+" +
+      "File type: " + fileKind + "
+" +
+      "Uploaded as: " + data1.key + "
+" +
       "Saved for review (ID: " + data2.review_id + ")";
 
   } catch (err) {
