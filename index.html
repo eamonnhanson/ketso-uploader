@@ -3,12 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <title>KETSO upload</title>
-
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
 
   <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
     body {
       font-family: Arial, sans-serif;
       padding: 20px;
@@ -16,14 +21,7 @@
       max-width: 1000px;
       margin: 0 auto;
       color: #111;
-      box-sizing: border-box;
       overflow-x: hidden;
-    }
-
-    *,
-    *::before,
-    *::after {
-      box-sizing: border-box;
     }
 
     h2 {
@@ -43,19 +41,21 @@
       max-width: 500px;
       padding: 8px;
       font-size: 16px;
-      box-sizing: border-box;
     }
 
     #image {
       display: none;
-      width: auto;
       max-width: 100%;
       height: auto;
       max-height: 600px;
       margin-top: 20px;
     }
 
-    .cropper-container,
+    .cropper-container {
+      margin-top: 20px;
+      max-width: 100% !important;
+    }
+
     .cropper-wrap-box,
     .cropper-canvas,
     .cropper-drag-box,
@@ -83,7 +83,6 @@
       line-height: 1.2;
       text-align: center;
       text-decoration: none;
-      box-sizing: border-box;
     }
 
     button.secondary,
@@ -271,11 +270,7 @@
         max-height: 55vh;
       }
 
-      .note {
-        font-size: 13px;
-        line-height: 1.45;
-      }
-
+      .note,
       .upload-hint {
         font-size: 13px;
       }
@@ -284,449 +279,466 @@
 </head>
 
 <body>
+  <h2>KETSO upload</h2>
 
-<h2>KETSO upload</h2>
+  <label for="category">Category</label>
+  <select id="category">
+    <option value="">Select category</option>
+    <option value="academy_upload">Academy upload</option>
+    <option value="academy_onboarding">Academy onboarding</option>
+    <option value="forest_hero">Forest Hero</option>
+    <option value="nursery">Nursery</option>
+    <option value="training">Training</option>
+    <option value="vocational_training">Vocational training</option>
+    <option value="charcoal_making">Charcoal making</option>
+    <option value="truck">Truck</option>
+    <option value="wilde_ganzen">Wilde Ganzen</option>
+    <option value="hoorn_foundation">Hoorn Foundation</option>
+    <option value="josephina_foundation">Josephina Foundation</option>
+    <option value="care_international">Care International</option>
+    <option value="woord_en_daad">Woord en Daad</option>
+    <option value="plant_een_boom">Plant een Boom</option>
+    <option value="other">Other</option>
+  </select>
 
-<label for="category">Category</label>
-<select id="category">
-  <option value="">Select category</option>
-  <option value="academy_upload">Academy upload</option>
-  <option value="academy_onboarding">Academy onboarding</option>
-  <option value="forest_hero">Forest Hero</option>
-  <option value="nursery">Nursery</option>
-  <option value="training">Training</option>
-  <option value="vocational_training">Vocational training</option>
-  <option value="charcoal_making">Charcoal making</option>
-  <option value="truck">Truck</option>
-  <option value="wilde_ganzen">Wilde Ganzen</option>
-  <option value="hoorn_foundation">Hoorn Foundation</option>
-  <option value="josephina_foundation">Josephina Foundation</option>
-  <option value="care_international">Care International</option>
-  <option value="woord_en_daad">Woord en Daad</option>
-  <option value="plant_een_boom">Plant een Boom</option>
-  <option value="other">Other</option>
-</select>
+  <div id="forestHeroSection">
+    <label for="forestHeroSearch">Search Forest Hero / tree</label>
+    <input type="text" id="forestHeroSearch" placeholder="Type name, tree type, area, or tree code">
 
-<div id="forestHeroSection">
-  <label for="forestHeroSearch">Search Forest Hero / tree</label>
-  <input
-    type="text"
-    id="forestHeroSearch"
-    placeholder="Type name, tree type, area, or tree code"
-  >
-
-  <div class="small">
-    Example: Amara, mango, Makombeh, or tree code
+    <div class="small">Example: Amara, mango, Makombeh, or tree code</div>
+    <div id="searchResults"></div>
+    <div id="selectedHero" class="selected-item" style="display:none;"></div>
   </div>
 
-  <div id="searchResults"></div>
-  <div id="selectedHero" class="selected-item" style="display:none;"></div>
-</div>
+  <div class="upload-box">
+    <label><strong>Take a photo or upload file</strong></label>
 
-<div class="upload-box">
-  <label><strong>Take a photo or upload file</strong></label>
+    <div class="upload-buttons">
+      <label for="selfieInput" class="upload-action">Take selfie</label>
+      <label for="backCameraInput" class="upload-action secondary">Take photo</label>
+      <label for="fileInput" class="upload-action neutral">Take photo or upload file</label>
+    </div>
 
-  <div class="upload-buttons">
-    <label for="selfieInput" class="upload-action">
-      Take selfie
-    </label>
+    <input id="selfieInput" class="visually-hidden-file" type="file" accept="image/*" capture="user">
+    <input id="backCameraInput" class="visually-hidden-file" type="file" accept="image/*" capture="environment">
+    <input id="fileInput" class="visually-hidden-file" type="file" accept="image/*,video/*,.jpg,.jpeg,.png,.webp,.mp4,.mov,.webm,.m4v,.pdf,.doc,.docx,.txt">
 
-    <label for="backCameraInput" class="upload-action secondary">
-      Take photo
-    </label>
+    <div id="selectedFileInfo" class="selected-file"></div>
 
-    <label for="fileInput" class="upload-action neutral">
-      Take photo or upload file
-    </label>
+    <div class="upload-hint">
+      You can take a photo with your phone, or upload an image, video, document or text file from your laptop or computer.<br>
+      Images will be cropped to 600 px before upload.<br>
+      Videos, PDF, Word and text files will be uploaded directly without cropping.
+    </div>
   </div>
 
-  <input
-    id="selfieInput"
-    class="visually-hidden-file"
-    type="file"
-    accept="image/*"
-    capture="user"
-  >
+  <div class="note">
+    <strong>For images:</strong><br>
+    1. Take a photo or upload an image<br>
+    2. Use the zoom buttons to zoom in<br>
+    3. Drag the image to position it<br>
+    4. Adjust the crop box<br>
+    5. Click "Crop to 600 px"<br>
+    6. Click "Upload original + cropped"<br><br>
 
-  <input
-    id="backCameraInput"
-    class="visually-hidden-file"
-    type="file"
-    accept="image/*"
-    capture="environment"
-  >
+    <strong>For video, PDF, Word or text files:</strong><br>
+    1. Click "Take photo or upload file"<br>
+    2. Select your file<br>
+    3. Click "Upload selected file"<br><br>
 
-  <input
-    id="fileInput"
-    class="visually-hidden-file"
-    type="file"
-    accept="image/*,video/*,.jpg,.jpeg,.png,.webp,.mp4,.mov,.webm,.m4v,.pdf,.doc,.docx,.txt"
-  >
-
-  <div id="selectedFileInfo" class="selected-file"></div>
-
-  <div class="upload-hint">
-    You can take a photo with your phone, or upload an image, video, document or text file from your laptop or computer.<br>
-    Images will be cropped to 600 px before upload.<br>
-    Videos, PDF, Word and text files will be uploaded directly without cropping.
+    Use JPG, PNG or WebP for images. HEIC is not reliable in browser preview/crop.
   </div>
-</div>
 
-<div class="note">
-  <strong>For images:</strong><br>
-  1. Take a photo or upload an image<br>
-  2. Use the zoom buttons to zoom in<br>
-  3. Drag the image to position it<br>
-  4. Adjust the crop box<br>
-  5. Click "Crop to 600 px"<br>
-  6. Click "Upload original + cropped"<br><br>
+  <div id="fileSummary" class="file-summary"></div>
 
-  <strong>For video, PDF, Word or text files:</strong><br>
-  1. Click "Take photo or upload file"<br>
-  2. Select your file<br>
-  3. Click "Upload selected file"<br><br>
+  <img id="image" alt="Preview">
 
-  Use JPG, PNG or WebP for images. HEIC is not reliable in browser preview/crop.
-</div>
+  <div class="controls" id="cropControls">
+    <button id="zoomIn" type="button" disabled>Zoom in</button>
+    <button id="zoomOut" type="button" disabled>Zoom out</button>
+  </div>
 
-<div id="fileSummary" class="file-summary"></div>
+  <div class="controls">
+    <button id="cropBtn" type="button" disabled>Crop to 600 px</button>
+    <button id="uploadBtn" type="button" disabled>Upload original + cropped</button>
+    <button id="directUploadBtn" type="button" class="neutral" disabled style="display:none;">Upload selected file</button>
+  </div>
 
-<img id="image" alt="Preview">
+  <p id="status"></p>
 
-<div class="controls" id="cropControls">
-  <button id="zoomIn" type="button" disabled>Zoom in</button>
-  <button id="zoomOut" type="button" disabled>Zoom out</button>
-</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
 
-<div class="controls">
-  <button id="cropBtn" type="button" disabled>Crop to 600 px</button>
-  <button id="uploadBtn" type="button" disabled>Upload original + cropped</button>
-  <button id="directUploadBtn" type="button" class="neutral" disabled style="display:none;">Upload selected file</button>
-</div>
+  <script>
+    let cropper = null;
+    let croppedBlob = null;
+    let processedOriginalFile = null;
+    let selectedOriginalFile = null;
+    let selectedDirectFile = null;
+    let selectedFileMode = null;
+    let selectedLink = null;
+    let searchTimeout = null;
 
-<p id="status"></p>
+    const SEARCH_API_BASE = "https://ptb-tree-map.onrender.com";
+    const REVIEW_API_URL = "https://ptb-tree-map.onrender.com/api/save-photo-review";
+    const R2_PUBLIC_BASE = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/";
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+    const MAX_ORIGINAL_BYTES = 8 * 1024 * 1024;
+    const MAX_CROPPED_BYTES = 500 * 1024;
+    const HARD_MAX_IMAGE_INPUT_BYTES = 25 * 1024 * 1024;
+    const HARD_MAX_DIRECT_FILE_BYTES = 50 * 1024 * 1024;
 
-<script>
-let cropper = null;
-let croppedBlob = null;
-let processedOriginalFile = null;
-let selectedOriginalFile = null;
-let selectedDirectFile = null;
-let selectedFileMode = null;
-let selectedLink = null;
-let searchTimeout = null;
+    const selfieInput = document.getElementById("selfieInput");
+    const backCameraInput = document.getElementById("backCameraInput");
+    const fileInput = document.getElementById("fileInput");
 
-const SEARCH_API_BASE = "https://ptb-tree-map.onrender.com";
-const REVIEW_API_URL = "https://ptb-tree-map.onrender.com/api/save-photo-review";
-const R2_PUBLIC_BASE = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/";
+    const selectedFileInfo = document.getElementById("selectedFileInfo");
+    const fileSummary = document.getElementById("fileSummary");
 
-const MAX_ORIGINAL_BYTES = 8 * 1024 * 1024;
-const MAX_CROPPED_BYTES = 500 * 1024;
-const HARD_MAX_IMAGE_INPUT_BYTES = 25 * 1024 * 1024;
-const HARD_MAX_DIRECT_FILE_BYTES = 50 * 1024 * 1024;
+    const image = document.getElementById("image");
+    const cropBtn = document.getElementById("cropBtn");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const directUploadBtn = document.getElementById("directUploadBtn");
+    const zoomIn = document.getElementById("zoomIn");
+    const zoomOut = document.getElementById("zoomOut");
+    const status = document.getElementById("status");
 
-const selfieInput = document.getElementById("selfieInput");
-const backCameraInput = document.getElementById("backCameraInput");
-const fileInput = document.getElementById("fileInput");
+    const category = document.getElementById("category");
+    const forestHeroSection = document.getElementById("forestHeroSection");
+    const forestHeroSearch = document.getElementById("forestHeroSearch");
+    const searchResults = document.getElementById("searchResults");
+    const selectedHero = document.getElementById("selectedHero");
 
-const selectedFileInfo = document.getElementById("selectedFileInfo");
-const fileSummary = document.getElementById("fileSummary");
-
-const image = document.getElementById("image");
-const cropBtn = document.getElementById("cropBtn");
-const uploadBtn = document.getElementById("uploadBtn");
-const directUploadBtn = document.getElementById("directUploadBtn");
-const zoomIn = document.getElementById("zoomIn");
-const zoomOut = document.getElementById("zoomOut");
-const status = document.getElementById("status");
-
-const category = document.getElementById("category");
-const forestHeroSection = document.getElementById("forestHeroSection");
-const forestHeroSearch = document.getElementById("forestHeroSearch");
-const searchResults = document.getElementById("searchResults");
-const selectedHero = document.getElementById("selectedHero");
-
-function safeFileBaseName(name) {
-  return name
-    .replace(/\.[^/.]+$/, "")
-    .replace(/[^a-zA-Z0-9-_]/g, "_")
-    .toLowerCase();
-}
-
-function formatBytes(bytes) {
-  if (!bytes && bytes !== 0) return "unknown size";
-  if (bytes < 1024) return bytes + " bytes";
-  if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + " KB";
-  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-}
-
-function blobFromCanvas(canvas, type, quality) {
-  return new Promise((resolve) => {
-    canvas.toBlob(resolve, type, quality);
-  });
-}
-
-async function compressCanvasToMaxBytes(canvas, maxBytes, options = {}) {
-  const type = options.type || "image/jpeg";
-  let quality = options.startQuality || 0.86;
-  const minQuality = options.minQuality || 0.45;
-
-  let blob = await blobFromCanvas(canvas, type, quality);
-
-  while (blob && blob.size > maxBytes && quality > minQuality) {
-    quality -= 0.06;
-    blob = await blobFromCanvas(canvas, type, quality);
-  }
-
-  return blob;
-}
-
-function loadImageFromFile(file) {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(img);
-    };
-
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("Could not load image."));
-    };
-
-    img.src = url;
-  });
-}
-
-async function resizeOriginalIfNeeded(file) {
-  if (file.size <= MAX_ORIGINAL_BYTES) {
-    return file;
-  }
-
-  status.textContent = "Original image is larger than 8 MB. Resizing before upload...";
-
-  const img = await loadImageFromFile(file);
-
-  let scale = 0.9;
-  let blob = null;
-
-  while (scale > 0.25) {
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(img.naturalWidth * scale);
-    canvas.height = Math.round(img.naturalHeight * scale);
-
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-    blob = await compressCanvasToMaxBytes(canvas, MAX_ORIGINAL_BYTES, {
-      startQuality: 0.86,
-      minQuality: 0.45
-    });
-
-    if (blob && blob.size <= MAX_ORIGINAL_BYTES) {
-      break;
+    function setStatus(lines) {
+      status.textContent = lines.filter(Boolean).join("\n");
     }
 
-    scale -= 0.1;
-  }
+    function appendStatus(line) {
+      status.textContent += "\n" + line;
+    }
 
-  if (!blob || blob.size > MAX_ORIGINAL_BYTES) {
-    throw new Error("Could not reduce original image below 8 MB.");
-  }
+    function safeFileBaseName(name) {
+      return name
+        .replace(/\.[^/.]+$/, "")
+        .replace(/[^a-zA-Z0-9-_]/g, "_")
+        .toLowerCase();
+    }
 
-  const newName = safeFileBaseName(file.name || "photo") + "_original.jpg";
-  return new File([blob], newName, { type: "image/jpeg" });
-}
+    function formatBytes(bytes) {
+      if (!bytes && bytes !== 0) return "unknown size";
+      if (bytes < 1024) return bytes + " bytes";
+      if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + " KB";
+      return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+    }
 
-function resetImageState() {
-  croppedBlob = null;
-  processedOriginalFile = null;
-  selectedOriginalFile = null;
-  selectedDirectFile = null;
-  selectedFileMode = null;
+    function blobFromCanvas(canvas, type, quality) {
+      return new Promise((resolve) => {
+        canvas.toBlob(resolve, type, quality);
+      });
+    }
 
-  uploadBtn.disabled = true;
-  cropBtn.disabled = true;
-  directUploadBtn.disabled = true;
-  directUploadBtn.style.display = "none";
-  zoomIn.disabled = true;
-  zoomOut.disabled = true;
+    async function compressCanvasToMaxBytes(canvas, maxBytes, options = {}) {
+      const type = options.type || "image/jpeg";
+      let quality = options.startQuality || 0.86;
+      const minQuality = options.minQuality || 0.45;
 
-  if (cropper) {
-    cropper.destroy();
-    cropper = null;
-  }
+      let blob = await blobFromCanvas(canvas, type, quality);
 
-  image.removeAttribute("src");
-  image.style.display = "none";
-  fileSummary.style.display = "none";
-  fileSummary.innerHTML = "";
-}
+      while (blob && blob.size > maxBytes && quality > minQuality) {
+        quality -= 0.06;
+        blob = await blobFromCanvas(canvas, type, quality);
+      }
 
-function resetInputsExcept(activeInput) {
-  [selfieInput, backCameraInput, fileInput].forEach(input => {
-    if (input !== activeInput) input.value = "";
-  });
-}
+      return blob;
+    }
 
-function isImageFile(file) {
-  if (!file) return false;
+    function loadImageFromFile(file) {
+      return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
 
-  const type = (file.type || "").toLowerCase();
-  const name = (file.name || "").toLowerCase();
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          resolve(img);
+        };
 
-  // Mobile cameras sometimes return image files with a generic or unexpected MIME type.
-  // Accept any image/* file here, then let the browser image preview decide whether it can load it.
-  if (type.startsWith("image/")) {
-    return true;
-  }
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error("Could not load image."));
+        };
 
-  return (
-    name.endsWith(".jpg") ||
-    name.endsWith(".jpeg") ||
-    name.endsWith(".png") ||
-    name.endsWith(".webp")
-  );
-}
+        img.src = url;
+      });
+    }
 
-function isSupportedDirectFile(file) {
-  if (!file) return false;
+    async function resizeOriginalIfNeeded(file) {
+      if (file.size <= MAX_ORIGINAL_BYTES) {
+        return file;
+      }
 
-  if (isImageFile(file)) return true;
+      status.textContent = "Original image is larger than 8 MB. Resizing before upload...";
+      const img = await loadImageFromFile(file);
 
-  const name = (file.name || "").toLowerCase();
+      let scale = 0.9;
+      let blob = null;
 
-  const allowedExtensions = [
-    ".mp4",
-    ".mov",
-    ".webm",
-    ".m4v",
-    ".pdf",
-    ".doc",
-    ".docx",
-    ".txt"
-  ];
+      while (scale > 0.25) {
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.naturalWidth * scale);
+        canvas.height = Math.round(img.naturalHeight * scale);
 
-  return allowedExtensions.some(ext => name.endsWith(ext));
-}
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-function getFileKind(file) {
-  if (!file) return "unknown";
-  if (isImageFile(file)) return "image";
-  if ((file.type || "").startsWith("video/")) return "video";
-
-  const name = (file.name || "").toLowerCase();
-  if (name.endsWith(".pdf")) return "pdf";
-  if (name.endsWith(".doc") || name.endsWith(".docx")) return "document";
-  if (name.endsWith(".txt")) return "text";
-  return "file";
-}
-
-async function handleImageSelected(event, sourceLabel) {
-  const input = event.target;
-  const file = input.files && input.files[0];
-
-  if (!file) return;
-
-  resetInputsExcept(input);
-  resetImageState();
-
-  selectedFileInfo.textContent = "";
-  status.textContent = "Loading image preview...";
-
-  if (!isImageFile(file)) {
-    status.textContent = "Unsupported image format. Please use JPG, PNG or WebP. If your phone uses HEIC, change camera settings or upload a JPG/PNG version.";
-    input.value = "";
-    return;
-  }
-
-  if (file.size > HARD_MAX_IMAGE_INPUT_BYTES) {
-    status.textContent = "Image too large. Please use an image below 25 MB.";
-    input.value = "";
-    return;
-  }
-
-  selectedFileMode = "image";
-  selectedOriginalFile = file;
-  processedOriginalFile = file;
-  selectedFileInfo.textContent = sourceLabel + ": " + (file.name || "camera photo");
-
-  const reader = new FileReader();
-
-  reader.onerror = function () {
-    status.textContent = "The image could not be read from this device. Please try again, or upload a JPG, PNG or WebP image.";
-  };
-
-  reader.onload = function () {
-    image.onload = function () {
-      try {
-        if (cropper) cropper.destroy();
-
-        image.style.display = "block";
-
-        cropper = new Cropper(image, {
-          viewMode: 1,
-          dragMode: "move",
-          autoCropArea: 0.75,
-          responsive: true,
-          restore: false,
-          checkOrientation: true,
-          background: false,
-          zoomable: true,
-          guides: true,
-          center: true,
-          highlight: true
+        blob = await compressCanvasToMaxBytes(canvas, MAX_ORIGINAL_BYTES, {
+          startQuality: 0.86,
+          minQuality: 0.45
         });
 
-        cropBtn.disabled = false;
-        zoomIn.disabled = false;
-        zoomOut.disabled = false;
-        directUploadBtn.style.display = "none";
-        directUploadBtn.disabled = true;
-
-        status.textContent =
-          "Image loaded.
-" +
-          "Original file size: " + formatBytes(file.size) + "
-" +
-          "Now crop the image to 600 px.";
-
-        // Resize the original in the background if needed. This does not block the preview/cropper.
-        if (file.size > MAX_ORIGINAL_BYTES) {
-          resizeOriginalIfNeeded(file)
-            .then((resizedFile) => {
-              processedOriginalFile = resizedFile;
-              status.textContent += "
-Original was resized for upload: " + formatBytes(resizedFile.size) + ".";
-            })
-            .catch((err) => {
-              status.textContent += "
-Warning: original resize failed. Upload may be blocked. " + err.message;
-            });
+        if (blob && blob.size <= MAX_ORIGINAL_BYTES) {
+          break;
         }
 
-      } catch (err) {
-        status.textContent = "Cropper failed to load: " + err.message;
+        scale -= 0.1;
       }
-    };
 
-    image.onerror = function () {
+      if (!blob || blob.size > MAX_ORIGINAL_BYTES) {
+        throw new Error("Could not reduce original image below 8 MB.");
+      }
+
+      const newName = safeFileBaseName(file.name || "photo") + "_original.jpg";
+      return new File([blob], newName, { type: "image/jpeg" });
+    }
+
+    function resetImageState() {
+      croppedBlob = null;
+      processedOriginalFile = null;
+      selectedOriginalFile = null;
+      selectedDirectFile = null;
+      selectedFileMode = null;
+
+      uploadBtn.disabled = true;
+      cropBtn.disabled = true;
+      directUploadBtn.disabled = true;
+      directUploadBtn.style.display = "none";
+      zoomIn.disabled = true;
+      zoomOut.disabled = true;
+
+      if (cropper) {
+        cropper.destroy();
+        cropper = null;
+      }
+
+      image.onload = null;
+      image.onerror = null;
+      image.removeAttribute("src");
       image.style.display = "none";
+      fileSummary.style.display = "none";
+      fileSummary.innerHTML = "";
+    }
+
+    function resetInputsExcept(activeInput) {
+      [selfieInput, backCameraInput, fileInput].forEach((input) => {
+        if (input !== activeInput) input.value = "";
+      });
+    }
+
+    function isImageFile(file) {
+      if (!file) return false;
+
+      const type = (file.type || "").toLowerCase();
+      const name = (file.name || "").toLowerCase();
+
+      if (type.startsWith("image/")) {
+        return true;
+      }
+
+      return (
+        name.endsWith(".jpg") ||
+        name.endsWith(".jpeg") ||
+        name.endsWith(".png") ||
+        name.endsWith(".webp")
+      );
+    }
+
+    function isSupportedDirectFile(file) {
+      if (!file) return false;
+      if (isImageFile(file)) return true;
+
+      const name = (file.name || "").toLowerCase();
+      const allowedExtensions = [".mp4", ".mov", ".webm", ".m4v", ".pdf", ".doc", ".docx", ".txt"];
+
+      return allowedExtensions.some((ext) => name.endsWith(ext));
+    }
+
+    function getFileKind(file) {
+      if (!file) return "unknown";
+      if (isImageFile(file)) return "image";
+      if ((file.type || "").startsWith("video/")) return "video";
+
+      const name = (file.name || "").toLowerCase();
+      if (name.endsWith(".pdf")) return "pdf";
+      if (name.endsWith(".doc") || name.endsWith(".docx")) return "document";
+      if (name.endsWith(".txt")) return "text";
+      return "file";
+    }
+
+    async function handleImageSelected(event, sourceLabel) {
+      const input = event.target;
+      const file = input.files && input.files[0];
+
+      if (!file) return;
+
+      resetInputsExcept(input);
+      resetImageState();
+
+      selectedFileInfo.textContent = "";
+      status.textContent = "Loading image preview...";
+
+      if (!isImageFile(file)) {
+        status.textContent = "Unsupported image format. Please use JPG, PNG or WebP. If your phone uses HEIC, change camera settings or upload a JPG/PNG version.";
+        input.value = "";
+        return;
+      }
+
+      if (file.size > HARD_MAX_IMAGE_INPUT_BYTES) {
+        status.textContent = "Image too large. Please use an image below 25 MB.";
+        input.value = "";
+        return;
+      }
+
+      selectedFileMode = "image";
+      selectedOriginalFile = file;
+      processedOriginalFile = file;
+      selectedFileInfo.textContent = sourceLabel + ": " + (file.name || "camera photo");
+
+      const reader = new FileReader();
+
+      reader.onerror = function () {
+        status.textContent = "The image could not be read from this device. Please try again, or upload a JPG, PNG or WebP image.";
+      };
+
+      reader.onload = function () {
+        image.onload = function () {
+          try {
+            if (cropper) cropper.destroy();
+
+            image.style.display = "block";
+
+            cropper = new Cropper(image, {
+              viewMode: 1,
+              dragMode: "move",
+              autoCropArea: 0.75,
+              responsive: true,
+              restore: false,
+              checkOrientation: true,
+              background: false,
+              zoomable: true,
+              guides: true,
+              center: true,
+              highlight: true
+            });
+
+            cropBtn.disabled = false;
+            zoomIn.disabled = false;
+            zoomOut.disabled = false;
+            directUploadBtn.style.display = "none";
+            directUploadBtn.disabled = true;
+
+            setStatus([
+              "Image loaded.",
+              "Original file size: " + formatBytes(file.size),
+              "Now crop the image to 600 px."
+            ]);
+
+            if (file.size > MAX_ORIGINAL_BYTES) {
+              resizeOriginalIfNeeded(file)
+                .then((resizedFile) => {
+                  processedOriginalFile = resizedFile;
+                  appendStatus("Original was resized for upload: " + formatBytes(resizedFile.size) + ".");
+                })
+                .catch((err) => {
+                  appendStatus("Warning: original resize failed. Upload may be blocked. " + err.message);
+                });
+            }
+          } catch (err) {
+            status.textContent = "Cropper failed to load: " + err.message;
+          }
+        };
+
+        image.onerror = function () {
+          image.style.display = "none";
+
+          selectedFileMode = "direct";
+          selectedDirectFile = file;
+
+          fileSummary.style.display = "block";
+          fileSummary.innerHTML = `
+            <strong>Selected image</strong><br>
+            Name: ${escapeHtml(file.name || "camera photo")}<br>
+            Type: image<br>
+            Size: ${escapeHtml(formatBytes(file.size))}<br>
+            <span class="warning">Preview failed, so cropping is not available. This often happens with HEIC photos on some phones. You can upload this image directly, or choose a JPG, PNG or WebP image.</span>
+          `;
+
+          cropBtn.disabled = true;
+          uploadBtn.disabled = true;
+          zoomIn.disabled = true;
+          zoomOut.disabled = true;
+          directUploadBtn.style.display = "inline-block";
+          directUploadBtn.disabled = false;
+
+          status.textContent = "Image preview failed. You can upload the selected image directly, or choose a JPG, PNG or WebP image.";
+        };
+
+        image.style.display = "block";
+        image.src = reader.result;
+      };
+
+      reader.readAsDataURL(file);
+    }
+
+    function handleMixedFileSelected(event) {
+      const input = event.target;
+      const file = input.files && input.files[0];
+
+      if (!file) return;
+
+      if (isImageFile(file)) {
+        handleImageSelected(event, "Image selected");
+        return;
+      }
+
+      resetInputsExcept(input);
+      resetImageState();
+
+      selectedFileInfo.textContent = "";
+      status.textContent = "";
+
+      if (!isSupportedDirectFile(file)) {
+        status.textContent = "Unsupported file type. Use JPG, PNG, WebP, MP4, MOV, WebM, PDF, DOC, DOCX or TXT.";
+        input.value = "";
+        return;
+      }
+
+      if (file.size > HARD_MAX_DIRECT_FILE_BYTES) {
+        status.textContent = "File too large. Please use a file below 50 MB.";
+        input.value = "";
+        return;
+      }
 
       selectedFileMode = "direct";
       selectedDirectFile = file;
+      selectedFileInfo.textContent = "File selected: " + (file.name || "uploaded file");
+
+      const kind = getFileKind(file);
 
       fileSummary.style.display = "block";
       fileSummary.innerHTML = `
-        <strong>Selected image</strong><br>
-        Name: ${escapeHtml(file.name || "camera photo")}<br>
-        Type: image<br>
+        <strong>Selected file</strong><br>
+        Name: ${escapeHtml(file.name || "uploaded file")}<br>
+        Type: ${escapeHtml(kind)}<br>
         Size: ${escapeHtml(formatBytes(file.size))}<br>
-        <span class="warning">Preview failed, so cropping is not available. This often happens with HEIC photos on some phones. You can upload this image directly, or choose a JPG, PNG or WebP image.</span>
+        <span class="warning">This file will be uploaded directly. No cropping is needed.</span>
       `;
 
       cropBtn.disabled = true;
@@ -736,442 +748,366 @@ Warning: original resize failed. Upload may be blocked. " + err.message;
       directUploadBtn.style.display = "inline-block";
       directUploadBtn.disabled = false;
 
-      status.textContent = "Image preview failed. You can upload the selected image directly, or choose a JPG, PNG or WebP image.";
-    };
-
-    image.style.display = "block";
-    image.src = reader.result;
-  };
-
-  reader.readAsDataURL(file);
-}
-
-function handleMixedFileSelected(event) {
-  const input = event.target;
-  const file = input.files && input.files[0];
-
-  if (!file) return;
-
-  if (isImageFile(file)) {
-    handleImageSelected(event, "Image selected");
-    return;
-  }
-
-  resetInputsExcept(input);
-  resetImageState();
-
-  selectedFileInfo.textContent = "";
-  status.textContent = "";
-
-  if (!isSupportedDirectFile(file)) {
-    status.textContent = "Unsupported file type. Use JPG, PNG, WebP, MP4, MOV, WebM, PDF, DOC, DOCX or TXT.";
-    input.value = "";
-    return;
-  }
-
-  if (file.size > HARD_MAX_DIRECT_FILE_BYTES) {
-    status.textContent = "File too large. Please use a file below 50 MB.";
-    input.value = "";
-    return;
-  }
-
-  selectedFileMode = "direct";
-  selectedDirectFile = file;
-  selectedFileInfo.textContent = "File selected: " + (file.name || "uploaded file");
-
-  const kind = getFileKind(file);
-
-  fileSummary.style.display = "block";
-  fileSummary.innerHTML = `
-    <strong>Selected file</strong><br>
-    Name: ${escapeHtml(file.name || "uploaded file")}<br>
-    Type: ${escapeHtml(kind)}<br>
-    Size: ${escapeHtml(formatBytes(file.size))}<br>
-    <span class="warning">This file will be uploaded directly. No cropping is needed.</span>
-  `;
-
-  cropBtn.disabled = true;
-  uploadBtn.disabled = true;
-  zoomIn.disabled = true;
-  zoomOut.disabled = true;
-  directUploadBtn.style.display = "inline-block";
-  directUploadBtn.disabled = false;
-
-  status.textContent = "File ready. Click Upload selected file.";
-}
-
-function escapeHtml(value) {
-  return String(value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-category.addEventListener("change", () => {
-  selectedLink = null;
-  selectedHero.style.display = "none";
-  selectedHero.innerHTML = "";
-  searchResults.innerHTML = "";
-  forestHeroSearch.value = "";
-
-  forestHeroSection.style.display = category.value === "forest_hero" ? "block" : "none";
-});
-
-forestHeroSearch.addEventListener("input", () => {
-  const q = forestHeroSearch.value.trim();
-
-  selectedLink = null;
-  selectedHero.style.display = "none";
-  selectedHero.innerHTML = "";
-
-  if (searchTimeout) clearTimeout(searchTimeout);
-
-  if (q.length < 2) {
-    searchResults.innerHTML = "";
-    return;
-  }
-
-  searchTimeout = setTimeout(() => {
-    runForestHeroSearch(q);
-  }, 300);
-});
-
-async function runForestHeroSearch(q) {
-  searchResults.innerHTML = "Searching...";
-
-  try {
-    const url = `${SEARCH_API_BASE}/api/forest-hero-search?q=${encodeURIComponent(q)}`;
-    const res = await fetch(url);
-
-    if (!res.ok) {
-      searchResults.innerHTML = "Search failed.";
-      return;
+      status.textContent = "File ready. Click Upload selected file.";
     }
 
-    const results = await res.json();
-
-    if (!Array.isArray(results) || results.length === 0) {
-      searchResults.innerHTML = "No matching Forest Heroes found.";
-      return;
+    function escapeHtml(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
     }
 
-    searchResults.innerHTML = "";
+    category.addEventListener("change", () => {
+      selectedLink = null;
+      selectedHero.style.display = "none";
+      selectedHero.innerHTML = "";
+      searchResults.innerHTML = "";
+      forestHeroSearch.value = "";
 
-    results.forEach(item => {
-      const div = document.createElement("div");
-      div.className = "result-item";
-      div.textContent = item.display_label;
+      forestHeroSection.style.display = category.value === "forest_hero" ? "block" : "none";
+    });
 
-      div.addEventListener("click", () => {
-        selectedLink = item;
-        selectedHero.style.display = "block";
-        selectedHero.innerHTML = `
-          <strong>Selected Forest Hero</strong><br>
-          ${item.display_label}<br>
-          <span class="small">user_id: ${item.user_id}, tree_id: ${item.tree_id}</span>
-        `;
+    forestHeroSearch.addEventListener("input", () => {
+      const q = forestHeroSearch.value.trim();
+
+      selectedLink = null;
+      selectedHero.style.display = "none";
+      selectedHero.innerHTML = "";
+
+      if (searchTimeout) clearTimeout(searchTimeout);
+
+      if (q.length < 2) {
         searchResults.innerHTML = "";
+        return;
+      }
+
+      searchTimeout = setTimeout(() => {
+        runForestHeroSearch(q);
+      }, 300);
+    });
+
+    async function runForestHeroSearch(q) {
+      searchResults.innerHTML = "Searching...";
+
+      try {
+        const url = `${SEARCH_API_BASE}/api/forest-hero-search?q=${encodeURIComponent(q)}`;
+        const res = await fetch(url);
+
+        if (!res.ok) {
+          searchResults.innerHTML = "Search failed.";
+          return;
+        }
+
+        const results = await res.json();
+
+        if (!Array.isArray(results) || results.length === 0) {
+          searchResults.innerHTML = "No matching Forest Heroes found.";
+          return;
+        }
+
+        searchResults.innerHTML = "";
+
+        results.forEach((item) => {
+          const div = document.createElement("div");
+          div.className = "result-item";
+          div.textContent = item.display_label;
+
+          div.addEventListener("click", () => {
+            selectedLink = item;
+            selectedHero.style.display = "block";
+            selectedHero.innerHTML = `
+              <strong>Selected Forest Hero</strong><br>
+              ${escapeHtml(item.display_label)}<br>
+              <span class="small">user_id: ${escapeHtml(item.user_id)}, tree_id: ${escapeHtml(item.tree_id)}</span>
+            `;
+            searchResults.innerHTML = "";
+          });
+
+          searchResults.appendChild(div);
+        });
+      } catch (err) {
+        searchResults.innerHTML = "Search error: " + err.message;
+      }
+    }
+
+    selfieInput.addEventListener("change", (event) => {
+      handleImageSelected(event, "Selfie selected");
+    });
+
+    backCameraInput.addEventListener("change", (event) => {
+      handleImageSelected(event, "Photo selected");
+    });
+
+    fileInput.addEventListener("change", handleMixedFileSelected);
+
+    zoomIn.addEventListener("click", () => {
+      if (cropper) cropper.zoom(0.2);
+    });
+
+    zoomOut.addEventListener("click", () => {
+      if (cropper) cropper.zoom(-0.2);
+    });
+
+    cropBtn.addEventListener("click", async function () {
+      if (!cropper) return;
+
+      const canvas = cropper.getCroppedCanvas({
+        width: 600,
+        height: 600,
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: "high"
       });
 
-      searchResults.appendChild(div);
+      if (!canvas) {
+        status.textContent = "Cropping failed.";
+        return;
+      }
+
+      try {
+        const blob = await compressCanvasToMaxBytes(canvas, MAX_CROPPED_BYTES, {
+          startQuality: 0.86,
+          minQuality: 0.45
+        });
+
+        if (!blob) {
+          status.textContent = "Could not create cropped image.";
+          return;
+        }
+
+        if (blob.size > MAX_CROPPED_BYTES) {
+          status.textContent = "Cropped image is still above 500 KB. Please crop a smaller area or use another image.";
+          return;
+        }
+
+        croppedBlob = blob;
+        uploadBtn.disabled = false;
+
+        setStatus([
+          "Cropped image ready.",
+          "Cropped size: " + Math.round(croppedBlob.size / 1024) + " KB.",
+          "You can now upload both versions."
+        ]);
+      } catch (err) {
+        status.textContent = "Crop compression failed: " + err.message;
+      }
     });
 
-  } catch (err) {
-    searchResults.innerHTML = "Search error: " + err.message;
-  }
-}
+    async function uploadFileToR2(file, label) {
+      const fd = new FormData();
+      fd.append("file", file);
 
-selfieInput.addEventListener("change", (event) => {
-  handleImageSelected(event, "Selfie selected");
-});
+      const res = await fetch("/upload", {
+        method: "POST",
+        body: fd
+      });
 
-backCameraInput.addEventListener("change", (event) => {
-  handleImageSelected(event, "Photo selected");
-});
+      const contentType = res.headers.get("content-type") || "";
+      let data;
 
-fileInput.addEventListener("change", handleMixedFileSelected);
+      if (contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(label + " upload returned non-JSON response: " + text.slice(0, 200));
+      }
 
-zoomIn.addEventListener("click", () => {
-  if (cropper) cropper.zoom(0.2);
-});
+      if (!res.ok) {
+        throw new Error(label + " upload failed: " + (data.error || res.status));
+      }
 
-zoomOut.addEventListener("click", () => {
-  if (cropper) cropper.zoom(-0.2);
-});
+      return data;
+    }
 
-cropBtn.addEventListener("click", async function () {
-  if (!cropper) return;
+    async function saveReview(payload) {
+      const res = await fetch(REVIEW_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
 
-  const canvas = cropper.getCroppedCanvas({
-    width: 600,
-    height: 600,
-    imageSmoothingEnabled: true,
-    imageSmoothingQuality: "high"
-  });
+      const contentType = res.headers.get("content-type") || "";
+      let data;
 
-  if (!canvas) {
-    status.textContent = "Cropping failed.";
-    return;
-  }
+      if (contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error("Review save returned non-JSON response: " + text.slice(0, 200));
+      }
 
-  try {
-    const blob = await compressCanvasToMaxBytes(canvas, MAX_CROPPED_BYTES, {
-      startQuality: 0.86,
-      minQuality: 0.45
+      if (!res.ok) {
+        throw new Error("Review save failed: " + (data.error || res.status));
+      }
+
+      return data;
+    }
+
+    function buildBaseReviewPayload(fileUrl, originalUrl, originalSize, croppedSize, extra = {}) {
+      return {
+        category: category.value || null,
+        file_url: fileUrl,
+        cropped_file_url: fileUrl,
+        original_file_url: originalUrl,
+        original_file_size_bytes: originalSize,
+        cropped_file_size_bytes: croppedSize,
+        user_id: selectedLink ? selectedLink.user_id : null,
+        tree_id: selectedLink ? selectedLink.tree_id : null,
+        linked_entity_type: category.value === "forest_hero" ? "forest_hero" : "general",
+        linked_entity_name: selectedLink
+          ? `${selectedLink.first_name || ""} ${selectedLink.last_name || ""}`.trim()
+          : category.value,
+        uploader_name: null,
+        uploader_email: null,
+        ...extra
+      };
+    }
+
+    function validateBeforeUpload() {
+      if (!category.value) {
+        status.textContent = "Please select a category before uploading.";
+        return false;
+      }
+
+      if (category.value === "forest_hero" && !selectedLink) {
+        status.textContent = "Please select a Forest Hero before uploading.";
+        return false;
+      }
+
+      return true;
+    }
+
+    uploadBtn.addEventListener("click", async function () {
+      let originalFile = processedOriginalFile || selectedOriginalFile;
+
+      if (!originalFile) {
+        status.textContent = "No original image selected.";
+        return;
+      }
+
+      if (originalFile.size > MAX_ORIGINAL_BYTES) {
+        try {
+          status.textContent = "Original image is larger than 8 MB. Resizing before upload...";
+          originalFile = await resizeOriginalIfNeeded(originalFile);
+          processedOriginalFile = originalFile;
+        } catch (err) {
+          status.textContent = "Original image is still larger than 8 MB and could not be resized. Upload blocked. " + err.message;
+          return;
+        }
+      }
+
+      if (!croppedBlob) {
+        status.textContent = "Please crop the image first.";
+        return;
+      }
+
+      if (croppedBlob.size > MAX_CROPPED_BYTES) {
+        status.textContent = "Cropped image is larger than 500 KB. Upload blocked.";
+        return;
+      }
+
+      if (!validateBeforeUpload()) return;
+
+      uploadBtn.disabled = true;
+      directUploadBtn.disabled = true;
+
+      try {
+        status.textContent = "Uploading original image...";
+        const data1 = await uploadFileToR2(originalFile, "Original image");
+
+        status.textContent = "Uploading cropped 600 px version...";
+        const croppedName = safeFileBaseName(originalFile.name || "photo") + "_600px.jpg";
+        const croppedFile = new File([croppedBlob], croppedName, { type: "image/jpeg" });
+        const data2 = await uploadFileToR2(croppedFile, "Cropped image");
+
+        const croppedUrl = R2_PUBLIC_BASE + data2.key;
+        const originalUrl = R2_PUBLIC_BASE + data1.key;
+
+        const payload = buildBaseReviewPayload(
+          croppedUrl,
+          originalUrl,
+          originalFile.size,
+          croppedBlob.size,
+          {
+            upload_type: "image_cropped",
+            file_type: "image",
+            upload_context: category.value === "academy_upload" ? "academy_upload" : "photo_review"
+          }
+        );
+
+        const data3 = await saveReview(payload);
+
+        setStatus([
+          "Done.",
+          "Category: " + category.value,
+          selectedLink ? "Selected link: " + selectedLink.display_label : "",
+          "Original uploaded as: " + data1.key,
+          "Cropped uploaded as: " + data2.key,
+          "Saved for review (ID: " + data3.review_id + ")"
+        ]);
+      } catch (err) {
+        status.textContent = "Error: " + err.message;
+      } finally {
+        uploadBtn.disabled = false;
+      }
     });
 
-    if (!blob) {
-      status.textContent = "Could not create cropped image.";
-      return;
-    }
+    directUploadBtn.addEventListener("click", async function () {
+      const file = selectedDirectFile;
 
-    if (blob.size > MAX_CROPPED_BYTES) {
-      status.textContent = "Cropped image is still above 500 KB. Please crop a smaller area or use another image.";
-      return;
-    }
-
-    croppedBlob = blob;
-    uploadBtn.disabled = false;
-
-    status.textContent =
-      "Cropped image ready.
-" +
-      "Cropped size: " +
-      Math.round(croppedBlob.size / 1024) +
-      " KB.
-" +
-      "You can now upload both versions.";
-
-  } catch (err) {
-    status.textContent = "Crop compression failed: " + err.message;
-  }
-});
-
-async function uploadFileToR2(file, label) {
-  const fd = new FormData();
-  fd.append("file", file);
-
-  const res = await fetch("/upload", {
-    method: "POST",
-    body: fd
-  });
-
-  const contentType = res.headers.get("content-type") || "";
-  let data;
-
-  if (contentType.includes("application/json")) {
-    data = await res.json();
-  } else {
-    const text = await res.text();
-    throw new Error(label + " upload returned non-JSON response: " + text.slice(0, 200));
-  }
-
-  if (!res.ok) {
-    throw new Error(label + " upload failed: " + (data.error || res.status));
-  }
-
-  return data;
-}
-
-async function saveReview(payload) {
-  const res = await fetch(REVIEW_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
-  });
-
-  const contentType = res.headers.get("content-type") || "";
-  let data;
-
-  if (contentType.includes("application/json")) {
-    data = await res.json();
-  } else {
-    const text = await res.text();
-    throw new Error("Review save returned non-JSON response: " + text.slice(0, 200));
-  }
-
-  if (!res.ok) {
-    throw new Error("Review save failed: " + (data.error || res.status));
-  }
-
-  return data;
-}
-
-function buildBaseReviewPayload(fileUrl, originalUrl, originalSize, croppedSize, extra = {}) {
-  return {
-    category: category.value || null,
-    file_url: fileUrl,
-    cropped_file_url: fileUrl,
-    original_file_url: originalUrl,
-    original_file_size_bytes: originalSize,
-    cropped_file_size_bytes: croppedSize,
-    user_id: selectedLink ? selectedLink.user_id : null,
-    tree_id: selectedLink ? selectedLink.tree_id : null,
-    linked_entity_type: category.value === "forest_hero" ? "forest_hero" : "general",
-    linked_entity_name: selectedLink
-      ? `${selectedLink.first_name || ""} ${selectedLink.last_name || ""}`.trim()
-      : category.value,
-    uploader_name: null,
-    uploader_email: null,
-    ...extra
-  };
-}
-
-function validateBeforeUpload() {
-  if (!category.value) {
-    status.textContent = "Please select a category before uploading.";
-    return false;
-  }
-
-  if (category.value === "forest_hero" && !selectedLink) {
-    status.textContent = "Please select a Forest Hero before uploading.";
-    return false;
-  }
-
-  return true;
-}
-
-uploadBtn.addEventListener("click", async function () {
-  let originalFile = processedOriginalFile || selectedOriginalFile;
-
-  if (!originalFile) {
-    status.textContent = "No original image selected.";
-    return;
-  }
-
-  if (originalFile.size > MAX_ORIGINAL_BYTES) {
-    try {
-      status.textContent = "Original image is larger than 8 MB. Resizing before upload...";
-      originalFile = await resizeOriginalIfNeeded(originalFile);
-      processedOriginalFile = originalFile;
-    } catch (err) {
-      status.textContent = "Original image is still larger than 8 MB and could not be resized. Upload blocked. " + err.message;
-      return;
-    }
-  }
-
-  if (!croppedBlob) {
-    status.textContent = "Please crop the image first.";
-    return;
-  }
-
-  if (croppedBlob.size > MAX_CROPPED_BYTES) {
-    status.textContent = "Cropped image is larger than 500 KB. Upload blocked.";
-    return;
-  }
-
-  if (!validateBeforeUpload()) return;
-
-  uploadBtn.disabled = true;
-  directUploadBtn.disabled = true;
-
-  try {
-    status.textContent = "Uploading original image...";
-    const data1 = await uploadFileToR2(originalFile, "Original image");
-
-    status.textContent = "Uploading cropped 600 px version...";
-    const croppedName = safeFileBaseName(originalFile.name || "photo") + "_600px.jpg";
-    const croppedFile = new File([croppedBlob], croppedName, { type: "image/jpeg" });
-    const data2 = await uploadFileToR2(croppedFile, "Cropped image");
-
-    const croppedUrl = R2_PUBLIC_BASE + data2.key;
-    const originalUrl = R2_PUBLIC_BASE + data1.key;
-
-    const payload = buildBaseReviewPayload(
-      croppedUrl,
-      originalUrl,
-      originalFile.size,
-      croppedBlob.size,
-      {
-        upload_type: "image_cropped",
-        file_type: "image",
-        upload_context: category.value === "academy_upload" ? "academy_upload" : "photo_review"
+      if (!file) {
+        status.textContent = "No file selected.";
+        return;
       }
-    );
 
-    const data3 = await saveReview(payload);
-
-    status.textContent =
-      "Done.
-" +
-      "Category: " + category.value + "
-" +
-      (selectedLink ? "Selected link: " + selectedLink.display_label + "
-" : "") +
-      "Original uploaded as: " + data1.key + "
-" +
-      "Cropped uploaded as: " + data2.key + "
-" +
-      "Saved for review (ID: " + data3.review_id + ")";
-
-  } catch (err) {
-    status.textContent = "Error: " + err.message;
-  } finally {
-    uploadBtn.disabled = false;
-  }
-});
-
-directUploadBtn.addEventListener("click", async function () {
-  const file = selectedDirectFile;
-
-  if (!file) {
-    status.textContent = "No file selected.";
-    return;
-  }
-
-  if (file.size > HARD_MAX_DIRECT_FILE_BYTES) {
-    status.textContent = "File is larger than 50 MB. Upload blocked.";
-    return;
-  }
-
-  if (!validateBeforeUpload()) return;
-
-  directUploadBtn.disabled = true;
-  uploadBtn.disabled = true;
-
-  try {
-    status.textContent = "Uploading selected file...";
-    const data1 = await uploadFileToR2(file, "Selected file");
-
-    const fileUrl = R2_PUBLIC_BASE + data1.key;
-    const fileKind = getFileKind(file);
-
-    const payload = buildBaseReviewPayload(
-      fileUrl,
-      fileUrl,
-      file.size,
-      null,
-      {
-        upload_type: "direct_file",
-        file_type: fileKind,
-        upload_context: category.value === "academy_upload" ? "academy_upload" : "file_upload"
+      if (file.size > HARD_MAX_DIRECT_FILE_BYTES) {
+        status.textContent = "File is larger than 50 MB. Upload blocked.";
+        return;
       }
-    );
 
-    const data2 = await saveReview(payload);
+      if (!validateBeforeUpload()) return;
 
-    status.textContent =
-      "Done.
-" +
-      "Category: " + category.value + "
-" +
-      "File type: " + fileKind + "
-" +
-      "Uploaded as: " + data1.key + "
-" +
-      "Saved for review (ID: " + data2.review_id + ")";
+      directUploadBtn.disabled = true;
+      uploadBtn.disabled = true;
 
-  } catch (err) {
-    status.textContent = "Error: " + err.message;
-  } finally {
-    directUploadBtn.disabled = false;
-  }
-});
-</script>
+      try {
+        status.textContent = "Uploading selected file...";
+        const data1 = await uploadFileToR2(file, "Selected file");
 
+        const fileUrl = R2_PUBLIC_BASE + data1.key;
+        const fileKind = getFileKind(file);
+
+        const payload = buildBaseReviewPayload(
+          fileUrl,
+          fileUrl,
+          file.size,
+          null,
+          {
+            upload_type: "direct_file",
+            file_type: fileKind,
+            upload_context: category.value === "academy_upload" ? "academy_upload" : "file_upload"
+          }
+        );
+
+        const data2 = await saveReview(payload);
+
+        setStatus([
+          "Done.",
+          "Category: " + category.value,
+          "File type: " + fileKind,
+          "Uploaded as: " + data1.key,
+          "Saved for review (ID: " + data2.review_id + ")"
+        ]);
+      } catch (err) {
+        status.textContent = "Error: " + err.message;
+      } finally {
+        directUploadBtn.disabled = false;
+      }
+    });
+  </script>
 </body>
 </html>
