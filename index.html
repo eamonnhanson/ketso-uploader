@@ -47,10 +47,11 @@
     }
 
     #image {
-      width: 100%;
-      max-width: 100%;
-      max-height: 600px;
       display: none;
+      width: auto;
+      max-width: 100%;
+      height: auto;
+      max-height: 600px;
       margin-top: 20px;
     }
 
@@ -635,7 +636,7 @@ async function handleImageSelected(event, sourceLabel) {
   resetImageState();
 
   selectedFileInfo.textContent = "";
-  status.textContent = "";
+  status.textContent = "Loading image preview...";
 
   if (!isImageFile(file)) {
     status.textContent = "Unsupported image format. Please use JPG, PNG or WebP. If your phone uses HEIC, change camera settings or upload a JPG/PNG version.";
@@ -651,16 +652,17 @@ async function handleImageSelected(event, sourceLabel) {
 
   selectedFileMode = "image";
   selectedOriginalFile = file;
+  processedOriginalFile = file;
   selectedFileInfo.textContent = sourceLabel + ": " + (file.name || "camera photo");
 
-  try {
-    processedOriginalFile = await resizeOriginalIfNeeded(file);
+  const reader = new FileReader();
 
-    const objectUrl = URL.createObjectURL(processedOriginalFile);
+  reader.onerror = function () {
+    status.textContent = "The image could not be read from this device. Please try again, or upload a JPG, PNG or WebP image.";
+  };
 
+  reader.onload = function () {
     image.onload = function () {
-      URL.revokeObjectURL(objectUrl);
-
       try {
         if (cropper) cropper.destroy();
 
@@ -689,11 +691,23 @@ async function handleImageSelected(event, sourceLabel) {
         status.textContent =
           "Image loaded.
 " +
-          "Original ready for upload: " +
-          Math.round(processedOriginalFile.size / 1024) +
-          " KB.
+          "Original file size: " + formatBytes(file.size) + "
 " +
           "Now crop the image to 600 px.";
+
+        // Resize the original in the background if needed. This does not block the preview/cropper.
+        if (file.size > MAX_ORIGINAL_BYTES) {
+          resizeOriginalIfNeeded(file)
+            .then((resizedFile) => {
+              processedOriginalFile = resizedFile;
+              status.textContent += "
+Original was resized for upload: " + formatBytes(resizedFile.size) + ".";
+            })
+            .catch((err) => {
+              status.textContent += "
+Warning: original resize failed. Upload may be blocked. " + err.message;
+            });
+        }
 
       } catch (err) {
         status.textContent = "Cropper failed to load: " + err.message;
@@ -701,21 +715,35 @@ async function handleImageSelected(event, sourceLabel) {
     };
 
     image.onerror = function () {
-      URL.revokeObjectURL(objectUrl);
       image.style.display = "none";
-      status.textContent = "The image could not be previewed. This often happens with HEIC photos on some phones. Please change your camera settings to JPG/JPEG or upload a JPG, PNG or WebP image.";
+
+      selectedFileMode = "direct";
+      selectedDirectFile = file;
+
+      fileSummary.style.display = "block";
+      fileSummary.innerHTML = `
+        <strong>Selected image</strong><br>
+        Name: ${escapeHtml(file.name || "camera photo")}<br>
+        Type: image<br>
+        Size: ${escapeHtml(formatBytes(file.size))}<br>
+        <span class="warning">Preview failed, so cropping is not available. This often happens with HEIC photos on some phones. You can upload this image directly, or choose a JPG, PNG or WebP image.</span>
+      `;
+
       cropBtn.disabled = true;
+      uploadBtn.disabled = true;
       zoomIn.disabled = true;
       zoomOut.disabled = true;
-      uploadBtn.disabled = true;
+      directUploadBtn.style.display = "inline-block";
+      directUploadBtn.disabled = false;
+
+      status.textContent = "Image preview failed. You can upload the selected image directly, or choose a JPG, PNG or WebP image.";
     };
 
     image.style.display = "block";
-    image.src = objectUrl;
+    image.src = reader.result;
+  };
 
-  } catch (err) {
-    status.textContent = "Image processing failed: " + err.message;
-  }
+  reader.readAsDataURL(file);
 }
 
 function handleMixedFileSelected(event) {
@@ -1008,7 +1036,7 @@ function validateBeforeUpload() {
 }
 
 uploadBtn.addEventListener("click", async function () {
-  const originalFile = processedOriginalFile || selectedOriginalFile;
+  let originalFile = processedOriginalFile || selectedOriginalFile;
 
   if (!originalFile) {
     status.textContent = "No original image selected.";
@@ -1016,8 +1044,14 @@ uploadBtn.addEventListener("click", async function () {
   }
 
   if (originalFile.size > MAX_ORIGINAL_BYTES) {
-    status.textContent = "Original image is still larger than 8 MB. Upload blocked.";
-    return;
+    try {
+      status.textContent = "Original image is larger than 8 MB. Resizing before upload...";
+      originalFile = await resizeOriginalIfNeeded(originalFile);
+      processedOriginalFile = originalFile;
+    } catch (err) {
+      status.textContent = "Original image is still larger than 8 MB and could not be resized. Upload blocked. " + err.message;
+      return;
+    }
   }
 
   if (!croppedBlob) {
