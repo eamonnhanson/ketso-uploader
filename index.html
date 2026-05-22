@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <title>KETSO crop and upload</title>
 
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
 
   <style>
@@ -12,6 +14,7 @@
       padding: 20px;
       max-width: 1000px;
       margin: 0 auto;
+      color: #111;
     }
 
     h2 {
@@ -31,6 +34,7 @@
       max-width: 500px;
       padding: 8px;
       font-size: 14px;
+      box-sizing: border-box;
     }
 
     #image {
@@ -48,6 +52,19 @@
       padding: 10px 14px;
       margin: 5px 5px 0 0;
       cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      background: #0b6b37;
+      color: white;
+      font-weight: bold;
+    }
+
+    button.secondary {
+      background: #d35400;
+    }
+
+    button.neutral {
+      background: #444;
     }
 
     button:disabled {
@@ -66,6 +83,38 @@
       color: #444;
       font-size: 14px;
       line-height: 1.5;
+      max-width: 700px;
+    }
+
+    .upload-box {
+      margin-top: 18px;
+      padding: 14px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      background: #f8fbf7;
+      max-width: 740px;
+    }
+
+    .upload-buttons {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+      margin-bottom: 8px;
+    }
+
+    .upload-hint {
+      font-size: 14px;
+      line-height: 1.5;
+      color: #333;
+      margin-top: 8px;
+    }
+
+    .selected-file {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #0b6b37;
+      font-weight: bold;
     }
 
     #forestHeroSection {
@@ -109,6 +158,34 @@
       color: #555;
       margin-top: 6px;
     }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 14px;
+      }
+
+      h2 {
+        font-size: 22px;
+      }
+
+      button {
+        width: 100%;
+        margin-right: 0;
+      }
+
+      .upload-buttons {
+        flex-direction: column;
+      }
+
+      input[type="text"],
+      select {
+        max-width: 100%;
+      }
+
+      #image {
+        max-height: 420px;
+      }
+    }
   </style>
 </head>
 
@@ -150,16 +227,63 @@
   <div id="selectedHero" class="selected-item" style="display:none;"></div>
 </div>
 
-<label for="fileInput">Photo</label>
-<input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.webp">
+<div class="upload-box">
+  <label><strong>Photo</strong></label>
+
+  <div class="upload-buttons">
+    <button type="button" id="takeSelfieBtn">
+      Take selfie
+    </button>
+
+    <button type="button" id="takeBackPhotoBtn" class="secondary">
+      Take photo
+    </button>
+
+    <button type="button" id="uploadFileBtn" class="neutral">
+      Upload photo/file
+    </button>
+  </div>
+
+  <input
+    id="selfieInput"
+    type="file"
+    accept="image/*"
+    capture="user"
+    style="display:none"
+  >
+
+  <input
+    id="backCameraInput"
+    type="file"
+    accept="image/*"
+    capture="environment"
+    style="display:none"
+  >
+
+  <input
+    id="fileInput"
+    type="file"
+    accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+    style="display:none"
+  >
+
+  <div id="selectedFileInfo" class="selected-file"></div>
+
+  <div class="upload-hint">
+    Use <strong>Take selfie</strong> if you are on a mobile phone and want to use the front camera.<br>
+    Use <strong>Take photo</strong> if you want to photograph a tree, object, nursery, classroom or activity.<br>
+    Use <strong>Upload photo/file</strong> if you already have a photo or if you are using a laptop or computer.
+  </div>
+</div>
 
 <div class="note">
-  1. Use the zoom buttons to zoom in<br>
-  2. Drag the image to position it<br>
-  3. Adjust the crop box<br>
-  4. Click "Crop to 600 px"<br>
-  5. Click "Upload original + cropped"<br>
-  6. For this uploader, use JPG, PNG or WebP. HEIC is not reliable in browser preview/crop.
+  1. Select or take a photo<br>
+  2. Use the zoom buttons to zoom in<br>
+  3. Drag the image to position it<br>
+  4. Adjust the crop box<br>
+  5. Click "Crop to 600 px"<br>
+  6. Click "Upload original + cropped"<br>
+  7. Use JPG, PNG or WebP. HEIC is not reliable in browser preview/crop.
 </div>
 
 <img id="image" alt="Preview">
@@ -182,6 +306,7 @@
 let cropper = null;
 let croppedBlob = null;
 let processedOriginalFile = null;
+let selectedOriginalFile = null;
 let selectedLink = null;
 let searchTimeout = null;
 
@@ -193,7 +318,16 @@ const MAX_ORIGINAL_BYTES = 8 * 1024 * 1024;
 const MAX_CROPPED_BYTES = 500 * 1024;
 const HARD_MAX_INPUT_BYTES = 25 * 1024 * 1024;
 
+const takeSelfieBtn = document.getElementById("takeSelfieBtn");
+const takeBackPhotoBtn = document.getElementById("takeBackPhotoBtn");
+const uploadFileBtn = document.getElementById("uploadFileBtn");
+
+const selfieInput = document.getElementById("selfieInput");
+const backCameraInput = document.getElementById("backCameraInput");
 const fileInput = document.getElementById("fileInput");
+
+const selectedFileInfo = document.getElementById("selectedFileInfo");
+
 const image = document.getElementById("image");
 const cropBtn = document.getElementById("cropBtn");
 const uploadBtn = document.getElementById("uploadBtn");
@@ -290,8 +424,124 @@ async function resizeOriginalIfNeeded(file) {
     throw new Error("Could not reduce original image below 8 MB.");
   }
 
-  const newName = safeFileBaseName(file.name) + "_original.jpg";
+  const newName = safeFileBaseName(file.name || "photo") + "_original.jpg";
   return new File([blob], newName, { type: "image/jpeg" });
+}
+
+function resetImageState() {
+  croppedBlob = null;
+  processedOriginalFile = null;
+  selectedOriginalFile = null;
+
+  uploadBtn.disabled = true;
+  cropBtn.disabled = true;
+  zoomIn.disabled = true;
+  zoomOut.disabled = true;
+
+  if (cropper) {
+    cropper.destroy();
+    cropper = null;
+  }
+
+  image.removeAttribute("src");
+  image.style.display = "none";
+}
+
+function resetInputsExcept(activeInput) {
+  [selfieInput, backCameraInput, fileInput].forEach(input => {
+    if (input !== activeInput) input.value = "";
+  });
+}
+
+function isSupportedImage(file) {
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+  if (allowedTypes.includes(file.type)) {
+    return true;
+  }
+
+  const name = (file.name || "").toLowerCase();
+  return (
+    name.endsWith(".jpg") ||
+    name.endsWith(".jpeg") ||
+    name.endsWith(".png") ||
+    name.endsWith(".webp")
+  );
+}
+
+async function handlePhotoSelected(event, sourceLabel) {
+  const input = event.target;
+  const file = input.files && input.files[0];
+
+  if (!file) return;
+
+  resetInputsExcept(input);
+  resetImageState();
+
+  selectedFileInfo.textContent = "";
+  status.textContent = "";
+
+  if (!isSupportedImage(file)) {
+    status.textContent =
+      "Unsupported image format. Please use JPG, PNG or WebP. If your phone uses HEIC, change camera settings or upload a JPG/PNG version.";
+    input.value = "";
+    return;
+  }
+
+  if (file.size > HARD_MAX_INPUT_BYTES) {
+    status.textContent = "File too large. Please use an image below 25 MB.";
+    input.value = "";
+    return;
+  }
+
+  selectedOriginalFile = file;
+  selectedFileInfo.textContent = sourceLabel + ": " + (file.name || "camera photo");
+
+  try {
+    processedOriginalFile = await resizeOriginalIfNeeded(file);
+
+    const reader = new FileReader();
+
+    reader.onload = function () {
+      image.src = reader.result;
+      image.style.display = "block";
+
+      try {
+        if (cropper) cropper.destroy();
+
+        cropper = new Cropper(image, {
+          viewMode: 1,
+          dragMode: "move",
+          autoCropArea: 0.6,
+          responsive: true,
+          background: false,
+          zoomable: true,
+          guides: true,
+          center: true,
+          highlight: true
+        });
+
+        cropBtn.disabled = false;
+        zoomIn.disabled = false;
+        zoomOut.disabled = false;
+
+        status.textContent =
+          "Image loaded.\n" +
+          "Original ready for upload: " +
+          Math.round(processedOriginalFile.size / 1024) +
+          " KB.\n" +
+          "Now crop the image to 600 px.";
+
+      } catch (err) {
+        status.textContent = "Cropper failed to load: " + err.message;
+      }
+    };
+
+    reader.readAsDataURL(processedOriginalFile);
+
+  } catch (err) {
+    status.textContent = "Image processing failed: " + err.message;
+  }
 }
 
 // -----------------------------
@@ -375,94 +625,35 @@ async function runForestHeroSearch(q) {
 }
 
 // -----------------------------
-// image load + cropper
+// image input buttons
 // -----------------------------
-fileInput.addEventListener("change", async function (event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-
-  if (!allowedTypes.includes(file.type)) {
-    status.textContent = "Unsupported image format. Please use JPG, PNG or WebP.";
-    fileInput.value = "";
-    image.style.display = "none";
-    croppedBlob = null;
-    processedOriginalFile = null;
-    uploadBtn.disabled = true;
-    cropBtn.disabled = true;
-    zoomIn.disabled = true;
-    zoomOut.disabled = true;
-    return;
-  }
-
-  if (file.size > HARD_MAX_INPUT_BYTES) {
-    status.textContent = "File too large. Please use an image below 25 MB.";
-    fileInput.value = "";
-    image.style.display = "none";
-    croppedBlob = null;
-    processedOriginalFile = null;
-    uploadBtn.disabled = true;
-    cropBtn.disabled = true;
-    zoomIn.disabled = true;
-    zoomOut.disabled = true;
-    return;
-  }
-
-  croppedBlob = null;
-  processedOriginalFile = null;
-  uploadBtn.disabled = true;
-  cropBtn.disabled = true;
-  zoomIn.disabled = true;
-  zoomOut.disabled = true;
-  status.textContent = "";
-
-  try {
-    processedOriginalFile = await resizeOriginalIfNeeded(file);
-
-    const reader = new FileReader();
-
-    reader.onload = function () {
-      image.src = reader.result;
-      image.style.display = "block";
-
-      try {
-        if (cropper) cropper.destroy();
-
-        cropper = new Cropper(image, {
-          viewMode: 1,
-          dragMode: "move",
-          autoCropArea: 0.6,
-          responsive: true,
-          background: false,
-          zoomable: true,
-          guides: true,
-          center: true,
-          highlight: true
-        });
-
-        cropBtn.disabled = false;
-        zoomIn.disabled = false;
-        zoomOut.disabled = false;
-
-        status.textContent =
-          "Image loaded.\n" +
-          "Original ready for upload: " +
-          Math.round(processedOriginalFile.size / 1024) +
-          " KB.";
-
-      } catch (err) {
-        status.textContent = "Cropper failed to load: " + err.message;
-      }
-    };
-
-    reader.readAsDataURL(processedOriginalFile);
-
-  } catch (err) {
-    status.textContent = "Image processing failed: " + err.message;
-  }
+takeSelfieBtn.addEventListener("click", () => {
+  selfieInput.click();
 });
 
+takeBackPhotoBtn.addEventListener("click", () => {
+  backCameraInput.click();
+});
+
+uploadFileBtn.addEventListener("click", () => {
+  fileInput.click();
+});
+
+selfieInput.addEventListener("change", (event) => {
+  handlePhotoSelected(event, "Selfie selected");
+});
+
+backCameraInput.addEventListener("change", (event) => {
+  handlePhotoSelected(event, "Photo selected");
+});
+
+fileInput.addEventListener("change", (event) => {
+  handlePhotoSelected(event, "File selected");
+});
+
+// -----------------------------
+// crop controls
+// -----------------------------
 zoomIn.addEventListener("click", () => {
   if (cropper) cropper.zoom(0.2);
 });
@@ -521,7 +712,7 @@ cropBtn.addEventListener("click", async function () {
 // upload original + cropped + save review
 // -----------------------------
 uploadBtn.addEventListener("click", async function () {
-  const originalFile = processedOriginalFile || fileInput.files[0];
+  const originalFile = processedOriginalFile || selectedOriginalFile;
 
   if (!originalFile) {
     status.textContent = "No original file selected.";
@@ -584,7 +775,7 @@ uploadBtn.addEventListener("click", async function () {
 
     status.textContent = "Uploading cropped 600 px version...";
 
-    const croppedName = safeFileBaseName(originalFile.name) + "_600px.jpg";
+    const croppedName = safeFileBaseName(originalFile.name || "photo") + "_600px.jpg";
     const croppedFile = new File([croppedBlob], croppedName, { type: "image/jpeg" });
 
     const fd2 = new FormData();
@@ -618,9 +809,10 @@ uploadBtn.addEventListener("click", async function () {
       "Original uploaded as: " + data1.key + "\n" +
       "Cropped uploaded as: " + data2.key;
 
- const payload = {
+    const payload = {
       category: category.value || null,
       file_url: R2_PUBLIC_BASE + data2.key,
+      cropped_file_url: R2_PUBLIC_BASE + data2.key,
       original_file_url: R2_PUBLIC_BASE + data1.key,
       original_file_size_bytes: originalFile.size,
       cropped_file_size_bytes: croppedBlob.size,
