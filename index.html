@@ -49,21 +49,21 @@
       width: auto;
       height: auto;
       max-height: 600px;
-      margin-top: 20px;
+      margin: 0 auto;
       object-fit: contain;
     }
 
-    .cropper-container {
+    .crop-workspace {
+      width: 100%;
+      max-width: 760px;
       margin-top: 20px;
-      max-width: 100% !important;
-      max-height: 600px !important;
+      overflow: hidden;
+      background: #eee;
+      border: 1px solid #ddd;
+      border-radius: 8px;
     }
 
-    .cropper-wrap-box,
-    .cropper-canvas,
-    .cropper-drag-box,
-    .cropper-crop-box,
-    .cropper-view-box {
+    .cropper-container {
       max-width: 100% !important;
     }
 
@@ -240,6 +240,7 @@
       .upload-box,
       .note,
       .file-summary,
+      .crop-workspace,
       #forestHeroSection,
       #searchResults,
       .selected-item {
@@ -278,8 +279,9 @@
         max-height: 42vh;
       }
 
-      .cropper-container {
-        max-height: 42vh !important;
+      .crop-workspace {
+        max-height: 45vh;
+        overflow: hidden;
       }
 
       .note,
@@ -363,7 +365,9 @@
 
   <div id="fileSummary" class="file-summary"></div>
 
-  <img id="image" alt="Preview">
+  <div id="cropWorkspace" class="crop-workspace" style="display:none;">
+    <img id="image" alt="Preview">
+  </div>
 
   <div class="controls" id="cropControls">
     <button id="zoomIn" type="button" disabled>Zoom in</button>
@@ -391,6 +395,7 @@
     let searchTimeout = null;
 
     const SEARCH_API_BASE = "https://ptb-tree-map.onrender.com";
+    const UPLOAD_API_URL = `${SEARCH_API_BASE}/upload`;
     const REVIEW_API_URL = "https://ptb-tree-map.onrender.com/api/save-photo-review";
     const R2_PUBLIC_BASE = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/";
 
@@ -406,6 +411,7 @@
     const selectedFileInfo = document.getElementById("selectedFileInfo");
     const fileSummary = document.getElementById("fileSummary");
 
+    const cropWorkspace = document.getElementById("cropWorkspace");
     const image = document.getElementById("image");
     const cropBtn = document.getElementById("cropBtn");
     const uploadBtn = document.getElementById("uploadBtn");
@@ -439,6 +445,7 @@
       image.style.maxWidth = "100%";
       image.style.width = "auto";
       image.style.height = "auto";
+      cropWorkspace.style.maxHeight = isMobile ? Math.round(maxHeight + 24) + "px" : "none";
     }
 
     function safeFileBaseName(name) {
@@ -557,6 +564,7 @@
       image.onerror = null;
       image.removeAttribute("src");
       image.style.display = "none";
+      cropWorkspace.style.display = "none";
       fileSummary.style.display = "none";
       fileSummary.innerHTML = "";
     }
@@ -648,6 +656,7 @@
             if (cropper) cropper.destroy();
 
             applyPreviewSize();
+            cropWorkspace.style.display = "block";
             image.style.display = "block";
 
             cropper = new Cropper(image, {
@@ -661,7 +670,12 @@
               zoomable: true,
               guides: true,
               center: true,
-              highlight: true
+              highlight: true,
+              ready() {
+                setTimeout(() => {
+                  window.dispatchEvent(new Event("resize"));
+                }, 0);
+              }
             });
 
             cropBtn.disabled = false;
@@ -693,6 +707,7 @@
 
         image.onerror = function () {
           image.style.display = "none";
+          cropWorkspace.style.display = "none";
 
           selectedFileMode = "direct";
           selectedDirectFile = file;
@@ -925,10 +940,25 @@
       const fd = new FormData();
       fd.append("file", file);
 
-      const res = await fetch("/upload", {
-        method: "POST",
-        body: fd
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
+      let res;
+
+      try {
+        res = await fetch(UPLOAD_API_URL, {
+          method: "POST",
+          body: fd,
+          signal: controller.signal
+        });
+      } catch (err) {
+        if (err.name === "AbortError") {
+          throw new Error(label + " upload timed out. Please check your internet connection and try again.");
+        }
+
+        throw new Error(label + " upload could not reach the upload server. Check that the upload API is online and allows this page to upload.");
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       const contentType = res.headers.get("content-type") || "";
       let data;
