@@ -228,7 +228,7 @@
 </div>
 
 <div class="upload-box">
-  <label><strong>Photo</strong></label>
+  <label><strong>Take a photo or upload your work</strong></label>
 
   <div class="upload-buttons">
     <button type="button" id="takeSelfieBtn">
@@ -240,7 +240,7 @@
     </button>
 
     <button type="button" id="uploadFileBtn" class="neutral">
-      Upload photo/file
+      Upload photo from device
     </button>
   </div>
 
@@ -270,14 +270,15 @@
   <div id="selectedFileInfo" class="selected-file"></div>
 
   <div class="upload-hint">
-    Use <strong>Take selfie</strong> if you are on a mobile phone and want to use the front camera.<br>
+    You can take a photo with your phone, or upload an image from your laptop or computer.<br>
+    Use <strong>Take selfie</strong> if you want to use the front camera.<br>
     Use <strong>Take photo</strong> if you want to photograph a tree, object, nursery, classroom or activity.<br>
-    Use <strong>Upload photo/file</strong> if you already have a photo or if you are using a laptop or computer.
+    Use <strong>Upload photo from device</strong> if you already have a photo saved.
   </div>
 </div>
 
 <div class="note">
-  1. Select or take a photo<br>
+  1. Take a photo or upload an image<br>
   2. Use the zoom buttons to zoom in<br>
   3. Drag the image to position it<br>
   4. Adjust the crop box<br>
@@ -544,9 +545,6 @@ async function handlePhotoSelected(event, sourceLabel) {
   }
 }
 
-// -----------------------------
-// category logic
-// -----------------------------
 category.addEventListener("change", () => {
   selectedLink = null;
   selectedHero.style.display = "none";
@@ -557,9 +555,6 @@ category.addEventListener("change", () => {
   forestHeroSection.style.display = category.value === "forest_hero" ? "block" : "none";
 });
 
-// -----------------------------
-// forest hero search
-// -----------------------------
 forestHeroSearch.addEventListener("input", () => {
   const q = forestHeroSearch.value.trim();
 
@@ -624,9 +619,6 @@ async function runForestHeroSearch(q) {
   }
 }
 
-// -----------------------------
-// image input buttons
-// -----------------------------
 takeSelfieBtn.addEventListener("click", () => {
   selfieInput.click();
 });
@@ -648,12 +640,9 @@ backCameraInput.addEventListener("change", (event) => {
 });
 
 fileInput.addEventListener("change", (event) => {
-  handlePhotoSelected(event, "File selected");
+  handlePhotoSelected(event, "Photo uploaded from device");
 });
 
-// -----------------------------
-// crop controls
-// -----------------------------
 zoomIn.addEventListener("click", () => {
   if (cropper) cropper.zoom(0.2);
 });
@@ -708,9 +697,6 @@ cropBtn.addEventListener("click", async function () {
   }
 });
 
-// -----------------------------
-// upload original + cropped + save review
-// -----------------------------
 uploadBtn.addEventListener("click", async function () {
   const originalFile = processedOriginalFile || selectedOriginalFile;
 
