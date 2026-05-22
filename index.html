@@ -395,9 +395,9 @@
     let searchTimeout = null;
 
     const SEARCH_API_BASE = "https://ptb-tree-map.onrender.com";
+    const UPLOADER_API_BASE = "https://ketso-uploader.pages.dev";
     const UPLOAD_API_URLS = [
-      `${SEARCH_API_BASE}/api/upload`,
-      `${SEARCH_API_BASE}/upload`
+      `${UPLOADER_API_BASE}/upload`
     ];
     const REVIEW_API_URL = "https://ptb-tree-map.onrender.com/api/save-photo-review";
     const R2_PUBLIC_BASE = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/";
@@ -970,7 +970,11 @@
         data = await res.json();
       } else {
         const text = await res.text();
-        throw new Error(label + " upload at " + uploadUrl + " returned non-JSON response: " + text.slice(0, 200));
+        if (text.includes("Cannot POST")) {
+          throw new Error(label + " upload route does not exist at " + uploadUrl + ".");
+        }
+
+        throw new Error(label + " upload at " + uploadUrl + " did not return JSON.");
       }
 
       if (!res.ok) {
