@@ -575,13 +575,15 @@ function resetInputsExcept(activeInput) {
 function isImageFile(file) {
   if (!file) return false;
 
-  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+  const type = (file.type || "").toLowerCase();
+  const name = (file.name || "").toLowerCase();
 
-  if (allowedTypes.includes(file.type)) {
+  // Mobile cameras sometimes return image files with a generic or unexpected MIME type.
+  // Accept any image/* file here, then let the browser image preview decide whether it can load it.
+  if (type.startsWith("image/")) {
     return true;
   }
 
-  const name = (file.name || "").toLowerCase();
   return (
     name.endsWith(".jpg") ||
     name.endsWith(".jpeg") ||
@@ -654,20 +656,23 @@ async function handleImageSelected(event, sourceLabel) {
   try {
     processedOriginalFile = await resizeOriginalIfNeeded(file);
 
-    const reader = new FileReader();
+    const objectUrl = URL.createObjectURL(processedOriginalFile);
 
-    reader.onload = function () {
-      image.src = reader.result;
-      image.style.display = "block";
+    image.onload = function () {
+      URL.revokeObjectURL(objectUrl);
 
       try {
         if (cropper) cropper.destroy();
 
+        image.style.display = "block";
+
         cropper = new Cropper(image, {
           viewMode: 1,
           dragMode: "move",
-          autoCropArea: 0.6,
+          autoCropArea: 0.75,
           responsive: true,
+          restore: false,
+          checkOrientation: true,
           background: false,
           zoomable: true,
           guides: true,
@@ -695,7 +700,18 @@ async function handleImageSelected(event, sourceLabel) {
       }
     };
 
-    reader.readAsDataURL(processedOriginalFile);
+    image.onerror = function () {
+      URL.revokeObjectURL(objectUrl);
+      image.style.display = "none";
+      status.textContent = "The image could not be previewed. This often happens with HEIC photos on some phones. Please change your camera settings to JPG/JPEG or upload a JPG, PNG or WebP image.";
+      cropBtn.disabled = true;
+      zoomIn.disabled = true;
+      zoomOut.disabled = true;
+      uploadBtn.disabled = true;
+    };
+
+    image.style.display = "block";
+    image.src = objectUrl;
 
   } catch (err) {
     status.textContent = "Image processing failed: " + err.message;
