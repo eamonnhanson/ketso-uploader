@@ -141,6 +141,7 @@
   <input type="text" id="adminKey" placeholder="Admin key">
   <select id="statusFilter">
     <option value="pending">Pending</option>
+    <option value="submitted_for_review">Submitted for review</option>
     <option value="approved">Approved</option>
     <option value="rejected">Rejected</option>
     <option value="all">All</option>
@@ -194,12 +195,20 @@ async function loadUploads() {
     statusBox.textContent = `${uploads.length} upload(s) found.`;
     uploadsBox.innerHTML = uploads.map(renderUpload).join("");
 
-    document.querySelectorAll("[data-action='approve']").forEach(button => {
-      button.addEventListener("click", () => approveUpload(button.dataset.id));
+    document.querySelectorAll("[data-action='approve-public']").forEach(button => {
+      button.addEventListener("click", () => approveUpload(button.dataset.id, "public"));
+    });
+
+    document.querySelectorAll("[data-action='approve-private']").forEach(button => {
+      button.addEventListener("click", () => approveUpload(button.dataset.id, "private"));
     });
 
     document.querySelectorAll("[data-action='reject']").forEach(button => {
       button.addEventListener("click", () => rejectUpload(button.dataset.id));
+    });
+
+    document.querySelectorAll("[data-action='hide']").forEach(button => {
+      button.addEventListener("click", () => hideUpload(button.dataset.id));
     });
 
   } catch (err) {
@@ -219,12 +228,15 @@ function renderUpload(upload) {
 
         <div class="meta">
           <strong>Email:</strong> ${escapeHtml(upload.uploader_email || "")}<br>
+          <strong>Upload ID:</strong> ${escapeHtml(upload.id)}<br>
+          <strong>Category:</strong> ${escapeHtml(upload.category || "")}<br>
           <strong>Student ID:</strong> ${escapeHtml(upload.academy_student_id || "")}<br>
           <strong>Cohort:</strong> ${escapeHtml(upload.academy_cohort || "")}<br>
           <strong>Interest:</strong> ${escapeHtml(labelInterest(upload.interest_area || upload.academy_track))}<br>
           <strong>Lesson:</strong> ${escapeHtml(labelLesson(upload.lesson_key))}<br>
           <strong>Upload type:</strong> ${escapeHtml(upload.upload_type || upload.file_type || "")}<br>
           <strong>Status:</strong> ${escapeHtml(upload.verification_status || "")}<br>
+          <strong>Gallery:</strong> ${escapeHtml(upload.public_gallery_status || "")}<br>
           <strong>Points:</strong> ${escapeHtml(upload.points_awarded || 0)}
         </div>
 
@@ -234,7 +246,9 @@ function renderUpload(upload) {
         </div>
 
         <div class="actions">
-          <button class="approve" data-action="approve" data-id="${escapeAttr(upload.id)}">Approve + 1 point</button>
+          <button class="approve" data-action="approve-public" data-id="${escapeAttr(upload.id)}">Approve public</button>
+          <button data-action="approve-private" data-id="${escapeAttr(upload.id)}">Approve private</button>
+          <button data-action="hide" data-id="${escapeAttr(upload.id)}">Hide</button>
           <button class="reject" data-action="reject" data-id="${escapeAttr(upload.id)}">Reject</button>
           ${
             upload.academy_student_id
@@ -265,17 +279,19 @@ function renderPreview(upload, fileUrl) {
   return `<a class="file-link" href="${escapeAttr(fileUrl)}" target="_blank">Open file</a>`;
 }
 
-async function approveUpload(id) {
+async function approveUpload(id, publicGalleryStatus) {
   const adminKey = adminKeyInput.value.trim();
+  const label = publicGalleryStatus === "public" ? "approve this upload publicly" : "approve this upload privately";
 
-  if (!confirm("Approve this upload and award 1 point?")) return;
+  if (!confirm(`Are you sure you want to ${label}?`)) return;
 
   const res = await fetch(`${API_BASE}/api/academy-approve-upload?admin_key=${encodeURIComponent(adminKey)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       review_id: id,
-      reviewed_by: "eamonn"
+      reviewed_by: "eamonn",
+      public_gallery_status: publicGalleryStatus
     })
   });
 
@@ -309,6 +325,32 @@ async function rejectUpload(id) {
 
   if (!res.ok || !data.ok) {
     alert(data.error || "Rejection failed.");
+    return;
+  }
+
+  await loadUploads();
+}
+
+async function hideUpload(id) {
+  const adminKey = adminKeyInput.value.trim();
+  const reason = prompt("Optional reason for hiding this upload:", "Hidden by admin");
+
+  if (reason === null) return;
+
+  const res = await fetch(`${API_BASE}/api/academy-hide-upload?admin_key=${encodeURIComponent(adminKey)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      review_id: id,
+      reviewed_by: "eamonn",
+      rejected_reason: reason
+    })
+  });
+
+  const data = await res.json();
+
+  if (!res.ok || !data.ok) {
+    alert(data.error || "Hide failed.");
     return;
   }
 
