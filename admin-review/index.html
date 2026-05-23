@@ -116,6 +116,15 @@
       font-size: 14px;
     }
 
+    .duplicate-warning {
+      background: #fff7e6;
+      border-left: 4px solid #d98200;
+      padding: 10px;
+      margin-top: 10px;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
     .actions {
       margin-top: 12px;
       display: flex;
@@ -219,6 +228,7 @@ async function loadUploads() {
 function renderUpload(upload) {
   const fileUrl = upload.cropped_file_url || upload.original_file_url || "";
   const preview = renderPreview(upload, fileUrl);
+  const duplicateWarning = renderDuplicateWarning(upload);
 
   return `
     <div class="upload-card">
@@ -245,6 +255,8 @@ function renderUpload(upload) {
           ${escapeHtml(upload.ai_feedback || upload.ai_description || "No AI feedback available.")}
         </div>
 
+        ${duplicateWarning}
+
         <div class="actions">
           <button class="approve" data-action="approve-public" data-id="${escapeAttr(upload.id)}">Approve public</button>
           <button data-action="approve-private" data-id="${escapeAttr(upload.id)}">Approve private</button>
@@ -259,6 +271,24 @@ function renderUpload(upload) {
 
         <div class="meta">Upload ID: ${escapeHtml(upload.id)}</div>
       </div>
+    </div>
+  `;
+}
+
+function renderDuplicateWarning(upload) {
+  const isOnboarding = upload.category === "academy_onboarding" || upload.lesson_key === "onboarding";
+  const count = Number(upload.existing_approved_onboarding_count || 0);
+
+  if (!isOnboarding || !upload.academy_student_id || count < 1) {
+    return "";
+  }
+
+  return `
+    <div class="duplicate-warning">
+      <strong>Possible duplicate onboarding upload</strong><br>
+      This student already has ${count} approved public onboarding upload${count === 1 ? "" : "s"}.
+      Latest approved onboarding upload ID: ${escapeHtml(upload.latest_approved_onboarding_id || "")}.
+      Approve only if this should intentionally replace or add to the student's public onboarding record.
     </div>
   `;
 }
