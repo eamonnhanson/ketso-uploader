@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KETSO staff gallery</title>
+  <style>
+    body {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 18px;
+      font-family: Arial, sans-serif;
+      color: #222;
+    }
+
+    h1 {
+      margin-bottom: 8px;
+    }
+
+    .intro {
+      max-width: 760px;
+      color: #555;
+      line-height: 1.5;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      padding: 10px;
+      background: #fafafa;
+    }
+
+    img,
+    video {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      object-fit: cover;
+      border-radius: 8px;
+      background: #eee;
+    }
+
+    .file-link {
+      display: block;
+      padding: 12px;
+      border-radius: 8px;
+      background: #1f7a3f;
+      color: white;
+      text-align: center;
+      text-decoration: none;
+      font-weight: bold;
+    }
+
+    .meta {
+      margin-top: 8px;
+      color: #555;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    #status {
+      margin-top: 18px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>KETSO staff gallery</h1>
+  <p class="intro">Approved public staff uploads. Student uploads are excluded unless they are explicitly handled elsewhere.</p>
+
+  <div id="status">Loading staff gallery...</div>
+  <div id="gallery" class="grid"></div>
+
+  <script>
+    const API_URL = "https://ptb-tree-map.onrender.com/api/photo-review-gallery?verification_status=approved&public_gallery_status=public";
+
+    async function loadGallery() {
+      const status = document.getElementById("status");
+      const gallery = document.getElementById("gallery");
+
+      try {
+        const res = await fetch(API_URL);
+        const data = await res.json();
+
+        if (!res.ok || !data.ok) {
+          status.textContent = "Could not load staff gallery.";
+          return;
+        }
+
+        const uploads = (data.photos || []).filter(isStaffUpload);
+
+        if (!uploads.length) {
+          status.textContent = "No approved staff uploads yet.";
+          return;
+        }
+
+        status.textContent = "";
+        gallery.innerHTML = uploads.map(renderUpload).join("");
+      } catch (err) {
+        status.textContent = "Error loading staff gallery: " + err.message;
+      }
+    }
+
+    function isStaffUpload(upload) {
+      const category = upload.category || "";
+
+      if (upload.academy_student_id) return false;
+      if (category === "academy_onboarding" || category === "academy_upload") return false;
+      if (category.startsWith("student_")) return false;
+
+      return upload.linked_entity_type === "staff" ||
+        category === "staff_upload" ||
+        category === "training" ||
+        category === "nursery" ||
+        category === "vocational_training" ||
+        category === "charcoal_making" ||
+        category === "truck";
+    }
+
+    function renderUpload(upload) {
+      const fileUrl = upload.cropped_file_url || upload.original_file_url || "";
+      const type = upload.file_type || upload.upload_type || "";
+
+      return `
+        <article class="card">
+          ${renderPreview(fileUrl, type)}
+          <div class="meta">
+            <strong>${escapeHtml(upload.category || "Staff upload")}</strong><br>
+            ${escapeHtml(upload.linked_entity_name || upload.uploader_name || "")}<br>
+            ${escapeHtml((upload.ai_description || "").slice(0, 120))}
+          </div>
+        </article>
+      `;
+    }
+
+    function renderPreview(fileUrl, type) {
+      if (!fileUrl) return "<p>No file URL.</p>";
+      if (type === "video") return `<video controls src="${escapeAttr(fileUrl)}"></video>`;
+      if (type && type !== "image" && type !== "image_photo") {
+        return `<a class="file-link" href="${escapeAttr(fileUrl)}" target="_blank">Open file</a>`;
+      }
+
+      return `<img src="${escapeAttr(fileUrl)}" alt="Staff upload">`;
+    }
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value);
+    }
+
+    loadGallery();
+  </script>
+</body>
+</html>
