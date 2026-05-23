@@ -84,6 +84,8 @@ const month = document.getElementById("filterMonth").value;
 const search = document.getElementById("searchBox").value;
 
 const params = new URLSearchParams();
+params.set("verification_status", "approved");
+params.set("public_gallery_status", "public");
 
 if (category !== "all") {
   params.set("category", category);
@@ -113,11 +115,23 @@ const url = `${API}?${params.toString()}`;
       return;
     }
 
-    renderGallery(data.photos);
+    renderGallery((data.photos || []).filter(isGeneralGalleryPhoto));
 
   } catch (err) {
     container.textContent = "Failed: " + err.message;
   }
+}
+
+function isGeneralGalleryPhoto(photo) {
+  const category = photo.category || "";
+
+  if (photo.academy_student_id) return false;
+  if (photo.linked_entity_type === "staff") return false;
+  if (category === "academy_onboarding" || category === "academy_upload") return false;
+  if (category.startsWith("student_")) return false;
+  if (category === "staff_upload") return false;
+
+  return true;
 }
 
 function renderGallery(photos) {

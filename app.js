@@ -4,12 +4,14 @@ const SEARCH_API_BASE = "https://ptb-tree-map.onrender.com";
 const UPLOADER_API_BASE = "https://ketso-uploader.pages.dev";
 const UPLOAD_API_URLS = [`${UPLOADER_API_BASE}/upload`];
 const REVIEW_API_URL = "https://ptb-tree-map.onrender.com/api/save-photo-review";
+const ACADEMY_STUDENT_API_URL = "https://ptb-tree-map.onrender.com/api/academy-student";
 const R2_PUBLIC_BASE = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/";
 
 const STAFF_PASSWORD = "4234";
 const MAX_CROPPED_BYTES = 500 * 1024;
 const HARD_MAX_IMAGE_INPUT_BYTES = 25 * 1024 * 1024;
 const HARD_MAX_DIRECT_FILE_BYTES = 50 * 1024 * 1024;
+const MAX_ORIGINAL_BYTES = 8 * 1024 * 1024;
 
 let cropper = null;
 let croppedBlob = null;
@@ -17,10 +19,13 @@ let selectedImageFile = null;
 let selectedDirectFile = null;
 let selectedUploadKind = null;
 let staffUnlocked = false;
+let academyToken = null;
+let academyStudent = null;
 let selectedLink = null;
 let searchTimeout = null;
 
 const el = {
+  studentBanner: document.getElementById("studentBanner"),
   staffPassword: document.getElementById("staffPassword"),
   staffUnlockBtn: document.getElementById("staffUnlockBtn"),
   staffMessage: document.getElementById("staffMessage"),
@@ -80,6 +85,10 @@ function resetInputsExcept(activeInput) {
   [el.selfieInput, el.backCameraInput, el.fileInput].forEach((input) => {
     if (input !== activeInput) input.value = "";
   });
+}
+
+function getUrlToken() {
+  return new URLSearchParams(window.location.search).get("token");
 }
 
 function resetSelection() {
@@ -145,6 +154,7 @@ function getFileKind(file) {
 }
 
 function getStudentCategory() {
+  if (academyStudent) return "academy_onboarding";
   if (selectedUploadKind === "selfie") return "student_selfie";
   if (selectedUploadKind === "photo") return "student_photo";
   if (selectedUploadKind === "video") return "student_video";
@@ -158,6 +168,7 @@ function getActiveCategory() {
 }
 
 function getUploadContext() {
+  if (academyStudent) return "academy_onboarding";
   if (!staffUnlocked) return "student_mobile_upload";
   return el.category.value === "academy_upload" ? "academy_upload" : "staff_upload";
 }
@@ -166,6 +177,59 @@ function blobFromCanvas(canvas, type, quality) {
   return new Promise((resolve) => {
     canvas.toBlob(resolve, type, quality);
   });
+}
+
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not load image."));
+    };
+
+    img.src = url;
+  });
+}
+
+async function resizeOriginalIfNeeded(file) {
+  if (file.size <= MAX_ORIGINAL_BYTES) {
+    return file;
+  }
+
+  const img = await loadImageFromFile(file);
+  let scale = 0.9;
+  let blob = null;
+
+  while (scale > 0.25) {
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(img.naturalWidth * scale);
+    canvas.height = Math.round(img.naturalHeight * scale);
+
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    blob = await compressCanvasToMaxBytes(canvas, MAX_ORIGINAL_BYTES);
+
+    if (blob && blob.size <= MAX_ORIGINAL_BYTES) {
+      break;
+    }
+
+    scale -= 0.1;
+  }
+
+  if (!blob || blob.size > MAX_ORIGINAL_BYTES) {
+    throw new Error("Could not reduce original image below 8 MB.");
+  }
+
+  const newName = `${safeFileBaseName(file.name || "photo")}_original.jpg`;
+  return new File([blob], newName, { type: "image/jpeg" });
 }
 
 async function compressCanvasToMaxBytes(canvas, maxBytes) {
@@ -341,6 +405,7 @@ function validateBeforeUpload() {
 async function uploadFileToR2AtUrl(file, label, uploadUrl) {
   const fd = new FormData();
   fd.append("file", file);
+  fd.append("folder", getUploadFolder());
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 45000);
@@ -402,25 +467,49 @@ async function saveReview(payload) {
 
 function buildReviewPayload(fileUrl, size, fileType, extra = {}) {
   const category = getActiveCategory();
+  const studentName = academyStudent?.full_name ||
+    [academyStudent?.first_name, academyStudent?.last_name].filter(Boolean).join(" ") ||
+    null;
+  const academyTrack = academyStudent?.track || academyStudent?.primary_stream || null;
 
   return {
     category,
     file_url: fileUrl,
     cropped_file_url: fileType === "image" ? fileUrl : null,
-    original_file_url: null,
-    original_file_size_bytes: null,
+    original_file_url: extra.original_file_url || null,
+    original_file_size_bytes: extra.original_file_size_bytes || null,
     cropped_file_size_bytes: fileType === "image" ? size : null,
     user_id: selectedLink ? selectedLink.user_id : null,
     tree_id: selectedLink ? selectedLink.tree_id : null,
-    linked_entity_type: staffUnlocked && category === "forest_hero" ? "forest_hero" : "general",
-    linked_entity_name: selectedLink ? selectedLink.display_label : category,
-    uploader_name: null,
-    uploader_email: null,
+    linked_entity_type: academyStudent ? "student" : staffUnlocked && category === "forest_hero" ? "forest_hero" : staffUnlocked ? "staff" : "general",
+    linked_entity_name: selectedLink ? selectedLink.display_label : studentName || category,
+    uploader_name: studentName,
+    uploader_email: academyStudent?.email || null,
+    academy_student_id: academyStudent?.id || null,
+    academy_cohort: academyStudent?.cohort || null,
+    academy_track: academyTrack,
+    academy_whatsapp: academyStudent?.whatsapp || null,
+    lesson_key: academyStudent ? "onboarding" : null,
+    interest_area: academyTrack,
+    consent_given: Boolean(academyStudent),
     file_type: fileType,
     upload_context: getUploadContext(),
     uploader_role: staffUnlocked ? "staff" : "student",
     ...extra
   };
+}
+
+function getUploadFolder() {
+  if (academyStudent) {
+    const studentId = academyStudent.ketso_student_id || academyStudent.id || "student";
+    return `academy/onboarding/${safeFileBaseName(String(studentId))}`;
+  }
+
+  if (staffUnlocked) {
+    return `staff/${safeFileBaseName(el.category.value || "upload")}`;
+  }
+
+  return `student/${safeFileBaseName(getStudentCategory())}`;
 }
 
 async function uploadImage() {
@@ -444,20 +533,30 @@ async function uploadImage() {
       return;
     }
 
-    setStatus("Uploading photo...");
+    setStatus("Uploading original photo...");
+    const originalFile = await resizeOriginalIfNeeded(selectedImageFile);
+    const originalName = `${safeFileBaseName(selectedImageFile.name || selectedUploadKind)}_original.jpg`;
+    const originalUploadFile = originalFile.name ? originalFile : new File([originalFile], originalName, { type: originalFile.type || "image/jpeg" });
+    const originalUploaded = await uploadFileToR2(originalUploadFile, "Original photo");
+    const originalUrl = R2_PUBLIC_BASE + originalUploaded.key;
+
+    setStatus("Uploading cropped 600 px photo...");
     const croppedName = `${safeFileBaseName(selectedImageFile.name || selectedUploadKind)}_600px.jpg`;
     const croppedFile = new File([croppedBlob], croppedName, { type: "image/jpeg" });
     const uploaded = await uploadFileToR2(croppedFile, "Photo");
     const fileUrl = R2_PUBLIC_BASE + uploaded.key;
 
     const saved = await saveReview(buildReviewPayload(fileUrl, croppedBlob.size, "image", {
-      upload_type: "image_cropped"
+      upload_type: academyStudent ? "image_photo" : "image_cropped",
+      original_file_url: originalUrl,
+      original_file_size_bytes: originalUploadFile.size
     }));
 
     setStatus([
       "Done.",
       `Category: ${getActiveCategory()}`,
-      `Uploaded as: ${uploaded.key}`,
+      `Original uploaded as: ${originalUploaded.key}`,
+      `Cropped uploaded as: ${uploaded.key}`,
       `Saved for review (ID: ${saved.review_id})`
     ]);
   } catch (err) {
@@ -483,7 +582,7 @@ async function uploadDirectFile() {
     const fileUrl = R2_PUBLIC_BASE + uploaded.key;
     const fileKind = getFileKind(selectedDirectFile);
     const saved = await saveReview(buildReviewPayload(fileUrl, selectedDirectFile.size, fileKind, {
-      upload_type: "direct_file"
+      upload_type: fileKind === "pdf" ? "document" : fileKind
     }));
 
     setStatus([
@@ -517,7 +616,7 @@ async function uploadTypedText() {
     const uploaded = await uploadFileToR2(file, "Text");
     const fileUrl = R2_PUBLIC_BASE + uploaded.key;
     const saved = await saveReview(buildReviewPayload(fileUrl, file.size, "text", {
-      upload_type: "typed_text"
+      upload_type: "text"
     }));
 
     setStatus([
@@ -636,3 +735,34 @@ el.adaptCropBtn.addEventListener("click", async () => {
 el.uploadBtn.addEventListener("click", uploadImage);
 el.directUploadBtn.addEventListener("click", uploadDirectFile);
 el.textUploadBtn.addEventListener("click", uploadTypedText);
+
+async function initAcademyToken() {
+  academyToken = getUrlToken();
+  if (!academyToken) return;
+
+  setStatus("Loading academy student...");
+
+  try {
+    const url = `${ACADEMY_STUDENT_API_URL}?token=${encodeURIComponent(academyToken)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!res.ok || !data.ok || !data.student) {
+      setStatus(data.error || "Academy token could not be loaded.");
+      return;
+    }
+
+    academyStudent = data.student;
+    const name = academyStudent.full_name ||
+      [academyStudent.first_name, academyStudent.last_name].filter(Boolean).join(" ") ||
+      "Academy student";
+
+    el.studentBanner.hidden = false;
+    el.studentBanner.textContent = `Academy onboarding for ${name}`;
+    setStatus("Student loaded. Choose a selfie, photo, video, document or text update.");
+  } catch (err) {
+    setStatus(`Academy token lookup failed: ${err.message}`);
+  }
+}
+
+initAcademyToken();
