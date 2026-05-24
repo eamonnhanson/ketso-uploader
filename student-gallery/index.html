@@ -180,7 +180,11 @@ async function loadGallery() {
     status.textContent = "";
 
     gallery.innerHTML = photos.map(photo => {
-      const studentId = photo.academy_student_id || photo.student_id || photo.id;
+      const studentId = photo.academy_student_id || photo.student_id;
+
+if (!studentId) {
+  console.warn("Missing academy student id for gallery item:", photo);
+}
       const displayName = getFirstName(photo.uploader_name || photo.linked_entity_name || photo.full_name || "Student");
       const session = displaySession(photo.academy_track || photo.interest_area || photo.track);
       const imageUrl = photo.cropped_file_url || photo.file_url || "";
