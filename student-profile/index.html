@@ -28,7 +28,36 @@
       color: #1f7a3f;
       margin-top: 10px;
     }
+.points-explanation {
+  border: 1px solid #d8eadc;
+  background: #f7fbf8;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 24px;
+  max-width: 720px;
+}
 
+.points-explanation h2 {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.points-explanation ul {
+  margin-top: 8px;
+  padding-left: 20px;
+}
+
+.points-explanation li {
+  margin-bottom: 5px;
+}
+
+.points-cta {
+  margin-top: 12px;
+  padding: 10px;
+  background: #eef7ee;
+  border-left: 4px solid #1f7a3f;
+  line-height: 1.4;
+}
     .upload-card {
       border: 1px solid #ddd;
       border-radius: 10px;
@@ -109,13 +138,13 @@ async function loadProfile(id) {
       return;
     }
 
-    renderProfile(data.student, data.uploads || []);
+renderProfile(data.student, data.uploads || [], data.point_events || []);
   } catch (err) {
     app.innerHTML = "Error loading profile: " + err.message;
   }
 }
 
-function renderProfile(student, uploads) {
+function renderProfile(student, uploads, pointEvents) {
   app.innerHTML = `
     <div class="profile-box">
       <h1>${escapeHtml(student.full_name || "Student")}</h1>
@@ -124,11 +153,61 @@ function renderProfile(student, uploads) {
       <div class="points">⭐ ${student.total_points || 0} point(s)</div>
     </div>
 
+    ${renderPointsExplanation(student, pointEvents)}
+
     <h2>Approved uploads</h2>
     ${uploads.length ? uploads.map(renderUpload).join("") : "<p>No approved uploads yet.</p>"}
   `;
 }
+function renderPointsExplanation(student, pointEvents) {
+  const events = Array.isArray(pointEvents) ? pointEvents : [];
+  const total = Number(student.total_points || 0);
 
+  const rows = events
+    .filter(event => Number(event.points || 0) !== 0)
+    .map(event => `
+      <li>
+        <strong>+${Number(event.points || 0)}</strong>
+        ${escapeHtml(labelPointEvent(event))}
+      </li>
+    `)
+    .join("");
+
+  return `
+    <div class="points-explanation">
+      <h2>How these points were earned</h2>
+      ${
+        rows
+          ? `<p>This student has earned <strong>${total} point(s)</strong> through approved academy activity:</p><ul>${rows}</ul>`
+          : `<p>This student has not earned public points yet.</p>`
+      }
+
+      <div class="points-cta">
+        <strong>Want to earn more points?</strong><br>
+        Upload a clear photo, video, document, or lesson answer through your KETSO Academy upload link.
+        Approved public uploads can earn points. Students who complete onboarding receive an extra onboarding badge and bonus point.
+      </div>
+    </div>
+  `;
+}
+
+function labelPointEvent(event) {
+  const key = String(event.event_key || "");
+
+  if (key === "onboarding_approved_bonus") {
+    return "Onboarding completed bonus";
+  }
+
+  if (key === "onboarding_first_upload") {
+    return "First onboarding upload";
+  }
+
+  if (key.startsWith("approved_upload_")) {
+    return "Approved public upload";
+  }
+
+  return event.event_label || key || "Academy activity";
+}
 function renderUpload(upload) {
   const lesson = labelLesson(upload.lesson_key);
   const uploadType = upload.upload_type || upload.file_type || "upload";
