@@ -40,6 +40,7 @@ img {
 <div class="controls">
   <select id="filterCategory">
     <option value="all">All</option>
+    <option value="hoorn_foundation">Hoorn Foundation</option>
     <option value="plant_een_boom">Plant een Boom</option>
     <option value="forest_hero">Forest Hero</option>
     <option value="other">Other</option>
@@ -84,8 +85,6 @@ const month = document.getElementById("filterMonth").value;
 const search = document.getElementById("searchBox").value;
 
 const params = new URLSearchParams();
-params.set("verification_status", "approved");
-params.set("public_gallery_status", "public");
 
 if (category !== "all") {
   params.set("category", category);
@@ -105,6 +104,7 @@ if (search.trim()) {
 }
 
 const url = `${API}?${params.toString()}`;
+console.log("Gallery fetch URL:", url);
 
   try {
     const res = await fetch(url);
@@ -115,23 +115,11 @@ const url = `${API}?${params.toString()}`;
       return;
     }
 
-    renderGallery((data.photos || []).filter(isGeneralGalleryPhoto));
+    renderGallery(data.photos || []);
 
   } catch (err) {
     container.textContent = "Failed: " + err.message;
   }
-}
-
-function isGeneralGalleryPhoto(photo) {
-  const category = photo.category || "";
-
-  if (photo.academy_student_id) return false;
-  if (photo.linked_entity_type === "staff") return false;
-  if (category === "academy_onboarding" || category === "academy_upload") return false;
-  if (category.startsWith("student_")) return false;
-  if (category === "staff_upload") return false;
-
-  return true;
 }
 
 function renderGallery(photos) {
@@ -148,7 +136,7 @@ function renderGallery(photos) {
     div.className = "item";
 
     div.innerHTML = `
-      <img src="${p.cropped_file_url}">
+      <img src="${p.cropped_file_url || p.original_file_url || ""}">
       <div><strong>${p.category}</strong></div>
       <div class="small">${p.linked_entity_name || "-"}</div>
       <div class="small">Original: ${p.original_kb || "-"} KB</div>
