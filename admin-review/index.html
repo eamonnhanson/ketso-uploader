@@ -194,7 +194,10 @@ async function loadUploads() {
       return;
     }
 
-    const uploads = data.uploads || [];
+    const includeStaffUploads = new URLSearchParams(window.location.search).get("include_staff_uploads") === "1";
+    const uploads = (data.uploads || []).filter(upload =>
+      includeStaffUploads || !isDefaultHiddenStaffUpload(upload)
+    );
 
     if (!uploads.length) {
       statusBox.textContent = "No uploads found.";
@@ -273,6 +276,12 @@ function renderUpload(upload) {
       </div>
     </div>
   `;
+}
+
+function isDefaultHiddenStaffUpload(upload) {
+  return upload &&
+    upload.upload_context === "staff_upload" &&
+    upload.verification_status === "not_required";
 }
 
 function renderDuplicateWarning(upload) {
