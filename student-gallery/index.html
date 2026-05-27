@@ -294,7 +294,9 @@ function isApprovedStudentUpload(upload) {
   if (upload.upload_context === "staff_upload") return false;
   if (upload.uploader_role === "staff") return false;
   if (!isAcademyStudentUpload(upload)) return false;
-  return upload.public_gallery_status === "public" || upload.verification_status === "approved";
+  return upload.public_gallery_status === "public" ||
+    upload.verification_status === "approved" ||
+    upload.review_status === "approved";
 }
 
 function isAcademyStudentUpload(upload) {
@@ -304,6 +306,7 @@ function isAcademyStudentUpload(upload) {
   const lessonKey = String(upload.lesson_key || "").toLowerCase();
 
   if (upload.academy_student_id) return true;
+  if (category === "student_onboarding") return true;
   if (category === "academy_upload") return true;
   if (category === "academy_onboarding") return true;
   if (context === "academy_onboarding") return true;
