@@ -42,6 +42,7 @@ export async function onRequestPost({ request }) {
   try {
     const body = await request.json();
     const staffId = normalizeStaffId(body.staff_id || body.uploaded_by || "ketso_staff");
+    const staffName = normalizeStaffName(body.staff_name || body.uploader_name || staffId);
     const category = String(body.category || "").trim();
 
     if (!staffId) {
@@ -79,8 +80,8 @@ export async function onRequestPost({ request }) {
       user_id: null,
       tree_id: null,
       linked_entity_type: "staff",
-      linked_entity_name: staffId,
-      uploader_name: staffId,
+      linked_entity_name: staffName,
+      uploader_name: staffName,
       uploader_email: null,
       file_type: "image",
       upload_type: "staff_photo",
@@ -91,6 +92,7 @@ export async function onRequestPost({ request }) {
       public_gallery_status: "private",
       uploaded_by: staffId,
       staff_id: staffId,
+      staff_name: staffName,
       created_at: now,
       staff_created_at: now
     };
@@ -148,6 +150,16 @@ function normalizeStaffId(value) {
     .slice(0, 48);
 
   return /^[a-z0-9][a-z0-9_-]{1,47}$/.test(normalized) ? normalized : "";
+}
+
+function normalizeStaffName(value) {
+  const normalized = String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/[^a-zA-Z0-9 .'-]/g, "")
+    .slice(0, 80);
+
+  return normalized || "KETSO staff";
 }
 
 function validateR2Url(value, staffId) {
