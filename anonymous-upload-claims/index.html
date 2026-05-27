@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KETSO claim your upload</title>
+  <style>
+    :root {
+      --green: #1f7a3f;
+      --green-soft: #f2f7f1;
+      --line: #d7ddd4;
+      --ink: #111;
+      --muted: #555;
+      --danger: #a11;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 18px;
+      font-family: Arial, sans-serif;
+      color: var(--ink);
+      background: #fff;
+    }
+
+    main {
+      width: min(980px, 100%);
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: clamp(24px, 5vw, 34px);
+    }
+
+    .intro {
+      max-width: 760px;
+      margin: 0 0 16px;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+
+    .notice {
+      margin: 16px 0;
+      padding: 12px 14px;
+      border-left: 5px solid var(--green);
+      background: var(--green-soft);
+      line-height: 1.45;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin: 16px 0;
+    }
+
+    input,
+    button {
+      min-height: 42px;
+      border-radius: 8px;
+      font: inherit;
+    }
+
+    input {
+      flex: 1 1 260px;
+      border: 1px solid var(--line);
+      padding: 9px 11px;
+    }
+
+    button,
+    .button {
+      border: 0;
+      padding: 10px 13px;
+      background: var(--green);
+      color: #fff;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      border: 1px solid var(--line);
+      background: #f7faf6;
+      color: var(--ink);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    #status {
+      margin: 14px 0;
+      font-weight: 700;
+      color: var(--green);
+      white-space: pre-line;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #fff;
+    }
+
+    .card img {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      object-fit: cover;
+      border-radius: 6px;
+      display: block;
+      background: #eee;
+    }
+
+    .meta {
+      margin: 8px 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    .claim-form {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .claim-form input {
+      width: 100%;
+      min-height: 38px;
+      font-size: 14px;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
+    .error {
+      color: var(--danger);
+    }
+
+    @media (max-width: 620px) {
+      body {
+        padding: 12px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>KETSO Academy upload check</h1>
+    <p class="intro">
+      If you uploaded an onboarding photo but did not see your name, find your photo below.
+      Enter your full name and email, then send the claim message in the WhatsApp group.
+    </p>
+
+    <div class="notice">
+      This page does not approve photos automatically. It helps KETSO match anonymous uploads to the right student.
+    </div>
+
+    <div class="toolbar">
+      <input id="filterInput" type="search" placeholder="Filter by photo ID">
+      <button id="refreshBtn" type="button">Refresh</button>
+    </div>
+
+    <div id="status">Loading uploads...</div>
+    <div id="grid" class="grid"></div>
+  </main>
+
+  <script>
+    const PHOTO_REVIEW_URL = "https://ptb-tree-map.onrender.com/api/photo-review-gallery";
+    const statusEl = document.getElementById("status");
+    const gridEl = document.getElementById("grid");
+    const filterInput = document.getElementById("filterInput");
+    const refreshBtn = document.getElementById("refreshBtn");
+    let anonymousUploads = [];
+
+    refreshBtn.addEventListener("click", loadUploads);
+    filterInput.addEventListener("input", renderUploads);
+
+    loadUploads();
+
+    async function loadUploads() {
+      statusEl.textContent = "Loading uploads...";
+      gridEl.innerHTML = "";
+
+      try {
+        const res = await fetch(`${PHOTO_REVIEW_URL}?anonymous_onboarding=1&t=${Date.now()}`, {
+          cache: "no-store"
+        });
+        const data = await res.json();
+
+        if (!res.ok || !data.ok) {
+          throw new Error(data.error || "Could not load uploads.");
+        }
+
+        anonymousUploads = (data.photos || [])
+          .filter(isAnonymousStudentUpload)
+          .sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+
+        renderUploads();
+      } catch (err) {
+        statusEl.innerHTML = `<span class="error">Could not load anonymous uploads. Please try again later.</span>`;
+      }
+    }
+
+    function isAnonymousStudentUpload(upload) {
+      if (!upload) return false;
+      if (upload.upload_context === "staff_upload" || upload.uploader_role === "staff") return false;
+
+      const category = String(upload.category || "").toLowerCase();
+      const context = String(upload.upload_context || "").toLowerCase();
+      const lessonKey = String(upload.lesson_key || "").toLowerCase();
+      const hasIdentity = Boolean(upload.academy_student_id || upload.uploader_name || upload.uploader_email);
+      const hasImage = Boolean(upload.cropped_file_url || upload.file_url || upload.original_file_url);
+      const looksLikeOnboarding = category === "student_onboarding" ||
+        category === "academy_onboarding" ||
+        context === "academy_onboarding" ||
+        lessonKey === "onboarding";
+
+      return hasImage && looksLikeOnboarding && !hasIdentity;
+    }
+
+    function renderUploads() {
+      const filter = filterInput.value.trim().toLowerCase();
+      const uploads = anonymousUploads.filter((upload) => {
+        if (!filter) return true;
+        return String(upload.id || "").toLowerCase().includes(filter);
+      });
+
+      if (!uploads.length) {
+        statusEl.textContent = anonymousUploads.length
+          ? "No uploads match this filter."
+          : "No anonymous onboarding uploads found.";
+        gridEl.innerHTML = "";
+        return;
+      }
+
+      statusEl.textContent = `${uploads.length} anonymous upload(s) found.`;
+      gridEl.innerHTML = uploads.map(renderCard).join("");
+
+      gridEl.querySelectorAll("[data-copy-id]").forEach((button) => {
+        button.addEventListener("click", copyClaimMessage);
+      });
+      gridEl.querySelectorAll("[data-whatsapp-id]").forEach((button) => {
+        button.addEventListener("click", openWhatsAppClaim);
+      });
+    }
+
+    function renderCard(upload) {
+      const imageUrl = upload.cropped_file_url || upload.file_url || upload.original_file_url || "";
+      const created = formatDate(upload.created_at_utc);
+      const reviewed = formatDate(upload.reviewed_at_utc);
+
+      return `
+        <article class="card">
+          <img src="${escapeAttr(imageUrl)}" alt="Anonymous KETSO upload ${escapeAttr(upload.id)}">
+          <div class="meta">
+            <strong>Photo ID:</strong> ${escapeHtml(upload.id)}<br>
+            ${created ? `Uploaded: ${escapeHtml(created)}<br>` : ""}
+            ${reviewed ? `Reviewed: ${escapeHtml(reviewed)}<br>` : ""}
+            <a href="${escapeAttr(imageUrl)}" target="_blank" rel="noopener">Open photo</a>
+          </div>
+          <div class="claim-form">
+            <input id="name-${escapeAttr(upload.id)}" type="text" autocomplete="name" placeholder="Your full name">
+            <input id="email-${escapeAttr(upload.id)}" type="email" autocomplete="email" placeholder="Your KETSO Academy email">
+            <div class="actions">
+              <button type="button" data-copy-id="${escapeAttr(upload.id)}">Copy claim message</button>
+              <button class="secondary" type="button" data-whatsapp-id="${escapeAttr(upload.id)}">Open WhatsApp</button>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    async function copyClaimMessage(event) {
+      const id = event.currentTarget.getAttribute("data-copy-id");
+      const upload = anonymousUploads.find((item) => String(item.id) === String(id));
+      const name = document.getElementById(`name-${id}`).value.trim();
+      const email = document.getElementById(`email-${id}`).value.trim();
+
+      if (!name || !email) {
+        statusEl.innerHTML = `<span class="error">Please enter your full name and email before copying the claim message.</span>`;
+        return;
+      }
+
+      const message = buildClaimMessage(id, name, email, upload);
+
+      try {
+        await navigator.clipboard.writeText(message);
+        statusEl.textContent = `Claim message copied for photo ${id}. Paste it in the WhatsApp group.`;
+      } catch {
+        statusEl.textContent = message;
+      }
+    }
+
+    function openWhatsAppClaim(event) {
+      const id = event.currentTarget.getAttribute("data-whatsapp-id");
+      const upload = anonymousUploads.find((item) => String(item.id) === String(id));
+      const name = document.getElementById(`name-${id}`).value.trim();
+      const email = document.getElementById(`email-${id}`).value.trim();
+
+      if (!name || !email) {
+        statusEl.innerHTML = `<span class="error">Please enter your full name and email before opening WhatsApp.</span>`;
+        return;
+      }
+
+      window.open(`https://wa.me/?text=${encodeURIComponent(buildClaimMessage(id, name, email, upload))}`, "_blank", "noopener");
+    }
+
+    function buildClaimMessage(id, name, email, upload) {
+      const imageUrl = upload?.cropped_file_url || upload?.file_url || upload?.original_file_url || "";
+      return [
+        "KETSO Academy upload claim",
+        `Photo ID: ${id}`,
+        `Name: ${name || "[type your full name]"}`,
+        `Email: ${email || "[type your email]"}`,
+        `Photo: ${imageUrl}`
+      ].join("\n");
+    }
+
+    function formatDate(value) {
+      if (!value) return "";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "";
+      return date.toLocaleString();
+    }
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value);
+    }
+  </script>
+</body>
+</html>
