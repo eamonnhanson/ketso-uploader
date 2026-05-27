@@ -35,6 +35,10 @@ const el = {
   forestHeroSearch: document.getElementById("forestHeroSearch"),
   searchResults: document.getElementById("searchResults"),
   selectedHero: document.getElementById("selectedHero"),
+  devicePhotoAction: document.getElementById("devicePhotoAction"),
+  selfieAction: document.getElementById("selfieAction"),
+  cameraAction: document.getElementById("cameraAction"),
+  devicePhotoInput: document.getElementById("devicePhotoInput"),
   selfieInput: document.getElementById("selfieInput"),
   backCameraInput: document.getElementById("backCameraInput"),
   fileInput: document.getElementById("fileInput"),
@@ -82,7 +86,7 @@ function safeFileBaseName(name) {
 }
 
 function resetInputsExcept(activeInput) {
-  [el.selfieInput, el.backCameraInput, el.fileInput].forEach((input) => {
+  [el.devicePhotoInput, el.selfieInput, el.backCameraInput, el.fileInput].forEach((input) => {
     if (input !== activeInput) input.value = "";
   });
 }
@@ -170,7 +174,7 @@ function getActiveCategory() {
 function getUploadContext() {
   if (academyStudent) return "academy_onboarding";
   if (!staffUnlocked) return "student_mobile_upload";
-  return el.category.value === "academy_upload" ? "academy_upload" : "staff_upload";
+  return "staff_upload";
 }
 
 function blobFromCanvas(canvas, type, quality) {
@@ -653,6 +657,22 @@ function updateStaffCategory() {
   el.forestHeroSection.hidden = !(staffUnlocked && el.category.value === "forest_hero");
 }
 
+function updateUploadActionsForContext() {
+  if (academyStudent) {
+    el.selfieAction.style.order = "1";
+    el.selfieAction.textContent = "Take onboarding selfie";
+    el.devicePhotoAction.style.order = "2";
+    el.cameraAction.style.order = "3";
+    return;
+  }
+
+  el.devicePhotoAction.style.order = "1";
+  el.devicePhotoAction.textContent = "I want to upload a photo";
+  el.selfieAction.style.order = "2";
+  el.selfieAction.textContent = "Take selfie";
+  el.cameraAction.style.order = "3";
+}
+
 async function runForestHeroSearch(q) {
   el.searchResults.textContent = "Searching...";
 
@@ -715,6 +735,7 @@ el.forestHeroSearch.addEventListener("input", () => {
   searchTimeout = setTimeout(() => runForestHeroSearch(q), 300);
 });
 
+el.devicePhotoInput.addEventListener("change", (event) => handleImageSelected(event, "photo", "Photo selected"));
 el.selfieInput.addEventListener("change", (event) => handleImageSelected(event, "selfie", "Selfie selected"));
 el.backCameraInput.addEventListener("change", (event) => handleImageSelected(event, "photo", "Photo selected"));
 el.fileInput.addEventListener("change", handleDirectFileSelected);
@@ -759,10 +780,12 @@ async function initAcademyToken() {
 
     el.studentBanner.hidden = false;
     el.studentBanner.textContent = `Academy onboarding for ${name}`;
+    updateUploadActionsForContext();
     setStatus("Student loaded. Choose a selfie, photo, video, document or text update.");
   } catch (err) {
     setStatus(`Academy token lookup failed: ${err.message}`);
   }
 }
 
+updateUploadActionsForContext();
 initAcademyToken();
