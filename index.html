@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>KETSO upload</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
-  <link rel="stylesheet" href="styles.css?v=20260527-staff-upload-1">
+  <link rel="stylesheet" href="styles.css?v=20260527-student-purpose-1">
 </head>
 <body>
   <main class="app-shell">
@@ -59,6 +59,19 @@
 
     <section class="panel primary-panel" aria-labelledby="upload-title">
       <h2 id="upload-title">What do you want to upload?</h2>
+      <div id="studentPurposePanel" class="student-purpose">
+        <label for="studentPurpose">What is this upload for?</label>
+        <select id="studentPurpose">
+          <option value="onboarding">Selfie or photo to complete onboarding</option>
+          <option value="lesson_1_child_protection">Lesson 1: Child Protection</option>
+          <option value="lesson_2_climate_change">Lesson 2: Climate Change</option>
+          <option value="lesson_3_tree_health">Lesson 3: Tree Health</option>
+          <option value="lesson_4_tree_planting">Lesson 4: Tree Planting</option>
+          <option value="lesson_5_carbon_dioxide_increase">Lesson 5: Carbon Dioxide Increase</option>
+          <option value="tutor_question">A question to the tutor</option>
+        </select>
+      </div>
+
       <div class="action-grid" role="group" aria-label="Upload type">
         <label id="devicePhotoAction" for="devicePhotoInput" class="upload-action">I want to upload a photo</label>
         <label id="selfieAction" for="selfieInput" class="upload-action upload-action-secondary">Take selfie</label>
@@ -119,6 +132,6 @@
   </main>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-  <script src="app.js?v=20260527-staff-upload-1" defer></script>
+  <script src="app.js?v=20260527-student-purpose-1" defer></script>
 </body>
 </html>
