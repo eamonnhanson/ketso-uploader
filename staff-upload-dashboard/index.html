@@ -263,11 +263,11 @@
         <h2 id="upload-title">Upload staff photo</h2>
 
         <div id="staffWarning" class="warning" hidden>
-          No staff_id was provided. Using ketso_staff for testing. Add ?staff_id=your_name to the URL for real staff uploads.
+          No staff name was provided. Using KETSO staff for testing. Add ?staff_name=First%20Last to the URL for real staff uploads.
         </div>
 
-        <label for="staffId">Staff identifier</label>
-        <input id="staffId" type="text" autocomplete="off">
+        <label for="staffName">Staff name</label>
+        <input id="staffName" type="text" autocomplete="name" placeholder="First name Last name">
 
         <label for="category">Category</label>
         <select id="category"></select>
@@ -327,7 +327,7 @@
 
     const el = {
       staffWarning: document.getElementById("staffWarning"),
-      staffId: document.getElementById("staffId"),
+      staffName: document.getElementById("staffName"),
       category: document.getElementById("category"),
       caption: document.getElementById("caption"),
       fileInput: document.getElementById("fileInput"),
@@ -354,7 +354,7 @@
     }
 
     function renderCategories() {
-      const categories = window.KETSO_STAFF_CATEGORIES || [];
+      const categories = getStaffCategories();
       el.category.innerHTML = categories.map((item) =>
         `<option value="${escapeAttr(item.value)}">${escapeHtml(item.label)}</option>`
       ).join("");
@@ -362,10 +362,10 @@
 
     function initStaffId() {
       const params = new URLSearchParams(window.location.search);
-      const rawStaffId = params.get("staff_id");
-      const staffId = normalizeStaffId(rawStaffId || "ketso_staff");
-      el.staffId.value = staffId || "ketso_staff";
-      el.staffWarning.hidden = Boolean(rawStaffId);
+      const rawStaffName = params.get("staff_name") || params.get("staff_id");
+      const staffName = normalizeStaffName(rawStaffName || "KETSO staff");
+      el.staffName.value = staffName || "KETSO staff";
+      el.staffWarning.hidden = Boolean(rawStaffName);
     }
 
     function bindEvents() {
@@ -379,9 +379,9 @@
       el.uploadBtn.addEventListener("click", uploadStaffPhoto);
       el.clearBtn.addEventListener("click", resetForm);
       el.refreshBtn.addEventListener("click", loadUploads);
-      el.staffId.addEventListener("change", () => {
-        el.staffId.value = normalizeStaffId(el.staffId.value) || "ketso_staff";
-        el.staffWarning.hidden = el.staffId.value !== "ketso_staff";
+      el.staffName.addEventListener("change", () => {
+        el.staffName.value = normalizeStaffName(el.staffName.value) || "KETSO staff";
+        el.staffWarning.hidden = getStaffId() !== "ketso_staff";
         loadUploads();
       });
     }
@@ -398,6 +398,40 @@
         .replace(/_+/g, "_")
         .replace(/^_+|_+$/g, "")
         .slice(0, 48);
+    }
+
+    function normalizeStaffName(value) {
+      return String(value || "")
+        .trim()
+        .replace(/\s+/g, " ")
+        .replace(/[^a-zA-Z0-9 .'-]/g, "")
+        .slice(0, 80);
+    }
+
+    function getStaffId() {
+      return normalizeStaffId(el.staffName.value || "KETSO staff") || "ketso_staff";
+    }
+
+    function getStaffCategories() {
+      if (Array.isArray(window.KETSO_STAFF_CATEGORIES) && window.KETSO_STAFF_CATEGORIES.length) {
+        return window.KETSO_STAFF_CATEGORIES;
+      }
+
+      return [
+        { value: "forest_hero", label: "Forest Hero" },
+        { value: "nursery", label: "Nursery" },
+        { value: "training", label: "Training" },
+        { value: "vocational_training", label: "Vocational training" },
+        { value: "charcoal_making", label: "Charcoal making" },
+        { value: "truck", label: "Truck" },
+        { value: "wilde_ganzen", label: "Wilde Ganzen" },
+        { value: "hoorn_foundation", label: "Hoorn Foundation" },
+        { value: "josephina_foundation", label: "Josephina Foundation" },
+        { value: "care_international", label: "Care International" },
+        { value: "woord_en_daad", label: "Woord en Daad" },
+        { value: "plant_een_boom", label: "Plant een Boom" },
+        { value: "other", label: "Other" }
+      ];
     }
 
     function safeFileBaseName(name) {
@@ -565,10 +599,11 @@
     }
 
     async function uploadStaffPhoto() {
-      const staffId = normalizeStaffId(el.staffId.value);
+      const staffName = normalizeStaffName(el.staffName.value);
+      const staffId = getStaffId();
 
-      if (!staffId) {
-        setStatus("Enter a valid staff identifier.");
+      if (!staffName || !staffId) {
+        setStatus("Enter a valid staff name.");
         return;
       }
 
@@ -605,6 +640,7 @@
         const saved = await saveStaffUpload({
           staff_id: staffId,
           uploaded_by: staffId,
+          staff_name: staffName,
           category: el.category.value,
           caption: el.caption.value.trim(),
           file_url: croppedUrl,
@@ -654,7 +690,7 @@
     }
 
     async function loadUploads() {
-      const staffId = normalizeStaffId(el.staffId.value || "ketso_staff");
+      const staffId = getStaffId();
       el.uploadsStatus.textContent = "Loading uploads...";
       el.uploadsList.innerHTML = "";
 
@@ -677,7 +713,15 @@
         el.uploadsStatus.textContent = "";
         el.uploadsList.innerHTML = uploads.map(renderUploadCard).join("");
       } catch (err) {
-        el.uploadsStatus.textContent = "Error loading uploads: " + err.message;
+        const cachedUploads = getCachedUploads(staffId);
+
+        if (cachedUploads.length) {
+          el.uploadsStatus.textContent = "Showing recent uploads saved in this browser. The staff uploads API is not available yet.";
+          el.uploadsList.innerHTML = cachedUploads.map(renderUploadCard).join("");
+          return;
+        }
+
+        el.uploadsStatus.textContent = "Could not load staff uploads. Make sure the Cloudflare Function /api/staff-uploads is deployed.";
       }
     }
 
@@ -743,7 +787,7 @@
     }
 
     function labelCategory(value) {
-      const found = (window.KETSO_STAFF_CATEGORIES || []).find((item) => item.value === value);
+      const found = getStaffCategories().find((item) => item.value === value);
       return found ? found.label : value || "Staff upload";
     }
 
@@ -776,7 +820,7 @@
       const contentType = res.headers.get("content-type") || "";
       if (contentType.includes("application/json")) return res.json();
       const text = await res.text();
-      throw new Error(`${label} returned non-JSON response: ${text.slice(0, 160)}`);
+      throw new Error(`${label} API is not returning JSON. It may not be deployed yet.`);
     }
 
     function formatDate(value) {
