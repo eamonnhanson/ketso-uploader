@@ -192,7 +192,7 @@
 
 <script>
 const API_URL = "https://ptb-tree-map.onrender.com/api/student-gallery";
-const APPROVED_UPLOADS_URL = "https://ptb-tree-map.onrender.com/api/photo-review-gallery?verification_status=approved&public_gallery_status=public";
+const APPROVED_UPLOADS_URL = "https://ptb-tree-map.onrender.com/api/photo-review-gallery";
 const pendingPanel = document.getElementById("pendingPanel");
 const pendingGallery = document.getElementById("pendingGallery");
 const recentApprovedPanel = document.getElementById("recentApprovedPanel");
@@ -264,7 +264,7 @@ async function loadGallery() {
 
 async function loadRecentApprovedUploads() {
   try {
-    const res = await fetch(`${APPROVED_UPLOADS_URL}&t=${Date.now()}`, {
+    const res = await fetch(`${APPROVED_UPLOADS_URL}?t=${Date.now()}`, {
       cache: "no-store"
     });
     const data = await res.json();
@@ -294,6 +294,9 @@ function isApprovedStudentUpload(upload) {
   if (upload.upload_context === "staff_upload") return false;
   if (upload.uploader_role === "staff") return false;
   if (!isAcademyStudentUpload(upload)) return false;
+
+  if (String(upload.public_gallery_status || "").toLowerCase() === "private") return false;
+
   return upload.public_gallery_status === "public" ||
     upload.verification_status === "approved" ||
     upload.review_status === "approved";
