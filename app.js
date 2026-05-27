@@ -109,6 +109,8 @@ const el = {
   textEntry: document.getElementById("textEntry"),
   selectedFileInfo: document.getElementById("selectedFileInfo"),
   fileSummary: document.getElementById("fileSummary"),
+  recentUploadsPanel: document.getElementById("recentUploadsPanel"),
+  recentUploadsList: document.getElementById("recentUploadsList"),
   cropSection: document.getElementById("cropSection"),
   image: document.getElementById("image"),
   zoomOut: document.getElementById("zoomOut"),
@@ -160,6 +162,63 @@ function getUrlToken() {
 function getStudentPurpose() {
   const value = el.studentPurpose?.value || "onboarding";
   return STUDENT_PURPOSES[value] || STUDENT_PURPOSES.onboarding;
+}
+
+function getRecentUploadKey() {
+  const studentId = academyStudent?.id || academyStudent?.ketso_student_id || "this_device";
+  return `ketso_recent_student_uploads_${studentId}`;
+}
+
+function saveRecentStudentUpload(upload) {
+  if (staffUnlocked || !upload) return;
+
+  const key = getRecentUploadKey();
+  const uploads = getRecentStudentUploads()
+    .filter((item) => String(item.review_id || item.file_url) !== String(upload.review_id || upload.file_url));
+
+  uploads.unshift(upload);
+  localStorage.setItem(key, JSON.stringify(uploads.slice(0, 8)));
+  renderRecentStudentUploads();
+}
+
+function getRecentStudentUploads() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(getRecentUploadKey()) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function renderRecentStudentUploads() {
+  if (!el.recentUploadsPanel || staffUnlocked) return;
+
+  const uploads = getRecentStudentUploads();
+  el.recentUploadsPanel.hidden = uploads.length === 0;
+
+  if (!uploads.length) {
+    el.recentUploadsList.innerHTML = "";
+    return;
+  }
+
+  el.recentUploadsList.innerHTML = uploads.map((upload) => {
+    const imageUrl = upload.preview_url || upload.file_url || "";
+    const reviewLink = upload.review_id
+      ? `/academy-my-upload/?review_id=${encodeURIComponent(upload.review_id)}`
+      : "";
+
+    return `
+      <article class="recent-upload-card">
+        ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="Recent upload">` : "<div></div>"}
+        <div class="recent-upload-meta">
+          <strong>${escapeHtml(upload.reason_label || "Upload")}</strong><br>
+          ${escapeHtml(upload.created_at || "")}<br>
+          <span class="status-badge">${escapeHtml(upload.status || "Waiting for approval")}</span><br>
+          ${reviewLink ? `<a href="${escapeHtml(reviewLink)}">View my upload</a>` : ""}
+        </div>
+      </article>
+    `;
+  }).join("");
 }
 
 function resetSelection() {
@@ -622,11 +681,20 @@ async function uploadImage() {
     const uploaded = await uploadFileToR2(croppedFile, "Photo");
     const fileUrl = R2_PUBLIC_BASE + uploaded.key;
 
-    const saved = await saveReview(buildReviewPayload(fileUrl, croppedBlob.size, "image", {
+    const payload = buildReviewPayload(fileUrl, croppedBlob.size, "image", {
       upload_type: academyStudent ? "image_photo" : "image_cropped",
       original_file_url: originalUrl,
       original_file_size_bytes: originalUploadFile.size
-    }));
+    });
+    const saved = await saveReview(payload);
+    saveRecentStudentUpload({
+      review_id: saved.review_id,
+      file_url: fileUrl,
+      preview_url: fileUrl,
+      reason_label: payload.upload_reason_label || payload.category,
+      status: "Waiting for approval",
+      created_at: new Date().toLocaleString()
+    });
 
     setStatus([
       "Done.",
@@ -657,9 +725,18 @@ async function uploadDirectFile() {
     const uploaded = await uploadFileToR2(selectedDirectFile, "File");
     const fileUrl = R2_PUBLIC_BASE + uploaded.key;
     const fileKind = getFileKind(selectedDirectFile);
-    const saved = await saveReview(buildReviewPayload(fileUrl, selectedDirectFile.size, fileKind, {
+    const payload = buildReviewPayload(fileUrl, selectedDirectFile.size, fileKind, {
       upload_type: fileKind === "pdf" ? "document" : fileKind
-    }));
+    });
+    const saved = await saveReview(payload);
+    saveRecentStudentUpload({
+      review_id: saved.review_id,
+      file_url: fileUrl,
+      preview_url: fileKind === "video" ? "" : fileUrl,
+      reason_label: payload.upload_reason_label || payload.category,
+      status: "Waiting for approval",
+      created_at: new Date().toLocaleString()
+    });
 
     setStatus([
       "Done.",
@@ -691,9 +768,18 @@ async function uploadTypedText() {
     const file = new File([text], `student_text_${Date.now()}.txt`, { type: "text/plain" });
     const uploaded = await uploadFileToR2(file, "Text");
     const fileUrl = R2_PUBLIC_BASE + uploaded.key;
-    const saved = await saveReview(buildReviewPayload(fileUrl, file.size, "text", {
+    const payload = buildReviewPayload(fileUrl, file.size, "text", {
       upload_type: "text"
-    }));
+    });
+    const saved = await saveReview(payload);
+    saveRecentStudentUpload({
+      review_id: saved.review_id,
+      file_url: fileUrl,
+      preview_url: "",
+      reason_label: payload.upload_reason_label || payload.category,
+      status: "Waiting for approval",
+      created_at: new Date().toLocaleString()
+    });
 
     setStatus([
       "Done.",
@@ -718,6 +804,7 @@ function unlockStaff() {
   el.staffMessage.textContent = "Staff options unlocked.";
   el.staffOptions.hidden = false;
   el.studentPurposePanel.hidden = true;
+  if (el.recentUploadsPanel) el.recentUploadsPanel.hidden = true;
   updateStaffCategory();
 }
 
@@ -874,6 +961,7 @@ async function initAcademyToken() {
     el.studentBanner.hidden = false;
     el.studentBanner.textContent = `Academy onboarding for ${name}`;
     updateUploadActionsForContext();
+    renderRecentStudentUploads();
     setStatus("Student loaded. Choose a selfie, photo, video, document or text update.");
   } catch (err) {
     setStatus(`Academy token lookup failed: ${err.message}`);
@@ -881,4 +969,5 @@ async function initAcademyToken() {
 }
 
 updateUploadActionsForContext();
+renderRecentStudentUploads();
 initAcademyToken();
