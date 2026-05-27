@@ -154,6 +154,17 @@ textarea {
   margin-bottom: 12px;
 }
 
+.student-identity {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+  border: 1px solid #b7dfbd;
+  border-left: 5px solid var(--green);
+  border-radius: 8px;
+  background: #f2f7f1;
+  padding: 12px;
+}
+
 .upload-action,
 .button {
   display: inline-flex;
@@ -260,6 +271,51 @@ textarea {
 
 .file-summary {
   line-height: 1.5;
+}
+
+.recent-upload-list {
+  display: grid;
+  gap: 10px;
+}
+
+.recent-upload-card {
+  display: grid;
+  grid-template-columns: 86px 1fr;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px;
+}
+
+.recent-upload-card img {
+  width: 86px;
+  height: 86px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #eee;
+}
+
+.recent-upload-meta {
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.recent-upload-meta a {
+  color: var(--green-dark);
+  font-weight: 700;
+}
+
+.status-badge {
+  display: inline-block;
+  margin-top: 4px;
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: var(--soft);
+  color: var(--green-dark);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .search-results {
