@@ -33,21 +33,20 @@
       max-width: 760px;
       line-height: 1.5;
     }
-    
-.whatsapp-button {
-  display: inline-block;
-  background: #1f7a3f;
-  color: white;
-  padding: 10px 14px;
-  border-radius: 8px;
-  text-decoration: none;
-  font-weight: bold;
-  margin-top: 8px;
-}
 
-.whatsapp-button:hover {
-  background: #155c2f;
-}
+    .pending-panel {
+      margin-bottom: 24px;
+      border: 1px solid #d9ded8;
+      border-radius: 12px;
+      background: #fbfdf9;
+      padding: 14px;
+    }
+
+    .pending-panel h2 {
+      margin: 0 0 8px;
+      font-size: 20px;
+    }
+
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
@@ -159,24 +158,25 @@
 </p>
 
 <div class="cta">
-  <strong>Join the KETSO Academy WhatsApp group</strong><br>
-  Receive lesson updates, upload instructions and information about how to earn points.
-  <br><br>
-  <a
-    class="whatsapp-button"
-    href="https://chat.whatsapp.com/CqxAGgHO61xIXc48HyssjM"
-    target="_blank"
-    rel="noopener"
-  >
-    Join WhatsApp group
-  </a>
+  Want to introduce yourself to the group?
+  Post a short TikTok video and use the hashtag <strong>#KETSOAcademy</strong>.
 </div>
+
+<section id="pendingPanel" class="pending-panel" hidden>
+  <h2>Your uploads waiting for approval</h2>
+  <p class="intro">These uploads were sent from this browser. They may appear in the public gallery after KETSO approval.</p>
+  <div id="pendingGallery" class="grid"></div>
+</section>
 
 <div id="status">Loading student gallery...</div>
 <div id="gallery" class="grid"></div>
 
 <script>
 const API_URL = "https://ptb-tree-map.onrender.com/api/student-gallery";
+const pendingPanel = document.getElementById("pendingPanel");
+const pendingGallery = document.getElementById("pendingGallery");
+
+renderPendingUploads();
 
 async function loadGallery() {
   const status = document.getElementById("status");
@@ -203,11 +203,7 @@ async function loadGallery() {
     status.textContent = "";
 
     gallery.innerHTML = photos.map(photo => {
-      const studentId = photo.academy_student_id || photo.student_id;
-
-if (!studentId) {
-  console.warn("Missing academy student id for gallery item:", photo);
-}
+      const studentId = photo.academy_student_id || photo.student_id || photo.id;
       const displayName = getFirstName(photo.uploader_name || photo.linked_entity_name || photo.full_name || "Student");
       const session = displaySession(photo.academy_track || photo.interest_area || photo.track);
       const imageUrl = photo.cropped_file_url || photo.file_url || "";
@@ -312,6 +308,50 @@ function renderBadges(badges) {
       `).join("")}
     </div>
   `;
+}
+
+function renderPendingUploads() {
+  const uploads = getPendingUploads();
+
+  if (!uploads.length) {
+    pendingPanel.hidden = true;
+    return;
+  }
+
+  pendingPanel.hidden = false;
+  pendingGallery.innerHTML = uploads.map(upload => {
+    const reviewLink = upload.review_id
+      ? `/academy-my-upload/?review_id=${encodeURIComponent(upload.review_id)}`
+      : "#";
+
+    return `
+      <div class="card" role="link" tabindex="0" data-profile-url="${escapeAttr(reviewLink)}">
+        ${upload.preview_url ? `<img src="${escapeAttr(upload.preview_url)}" alt="Pending upload">` : ""}
+        <div class="name">${escapeHtml(upload.reason_label || "Upload")}</div>
+        <div class="meta">${escapeHtml(upload.created_at || "")}</div>
+        <div class="points">${escapeHtml(upload.status || "Waiting for approval")}</div>
+        <div class="view-profile">View my upload</div>
+      </div>
+    `;
+  }).join("");
+}
+
+function getPendingUploads() {
+  const uploads = [];
+
+  for (let i = 0; i < localStorage.length; i += 1) {
+    const key = localStorage.key(i);
+    if (!key || !key.startsWith("ketso_recent_student_uploads_")) continue;
+
+    try {
+      const parsed = JSON.parse(localStorage.getItem(key) || "[]");
+      if (Array.isArray(parsed)) uploads.push(...parsed);
+    } catch {
+      // Ignore broken local cache entries.
+    }
+  }
+
+  return uploads.slice(0, 8);
 }
 
 function escapeHtml(value) {
