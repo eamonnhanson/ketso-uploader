@@ -72,6 +72,18 @@
         </select>
       </div>
 
+      <section id="studentIdentityPanel" class="student-identity" hidden>
+        <label for="studentNameSearch">Student name</label>
+        <input id="studentNameSearch" type="text" autocomplete="name" placeholder="Start typing your first name">
+        <div id="studentSearchResults" class="search-results"></div>
+
+        <label for="studentEmail">Student email</label>
+        <input id="studentEmail" type="email" autocomplete="email" placeholder="The email used for KETSO Academy">
+
+        <div id="selectedStudent" class="selected-item" hidden></div>
+        <p class="small">For onboarding uploads, select your name and confirm your email before uploading.</p>
+      </section>
+
       <div class="action-grid" role="group" aria-label="Upload type">
         <label id="devicePhotoAction" for="devicePhotoInput" class="upload-action">I want to upload a photo</label>
         <label id="selfieAction" for="selfieInput" class="upload-action upload-action-secondary">Take selfie</label>
