@@ -78,7 +78,7 @@
   <div id="gallery" class="grid"></div>
 
   <script>
-    const API_URL = "https://ptb-tree-map.onrender.com/api/photo-review-gallery?verification_status=approved&public_gallery_status=public";
+    const API_URL = "https://ptb-tree-map.onrender.com/api/photo-review-gallery?public_gallery_status=public";
 
     async function loadGallery() {
       const status = document.getElementById("status");
@@ -113,8 +113,10 @@
       if (upload.academy_student_id) return false;
       if (category === "academy_onboarding" || category === "academy_upload") return false;
       if (category.startsWith("student_")) return false;
+      if (upload.public_gallery_status !== "public") return false;
 
       return upload.linked_entity_type === "staff" ||
+        upload.upload_context === "staff_upload" ||
         category === "staff_upload" ||
         category === "training" ||
         category === "nursery" ||
