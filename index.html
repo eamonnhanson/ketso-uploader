@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>KETSO upload</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
-  <link rel="stylesheet" href="styles.css?v=20260523-academy-1">
+  <link rel="stylesheet" href="styles.css?v=20260527-staff-upload-1">
 </head>
 <body>
   <main class="app-shell">
@@ -31,8 +31,6 @@
         <div id="staffOptions" class="staff-options" hidden>
           <label for="category">Category</label>
           <select id="category">
-            <option value="academy_upload">Academy upload</option>
-            <option value="academy_onboarding">Academy onboarding</option>
             <option value="forest_hero">Forest Hero</option>
             <option value="nursery">Nursery</option>
             <option value="training">Training</option>
@@ -62,12 +60,14 @@
     <section class="panel primary-panel" aria-labelledby="upload-title">
       <h2 id="upload-title">What do you want to upload?</h2>
       <div class="action-grid" role="group" aria-label="Upload type">
-        <label for="selfieInput" class="upload-action">Take selfie</label>
-        <label for="backCameraInput" class="upload-action upload-action-secondary">Take photo</label>
+        <label id="devicePhotoAction" for="devicePhotoInput" class="upload-action">I want to upload a photo</label>
+        <label id="selfieAction" for="selfieInput" class="upload-action upload-action-secondary">Take selfie</label>
+        <label id="cameraAction" for="backCameraInput" class="upload-action upload-action-secondary">Take photo</label>
         <label for="fileInput" class="upload-action upload-action-dark">Upload video or document</label>
         <button id="textModeBtn" type="button" class="upload-action upload-action-light">Type text</button>
       </div>
 
+      <input id="devicePhotoInput" class="visually-hidden-file" type="file" accept="image/*">
       <input id="selfieInput" class="visually-hidden-file" type="file" accept="image/*" capture="user">
       <input id="backCameraInput" class="visually-hidden-file" type="file" accept="image/*" capture="environment">
       <input id="fileInput" class="visually-hidden-file" type="file" accept="video/*,.mp4,.mov,.webm,.m4v,.pdf,.doc,.docx,.txt">
@@ -84,6 +84,11 @@
     <section id="fileSummary" class="file-summary" hidden></section>
 
     <section id="cropSection" class="crop-section" hidden>
+      <div class="crop-note">
+        <strong>Crop your photo before uploading</strong>
+        <span>Move or zoom the image, then use Adapt crop if you change the framing.</span>
+      </div>
+
       <div id="cropWorkspace" class="crop-workspace">
         <img id="image" alt="Selected image preview">
       </div>
@@ -114,6 +119,6 @@
   </main>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-  <script src="app.js?v=20260523-academy-1" defer></script>
+  <script src="app.js?v=20260527-staff-upload-1" defer></script>
 </body>
 </html>
