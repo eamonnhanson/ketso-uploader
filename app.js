@@ -24,6 +24,65 @@ let academyStudent = null;
 let selectedLink = null;
 let searchTimeout = null;
 
+const STUDENT_PURPOSES = {
+  onboarding: {
+    label: "Selfie or photo to complete onboarding",
+    category: "academy_onboarding",
+    studentCategory: "student_onboarding",
+    uploadContext: "academy_onboarding",
+    lessonKey: "onboarding",
+    primaryAction: "selfie"
+  },
+  lesson_1_child_protection: {
+    label: "Lesson 1: Child Protection",
+    category: "academy_lesson_1_child_protection",
+    studentCategory: "student_lesson_1_child_protection",
+    uploadContext: "academy_lesson_upload",
+    lessonKey: "lesson_1_child_protection",
+    primaryAction: "photo"
+  },
+  lesson_2_climate_change: {
+    label: "Lesson 2: Climate Change",
+    category: "academy_lesson_2_climate_change",
+    studentCategory: "student_lesson_2_climate_change",
+    uploadContext: "academy_lesson_upload",
+    lessonKey: "lesson_2_climate_change",
+    primaryAction: "photo"
+  },
+  lesson_3_tree_health: {
+    label: "Lesson 3: Tree Health",
+    category: "academy_lesson_3_tree_health",
+    studentCategory: "student_lesson_3_tree_health",
+    uploadContext: "academy_lesson_upload",
+    lessonKey: "lesson_3_tree_health",
+    primaryAction: "photo"
+  },
+  lesson_4_tree_planting: {
+    label: "Lesson 4: Tree Planting",
+    category: "academy_lesson_4_tree_planting",
+    studentCategory: "student_lesson_4_tree_planting",
+    uploadContext: "academy_lesson_upload",
+    lessonKey: "lesson_4_tree_planting",
+    primaryAction: "photo"
+  },
+  lesson_5_carbon_dioxide_increase: {
+    label: "Lesson 5: Carbon Dioxide Increase",
+    category: "academy_lesson_5_carbon_dioxide_increase",
+    studentCategory: "student_lesson_5_carbon_dioxide_increase",
+    uploadContext: "academy_lesson_upload",
+    lessonKey: "lesson_5_carbon_dioxide_increase",
+    primaryAction: "photo"
+  },
+  tutor_question: {
+    label: "A question to the tutor",
+    category: "academy_tutor_question",
+    studentCategory: "student_tutor_question",
+    uploadContext: "academy_tutor_question",
+    lessonKey: "tutor_question",
+    primaryAction: "text"
+  }
+};
+
 const el = {
   studentBanner: document.getElementById("studentBanner"),
   staffPassword: document.getElementById("staffPassword"),
@@ -31,6 +90,8 @@ const el = {
   staffMessage: document.getElementById("staffMessage"),
   staffOptions: document.getElementById("staffOptions"),
   category: document.getElementById("category"),
+  studentPurposePanel: document.getElementById("studentPurposePanel"),
+  studentPurpose: document.getElementById("studentPurpose"),
   forestHeroSection: document.getElementById("forestHeroSection"),
   forestHeroSearch: document.getElementById("forestHeroSearch"),
   searchResults: document.getElementById("searchResults"),
@@ -96,6 +157,11 @@ function getUrlToken() {
   return new URLSearchParams(window.location.search).get("token");
 }
 
+function getStudentPurpose() {
+  const value = el.studentPurpose?.value || "onboarding";
+  return STUDENT_PURPOSES[value] || STUDENT_PURPOSES.onboarding;
+}
+
 function resetSelection() {
   croppedBlob = null;
   selectedImageFile = null;
@@ -159,7 +225,9 @@ function getFileKind(file) {
 }
 
 function getStudentCategory() {
-  if (academyStudent) return "academy_onboarding";
+  const purpose = getStudentPurpose();
+  if (academyStudent) return purpose.category;
+  if (purpose) return purpose.studentCategory;
   if (selectedUploadKind === "selfie") return "student_selfie";
   if (selectedUploadKind === "photo") return "student_photo";
   if (selectedUploadKind === "video") return "student_video";
@@ -173,7 +241,7 @@ function getActiveCategory() {
 }
 
 function getUploadContext() {
-  if (academyStudent) return "academy_onboarding";
+  if (academyStudent) return getStudentPurpose().uploadContext;
   if (!staffUnlocked) return "student_mobile_upload";
   return "staff_upload";
 }
@@ -472,6 +540,7 @@ async function saveReview(payload) {
 
 function buildReviewPayload(fileUrl, size, fileType, extra = {}) {
   const category = getActiveCategory();
+  const purpose = getStudentPurpose();
   const studentName = academyStudent?.full_name ||
     [academyStudent?.first_name, academyStudent?.last_name].filter(Boolean).join(" ") ||
     null;
@@ -494,7 +563,9 @@ function buildReviewPayload(fileUrl, size, fileType, extra = {}) {
     academy_cohort: academyStudent?.cohort || null,
     academy_track: academyTrack,
     academy_whatsapp: academyStudent?.whatsapp || null,
-    lesson_key: academyStudent ? "onboarding" : null,
+    lesson_key: academyStudent || !staffUnlocked ? purpose.lessonKey : null,
+    upload_reason: academyStudent || !staffUnlocked ? el.studentPurpose.value : null,
+    upload_reason_label: academyStudent || !staffUnlocked ? purpose.label : null,
     interest_area: academyTrack,
     consent_given: Boolean(academyStudent),
     file_type: fileType,
@@ -507,7 +578,7 @@ function buildReviewPayload(fileUrl, size, fileType, extra = {}) {
 function getUploadFolder() {
   if (academyStudent) {
     const studentId = academyStudent.ketso_student_id || academyStudent.id || "student";
-    return `academy/onboarding/${safeFileBaseName(String(studentId))}`;
+    return `academy/${safeFileBaseName(getStudentPurpose().lessonKey)}/${safeFileBaseName(String(studentId))}`;
   }
 
   if (staffUnlocked) {
@@ -646,6 +717,7 @@ function unlockStaff() {
   staffUnlocked = true;
   el.staffMessage.textContent = "Staff options unlocked.";
   el.staffOptions.hidden = false;
+  el.studentPurposePanel.hidden = true;
   updateStaffCategory();
 }
 
@@ -659,13 +731,28 @@ function updateStaffCategory() {
 }
 
 function updateUploadActionsForContext() {
-  if (academyStudent) {
+  const purpose = getStudentPurpose();
+  const isOnboarding = purpose.primaryAction === "selfie";
+  const isTutorQuestion = purpose.primaryAction === "text";
+
+  if (academyStudent && isOnboarding) {
     el.selfieAction.style.order = "1";
     el.selfieAction.textContent = "Take onboarding selfie";
     el.devicePhotoAction.style.order = "2";
     el.cameraAction.style.order = "3";
     el.fileAction.style.order = "4";
     el.textModeBtn.style.order = "5";
+    return;
+  }
+
+  if (!staffUnlocked && isTutorQuestion) {
+    el.textModeBtn.style.order = "1";
+    el.devicePhotoAction.style.order = "2";
+    el.fileAction.style.order = "3";
+    el.selfieAction.style.order = "4";
+    el.cameraAction.style.order = "5";
+    el.selfieAction.textContent = "Take selfie";
+    el.devicePhotoAction.textContent = "I want to upload a photo";
     return;
   }
 
@@ -724,6 +811,7 @@ el.staffPassword.addEventListener("keydown", (event) => {
   if (event.key === "Enter") unlockStaff();
 });
 el.category.addEventListener("change", updateStaffCategory);
+el.studentPurpose.addEventListener("change", updateUploadActionsForContext);
 el.forestHeroSearch.addEventListener("input", () => {
   const q = el.forestHeroSearch.value.trim();
   selectedLink = null;
