@@ -7,6 +7,8 @@ const REVIEW_API_URL = "https://ptb-tree-map.onrender.com/api/save-photo-review"
 const ACADEMY_STUDENT_API_URL = "https://ptb-tree-map.onrender.com/api/academy-student";
 const ACADEMY_STUDENT_SEARCH_API_URL = "/api/academy-student-search";
 const R2_PUBLIC_BASE = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/";
+const ONBOARDING_FORM_URL = "https://forms.zohopublic.eu/greenmakombeh/form/KETSOacademy/formperma/Qt8SERehFwXmL4fYledPgJO-1QOC9wurOwpZydf68LA";
+const ONBOARDING_HELP_VIDEO_URL = "https://www.tiktok.com/@plantatreenow/video/7638751146852633878?is_from_webapp=1&sender_device=pc&web_id=7548932980812826144";
 
 const STAFF_PASSWORD = "4234";
 const MAX_CROPPED_BYTES = 500 * 1024;
@@ -134,6 +136,19 @@ function setStatus(lines) {
   el.status.textContent = Array.isArray(lines) ? lines.filter(Boolean).join("\n") : lines;
 }
 
+function renderOnboardingPrompt(target, message) {
+  target.innerHTML = `
+    <div class="onboarding-prompt">
+      <strong>${escapeHtml(message)}</strong>
+      <p>Please complete your KETSO Academy onboarding first. After onboarding, come back here and search your name again.</p>
+      <div class="prompt-actions">
+        <a href="${escapeHtml(ONBOARDING_FORM_URL)}" target="_blank" rel="noopener">Complete onboarding</a>
+        <a href="${escapeHtml(ONBOARDING_HELP_VIDEO_URL)}" target="_blank" rel="noopener">Watch help video</a>
+      </div>
+    </div>
+  `;
+}
+
 function escapeHtml(value) {
   return String(value || "")
     .replaceAll("&", "&amp;")
@@ -174,6 +189,30 @@ function getStudentPurpose() {
 
 function getActiveStudent() {
   return academyStudent || selectedStudent;
+}
+
+function getTypedStudentIdentity() {
+  if (staffUnlocked || !el.studentIdentityPanel || el.studentIdentityPanel.hidden) {
+    return null;
+  }
+
+  const fullName = String(el.studentNameSearch?.value || "").trim().replace(/\s+/g, " ");
+  const email = normalizeEmail(el.studentEmail?.value || "");
+
+  if (!fullName && !email) return null;
+
+  return {
+    id: null,
+    ketso_student_id: null,
+    full_name: fullName,
+    first_name: fullName.split(" ")[0] || "",
+    last_name: fullName.split(" ").slice(1).join(" "),
+    email
+  };
+}
+
+function getUploadStudentIdentity() {
+  return getActiveStudent();
 }
 
 function isOnboardingPurpose() {
@@ -310,7 +349,7 @@ function getFileKind(file) {
 
 function getStudentCategory() {
   const purpose = getStudentPurpose();
-  if (getActiveStudent()) return purpose.category;
+  if (getUploadStudentIdentity()) return purpose.category;
   if (purpose) return purpose.studentCategory;
   if (selectedUploadKind === "selfie") return "student_selfie";
   if (selectedUploadKind === "photo") return "student_photo";
@@ -325,7 +364,7 @@ function getActiveCategory() {
 }
 
 function getUploadContext() {
-  if (getActiveStudent()) return getStudentPurpose().uploadContext;
+  if (getUploadStudentIdentity()) return getStudentPurpose().uploadContext;
   if (!staffUnlocked) return "student_mobile_upload";
   return "staff_upload";
 }
@@ -556,13 +595,45 @@ function validateBeforeUpload() {
     return false;
   }
 
-  if (!staffUnlocked && isOnboardingPurpose() && !getActiveStudent()) {
-    setStatus("Please select your student name and confirm your email before uploading onboarding.");
+  if (!staffUnlocked && !getActiveStudent()) {
+    const typedIdentity = getTypedStudentIdentity();
+
+    if (!typedIdentity?.full_name || !typedIdentity?.email) {
+      setStatus("Please enter your student name and email before uploading.");
+      return false;
+    }
+
+    if (typedIdentity.full_name.length < 3 || !typedIdentity.full_name.includes(" ")) {
+      setStatus("Please enter your first and last name before uploading.");
+      return false;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(typedIdentity.email)) {
+      setStatus("Please enter a valid student email before uploading.");
+      return false;
+    }
+
+    setStatus([
+      "Please choose your name from the student search results before uploading.",
+      "If your name does not appear, complete onboarding first:",
+      ONBOARDING_FORM_URL,
+      "Help video:",
+      ONBOARDING_HELP_VIDEO_URL
+    ]);
     return false;
   }
 
-  if (!staffUnlocked && isOnboardingPurpose() && selectedStudent && !emailsMatch(el.studentEmail.value, selectedStudent.email)) {
+  if (!staffUnlocked && selectedStudent?.email && !emailsMatch(el.studentEmail.value, selectedStudent.email)) {
     setStatus("The email does not match the selected student. Please check your email or choose the correct name.");
+    return false;
+  }
+
+  if (!staffUnlocked && selectedStudent && !selectedStudent.email) {
+    setStatus([
+      "This student record has no email, so it cannot be verified here.",
+      "Please complete onboarding first or ask KETSO to update your student record:",
+      ONBOARDING_FORM_URL
+    ]);
     return false;
   }
 
@@ -635,7 +706,7 @@ async function saveReview(payload) {
 function buildReviewPayload(fileUrl, size, fileType, extra = {}) {
   const category = getActiveCategory();
   const purpose = getStudentPurpose();
-  const activeStudent = getActiveStudent();
+  const activeStudent = getUploadStudentIdentity();
   const studentName = activeStudent?.full_name ||
     [activeStudent?.first_name, activeStudent?.last_name].filter(Boolean).join(" ") ||
     null;
@@ -671,10 +742,10 @@ function buildReviewPayload(fileUrl, size, fileType, extra = {}) {
 }
 
 function getUploadFolder() {
-  const activeStudent = getActiveStudent();
+  const activeStudent = getUploadStudentIdentity();
 
   if (activeStudent) {
-    const studentId = activeStudent.ketso_student_id || activeStudent.id || "student";
+    const studentId = activeStudent.ketso_student_id || activeStudent.id || activeStudent.email || activeStudent.full_name || "student";
     return `academy/${safeFileBaseName(getStudentPurpose().lessonKey)}/${safeFileBaseName(String(studentId))}`;
   }
 
@@ -858,7 +929,7 @@ function updateStaffCategory() {
 function updateStudentIdentityPanel() {
   if (!el.studentIdentityPanel) return;
 
-  const shouldIdentify = !staffUnlocked && !academyStudent && isOnboardingPurpose();
+  const shouldIdentify = !staffUnlocked && !academyStudent;
   el.studentIdentityPanel.hidden = !shouldIdentify;
 
   if (!shouldIdentify) {
@@ -898,14 +969,20 @@ async function runStudentSearch(q) {
     const data = await res.json();
 
     if (!res.ok || !data.ok) {
-      el.studentSearchResults.textContent = data.error || "Student search is not available yet.";
+      renderOnboardingPrompt(
+        el.studentSearchResults,
+        data.error || "Student search is not available yet."
+      );
       return;
     }
 
     const students = data.students || [];
 
     if (!students.length) {
-      el.studentSearchResults.textContent = "No matching students found.";
+      renderOnboardingPrompt(
+        el.studentSearchResults,
+        "No matching student record found."
+      );
       return;
     }
 
@@ -918,7 +995,10 @@ async function runStudentSearch(q) {
       el.studentSearchResults.appendChild(div);
     });
   } catch (err) {
-    el.studentSearchResults.textContent = "Student search is not available yet. Please use your personal onboarding link.";
+    renderOnboardingPrompt(
+      el.studentSearchResults,
+      "Student search is not available yet."
+    );
   }
 }
 
@@ -1025,7 +1105,7 @@ el.studentPurpose.addEventListener("change", () => {
 });
 el.studentNameSearch.addEventListener("input", handleStudentSearchInput);
 el.studentEmail.addEventListener("input", () => {
-  if (selectedStudent && !emailsMatch(el.studentEmail.value, selectedStudent.email)) {
+  if (selectedStudent?.email && !emailsMatch(el.studentEmail.value, selectedStudent.email)) {
     el.selectedStudent.innerHTML = `
       <strong>Selected student</strong><br>
       ${escapeHtml(selectedStudent.full_name || "")}<br>
