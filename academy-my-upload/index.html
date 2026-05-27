@@ -100,16 +100,31 @@ async function loadUpload() {
 
         <img src="${u.file_url}" alt="Your uploaded image">
 
-        <button id="submitBtn">Submit for approval</button>
+        ${renderSubmitButton(u)}
       </div>
     `;
 
-    document.getElementById("submitBtn").addEventListener("click", submitForApproval);
+    const submitBtn = document.getElementById("submitBtn");
+    if (submitBtn) submitBtn.addEventListener("click", submitForApproval);
 
   } catch (err) {
     console.error(err);
     content.innerHTML = "<p>Could not load your upload.</p>";
   }
+}
+
+function renderSubmitButton(upload) {
+  const status = String(upload.verification_status || "").toLowerCase();
+
+  if (status === "approved") {
+    return "<p><strong>This upload has been approved.</strong></p>";
+  }
+
+  if (status === "submitted_for_review" || status === "submitted for review") {
+    return "<p><strong>This upload is waiting for KETSO approval.</strong></p>";
+  }
+
+  return '<button id="submitBtn">Submit for approval</button>';
 }
 
 async function submitForApproval() {
