@@ -728,7 +728,7 @@
     function renderUploadCard(upload) {
       const imageUrl = upload.cropped_file_url || upload.file_url || "";
       const originalUrl = upload.original_file_url || imageUrl;
-      const category = labelCategory(upload.category);
+      const category = labelCategory(upload.staff_category || upload.selected_category || upload.category);
       const caption = upload.caption ? `<div>${escapeHtml(upload.caption)}</div>` : "";
       const date = formatDate(upload.created_at_utc || upload.created_at || upload.staff_created_at);
       const publicStatus = upload.public_gallery_status || "private";
