@@ -148,6 +148,12 @@ textarea {
   gap: 10px;
 }
 
+.student-purpose {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
 .upload-action,
 .button {
   display: inline-flex;
