@@ -174,6 +174,47 @@
       white-space: pre-line;
     }
 
+    .forest-hero-search {
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 10px;
+    }
+
+    .small {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .search-results {
+      display: grid;
+      gap: 7px;
+      margin-top: 9px;
+    }
+
+    .result-item,
+    .selected-item {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 9px;
+    }
+
+    .result-item {
+      cursor: pointer;
+    }
+
+    .result-item:hover {
+      background: #f0f6ff;
+    }
+
+    .selected-item {
+      border-color: #2a6df4;
+      background: #eef4ff;
+    }
+
     .gallery-head {
       justify-content: space-between;
       margin-bottom: 12px;
@@ -272,6 +313,14 @@
         <label for="category">Category</label>
         <select id="category"></select>
 
+        <section id="forestHeroSection" class="forest-hero-search" hidden>
+          <label for="forestHeroSearch">Search Forest Hero / tree</label>
+          <input id="forestHeroSearch" type="text" placeholder="Type name, tree type, area, or tree code">
+          <p class="small">Example: Amara, mango, Makombeh, or tree code</p>
+          <div id="searchResults" class="search-results"></div>
+          <div id="selectedHero" class="selected-item" hidden></div>
+        </section>
+
         <label for="caption">Caption</label>
         <textarea id="caption" maxlength="500" placeholder="Optional short note"></textarea>
 
@@ -315,6 +364,7 @@
   <script src="/shared/staff-categories.js"></script>
   <script>
     const R2_PUBLIC_BASE = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/";
+    const SEARCH_API_BASE = "https://ptb-tree-map.onrender.com";
     const MAX_CROPPED_BYTES = 500 * 1024;
     const MAX_ORIGINAL_BYTES = 8 * 1024 * 1024;
     const HARD_MAX_IMAGE_INPUT_BYTES = 25 * 1024 * 1024;
@@ -324,11 +374,17 @@
     let originalFile = null;
     let croppedBlob = null;
     let uploadFolder = "";
+    let selectedForestHero = null;
+    let searchTimeout = null;
 
     const el = {
       staffWarning: document.getElementById("staffWarning"),
       staffName: document.getElementById("staffName"),
       category: document.getElementById("category"),
+      forestHeroSection: document.getElementById("forestHeroSection"),
+      forestHeroSearch: document.getElementById("forestHeroSearch"),
+      searchResults: document.getElementById("searchResults"),
+      selectedHero: document.getElementById("selectedHero"),
       caption: document.getElementById("caption"),
       fileInput: document.getElementById("fileInput"),
       cropSection: document.getElementById("cropSection"),
@@ -379,11 +435,14 @@
       el.uploadBtn.addEventListener("click", uploadStaffPhoto);
       el.clearBtn.addEventListener("click", resetForm);
       el.refreshBtn.addEventListener("click", loadUploads);
+      el.category.addEventListener("change", updateForestHeroSearch);
+      el.forestHeroSearch.addEventListener("input", handleForestHeroSearchInput);
       el.staffName.addEventListener("change", () => {
         el.staffName.value = normalizeStaffName(el.staffName.value) || "KETSO staff";
         el.staffWarning.hidden = getStaffId() !== "ketso_staff";
         loadUploads();
       });
+      updateForestHeroSearch();
     }
 
     function setStatus(message) {
@@ -432,6 +491,74 @@
         { value: "plant_een_boom", label: "Plant een Boom" },
         { value: "other", label: "Other" }
       ];
+    }
+
+    function updateForestHeroSearch() {
+      selectedForestHero = null;
+      el.selectedHero.hidden = true;
+      el.selectedHero.innerHTML = "";
+      el.searchResults.innerHTML = "";
+      el.forestHeroSearch.value = "";
+      el.forestHeroSection.hidden = el.category.value !== "forest_hero";
+    }
+
+    function handleForestHeroSearchInput() {
+      const q = el.forestHeroSearch.value.trim();
+      selectedForestHero = null;
+      el.selectedHero.hidden = true;
+      el.selectedHero.innerHTML = "";
+
+      if (searchTimeout) clearTimeout(searchTimeout);
+
+      if (q.length < 2) {
+        el.searchResults.innerHTML = "";
+        return;
+      }
+
+      searchTimeout = setTimeout(() => runForestHeroSearch(q), 300);
+    }
+
+    async function runForestHeroSearch(q) {
+      el.searchResults.textContent = "Searching...";
+
+      try {
+        const url = `${SEARCH_API_BASE}/api/forest-hero-search?q=${encodeURIComponent(q)}`;
+        const res = await fetch(url);
+
+        if (!res.ok) {
+          el.searchResults.textContent = "Search failed.";
+          return;
+        }
+
+        const results = await res.json();
+
+        if (!Array.isArray(results) || results.length === 0) {
+          el.searchResults.textContent = "No matching Forest Heroes found.";
+          return;
+        }
+
+        el.searchResults.innerHTML = "";
+        results.forEach((item) => {
+          const div = document.createElement("div");
+          div.className = "result-item";
+          div.textContent = item.display_label;
+          div.addEventListener("click", () => selectForestHero(item));
+          el.searchResults.appendChild(div);
+        });
+      } catch (err) {
+        el.searchResults.textContent = `Search error: ${err.message}`;
+      }
+    }
+
+    function selectForestHero(item) {
+      selectedForestHero = item;
+      el.selectedHero.hidden = false;
+      el.selectedHero.innerHTML = `
+        <strong>Selected Forest Hero</strong><br>
+        ${escapeHtml(item.display_label)}<br>
+        <span class="small">user_id: ${escapeHtml(item.user_id)}, tree_id: ${escapeHtml(item.tree_id)}</span>
+      `;
+      el.searchResults.innerHTML = "";
     }
 
     function safeFileBaseName(name) {
@@ -612,6 +739,11 @@
         return;
       }
 
+      if (el.category.value === "forest_hero" && !selectedForestHero) {
+        setStatus("Select a Forest Hero / tree before uploading.");
+        return;
+      }
+
       if (!croppedBlob) {
         setStatus("Finalising crop...");
         await createCroppedBlob();
@@ -643,6 +775,7 @@
           staff_name: staffName,
           category: el.category.value,
           caption: el.caption.value.trim(),
+          forest_hero: selectedForestHero,
           file_url: croppedUrl,
           original_file_url: originalUrl,
           cropped_file_size_bytes: croppedFile.size,
@@ -794,6 +927,7 @@
     function resetForm() {
       el.fileInput.value = "";
       el.caption.value = "";
+      updateForestHeroSearch();
       resetImageState();
       setStatus("");
     }
