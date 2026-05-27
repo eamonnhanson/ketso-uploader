@@ -293,8 +293,25 @@ function isApprovedStudentUpload(upload) {
   if (!upload) return false;
   if (upload.upload_context === "staff_upload") return false;
   if (upload.uploader_role === "staff") return false;
-  if (!upload.academy_student_id && !upload.uploader_name && !upload.linked_entity_name) return false;
+  if (!isAcademyStudentUpload(upload)) return false;
   return upload.public_gallery_status === "public" || upload.verification_status === "approved";
+}
+
+function isAcademyStudentUpload(upload) {
+  const category = String(upload.category || "").toLowerCase();
+  const context = String(upload.upload_context || "").toLowerCase();
+  const linkedType = String(upload.linked_entity_type || "").toLowerCase();
+  const lessonKey = String(upload.lesson_key || "").toLowerCase();
+
+  if (upload.academy_student_id) return true;
+  if (category === "academy_upload") return true;
+  if (category === "academy_onboarding") return true;
+  if (context === "academy_onboarding") return true;
+  if (linkedType === "student") return true;
+  if (lessonKey === "onboarding") return true;
+
+  return category.startsWith("academy_lesson_") ||
+    category.startsWith("student_lesson_");
 }
 
 function renderApprovedUpload(upload) {
