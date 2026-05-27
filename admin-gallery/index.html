@@ -112,6 +112,14 @@
       margin-top: 10px;
     }
 
+    .file-link {
+      display: inline-block;
+      margin-top: 8px;
+      color: #1f7a3f;
+      font-weight: bold;
+      text-decoration: none;
+    }
+
     .small {
       font-size: 12px;
       color: #666;
@@ -144,8 +152,8 @@
 <h1>KETSO Academy moderation</h1>
 
 <p class="intro">
-  Review student onboarding uploads before they appear in the public KETSO Academy student gallery.
-  Approving an upload makes it public and triggers the approval email through Zapier.
+  Review student uploads before they appear in student profiles. The student gallery shows one card per student;
+  approved lesson uploads appear inside that student's profile after opening "View profile".
 </p>
 
 <div class="toolbar">
@@ -266,8 +274,13 @@ function renderCard(u) {
       </div>
 
       <div class="actions">
-        <button class="approve" onclick="approveUpload(${u.id})">Approve</button>
+        <button class="approve" onclick="approveUpload(${u.id})">Approve public</button>
         <button class="reject" onclick="rejectUpload(${u.id})">Reject</button>
+        ${
+          u.academy_student_id
+            ? `<a class="file-link" href="/student-profile/?student_id=${encodeURIComponent(u.academy_student_id)}" target="_blank">Open student profile</a>`
+            : ""
+        }
       </div>
     </div>
   `;
@@ -284,7 +297,9 @@ async function approveUpload(id) {
     return;
   }
 
-  await updateUpload(id, "/api/academy-approve-upload", "Approved");
+  await updateUpload(id, "/api/academy-approve-upload", "Approved", {
+    public_gallery_status: "public"
+  });
 }
 
 async function rejectUpload(id) {
@@ -295,13 +310,14 @@ async function rejectUpload(id) {
   await updateUpload(id, "/api/academy-reject-upload", "Rejected");
 }
 
-async function updateUpload(id, endpoint, label) {
+async function updateUpload(id, endpoint, label, extraPayload = {}) {
   const status = document.getElementById("status");
 
   try {
     status.textContent = `${label} upload ${id}...`;
 
-    const res = await fetch(`${API_BASE}${endpoint}`, {
+    const query = adminKey ? `?admin_key=${encodeURIComponent(adminKey)}` : "";
+    const res = await fetch(`${API_BASE}${endpoint}${query}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -310,7 +326,7 @@ async function updateUpload(id, endpoint, label) {
       body: JSON.stringify({
         review_id: id,
         reviewed_by: "eamonn",
-        public_gallery_status: "public"
+        ...extraPayload
       })
     });
 
@@ -328,7 +344,7 @@ async function updateUpload(id, endpoint, label) {
       card.remove();
     }
 
-    status.textContent = `${label}: upload ${id}`;
+    status.textContent = `${label}: upload ${id}. If this was a lesson upload, open the student's profile from the gallery to see it.`;
 
   } catch (err) {
     console.error(`${label} error:`, err);
