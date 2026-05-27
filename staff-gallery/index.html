@@ -108,7 +108,7 @@
     }
 
     function isStaffUpload(upload) {
-      const category = upload.category || "";
+      const category = upload.staff_category || upload.selected_category || upload.category || "";
 
       if (upload.academy_student_id) return false;
       if (category === "academy_onboarding" || category === "academy_upload") return false;
@@ -133,7 +133,7 @@
         <article class="card">
           ${renderPreview(fileUrl, type)}
           <div class="meta">
-            <strong>${escapeHtml(upload.category || "Staff upload")}</strong><br>
+            <strong>${escapeHtml(upload.staff_category || upload.selected_category || upload.category || "Staff upload")}</strong><br>
             ${escapeHtml(upload.linked_entity_name || upload.uploader_name || "")}<br>
             ${escapeHtml((upload.ai_description || "").slice(0, 120))}
           </div>
