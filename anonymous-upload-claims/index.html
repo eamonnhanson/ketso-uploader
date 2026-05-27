@@ -224,7 +224,7 @@
 
     function isAnonymousStudentUpload(upload) {
       if (!upload) return false;
-      if (upload.upload_context === "staff_upload" || upload.uploader_role === "staff") return false;
+      if (upload.upload_context === "staff_upload") return false;
 
       const category = String(upload.category || "").toLowerCase();
       const context = String(upload.upload_context || "").toLowerCase();
