@@ -38,6 +38,7 @@ const el = {
   devicePhotoAction: document.getElementById("devicePhotoAction"),
   selfieAction: document.getElementById("selfieAction"),
   cameraAction: document.getElementById("cameraAction"),
+  fileAction: document.querySelector('label[for="fileInput"]'),
   devicePhotoInput: document.getElementById("devicePhotoInput"),
   selfieInput: document.getElementById("selfieInput"),
   backCameraInput: document.getElementById("backCameraInput"),
@@ -663,6 +664,8 @@ function updateUploadActionsForContext() {
     el.selfieAction.textContent = "Take onboarding selfie";
     el.devicePhotoAction.style.order = "2";
     el.cameraAction.style.order = "3";
+    el.fileAction.style.order = "4";
+    el.textModeBtn.style.order = "5";
     return;
   }
 
@@ -671,6 +674,8 @@ function updateUploadActionsForContext() {
   el.selfieAction.style.order = "2";
   el.selfieAction.textContent = "Take selfie";
   el.cameraAction.style.order = "3";
+  el.fileAction.style.order = "4";
+  el.textModeBtn.style.order = "5";
 }
 
 async function runForestHeroSearch(q) {
