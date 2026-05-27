@@ -43,13 +43,13 @@ export async function onRequestPost({ request }) {
     const body = await request.json();
     const staffId = normalizeStaffId(body.staff_id || body.uploaded_by || "ketso_staff");
     const staffName = normalizeStaffName(body.staff_name || body.uploader_name || staffId);
-    const category = String(body.category || "").trim();
+    const staffCategory = String(body.category || "").trim();
 
     if (!staffId) {
       return jsonResponse({ ok: false, error: "Invalid staff_id" }, 400);
     }
 
-    if (!isAllowedStaffCategory(category)) {
+    if (!isAllowedStaffCategory(staffCategory)) {
       return jsonResponse({ ok: false, error: "Invalid staff category" }, 400);
     }
 
@@ -70,7 +70,9 @@ export async function onRequestPost({ request }) {
     const now = new Date().toISOString();
 
     const payload = {
-      category,
+      category: "staff_upload",
+      staff_category: staffCategory,
+      selected_category: staffCategory,
       caption,
       file_url: fileUrl,
       cropped_file_url: fileUrl,
