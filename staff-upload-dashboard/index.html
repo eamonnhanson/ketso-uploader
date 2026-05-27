@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KETSO staff upload dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    :root {
+      --green: #206f3a;
+      --green-dark: #15562b;
+      --ink: #161616;
+      --muted: #555;
+      --line: #d9ded8;
+      --panel: #fbfdf9;
+      --soft: #eef3ec;
+      --warn-bg: #fff7e6;
+      --warn-line: #d98200;
+    }
+
+    body {
+      margin: 0;
+      background: #fff;
+      color: var(--ink);
+      font-family: Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.45;
+    }
+
+    .shell {
+      width: min(100%, 1180px);
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    h1, h2, p {
+      margin-top: 0;
+    }
+
+    h1 {
+      margin-bottom: 4px;
+      font-size: 30px;
+      line-height: 1.1;
+    }
+
+    h2 {
+      margin-bottom: 14px;
+      font-size: 20px;
+    }
+
+    .intro {
+      color: var(--muted);
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(320px, 0.82fr);
+      gap: 16px;
+      align-items: start;
+      margin-top: 16px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 14px;
+    }
+
+    label {
+      display: block;
+      margin-top: 12px;
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 11px;
+      background: #fff;
+      font: inherit;
+    }
+
+    textarea {
+      min-height: 84px;
+      resize: vertical;
+    }
+
+    .warning {
+      margin: 12px 0 0;
+      border: 1px solid #f0d08c;
+      border-left: 5px solid var(--warn-line);
+      border-radius: 8px;
+      background: var(--warn-bg);
+      padding: 10px 12px;
+      color: #5c3700;
+      font-weight: 700;
+    }
+
+    .actions,
+    .gallery-head {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .actions {
+      margin-top: 14px;
+    }
+
+    button,
+    .button-link {
+      min-height: 44px;
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      background: var(--green);
+      color: #fff;
+      font: inherit;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .button-soft {
+      border: 1px solid var(--line);
+      background: var(--soft);
+      color: var(--ink);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    .crop-section {
+      margin-top: 14px;
+    }
+
+    .crop-workspace {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #777;
+    }
+
+    #image {
+      display: block;
+      max-width: 100%;
+      max-height: 54vh;
+      margin: 0 auto;
+    }
+
+    .crop-toolbar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .status {
+      margin-top: 12px;
+      color: var(--green-dark);
+      font-weight: 700;
+      white-space: pre-line;
+    }
+
+    .gallery-head {
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .upload-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .upload-card {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 10px;
+    }
+
+    .upload-card img {
+      width: 92px;
+      height: 92px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: #eee;
+    }
+
+    .upload-meta {
+      min-width: 0;
+      color: #333;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .upload-meta strong {
+      color: var(--ink);
+    }
+
+    .badge {
+      display: inline-block;
+      margin: 4px 4px 0 0;
+      border-radius: 999px;
+      padding: 3px 7px;
+      background: var(--soft);
+      color: var(--green-dark);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .upload-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 7px;
+    }
+
+    .upload-links a {
+      color: var(--green-dark);
+      font-weight: 700;
+    }
+
+    @media (max-width: 820px) {
+      .shell {
+        padding: 14px;
+      }
+
+      .dashboard {
+        grid-template-columns: 1fr;
+      }
+
+      .crop-toolbar {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <h1>KETSO staff upload dashboard</h1>
+      <p class="intro">Upload staff photos, crop them, and see your recent staff uploads.</p>
+    </header>
+
+    <div class="dashboard">
+      <section class="panel" aria-labelledby="upload-title">
+        <h2 id="upload-title">Upload staff photo</h2>
+
+        <div id="staffWarning" class="warning" hidden>
+          No staff_id was provided. Using ketso_staff for testing. Add ?staff_id=your_name to the URL for real staff uploads.
+        </div>
+
+        <label for="staffId">Staff identifier</label>
+        <input id="staffId" type="text" autocomplete="off">
+
+        <label for="category">Category</label>
+        <select id="category"></select>
+
+        <label for="caption">Caption</label>
+        <textarea id="caption" maxlength="500" placeholder="Optional short note"></textarea>
+
+        <label for="fileInput">Choose image</label>
+        <input id="fileInput" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
+
+        <section id="cropSection" class="crop-section" hidden>
+          <label>Crop image</label>
+          <div class="crop-workspace">
+            <img id="image" alt="Selected staff image preview">
+          </div>
+
+          <div class="crop-toolbar">
+            <button id="zoomOut" type="button" class="button-soft" disabled>Zoom out</button>
+            <button id="zoomIn" type="button" class="button-soft" disabled>Zoom in</button>
+            <button id="adaptCropBtn" type="button" class="button-soft" disabled>Adapt crop</button>
+          </div>
+        </section>
+
+        <div class="actions">
+          <button id="uploadBtn" type="button" disabled>Upload</button>
+          <button id="clearBtn" type="button" class="button-soft">Clear/reset</button>
+        </div>
+
+        <p id="status" class="status" aria-live="polite"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="uploads-title">
+        <div class="gallery-head">
+          <h2 id="uploads-title">My staff uploads</h2>
+          <button id="refreshBtn" type="button" class="button-soft">Refresh</button>
+        </div>
+
+        <div id="uploadsStatus" class="status">Loading uploads...</div>
+        <div id="uploadsList" class="upload-list"></div>
+      </section>
+    </div>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+  <script src="/shared/staff-categories.js"></script>
+  <script>
+    const R2_PUBLIC_BASE = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/";
+    const MAX_CROPPED_BYTES = 500 * 1024;
+    const MAX_ORIGINAL_BYTES = 8 * 1024 * 1024;
+    const HARD_MAX_IMAGE_INPUT_BYTES = 25 * 1024 * 1024;
+
+    let cropper = null;
+    let selectedFile = null;
+    let originalFile = null;
+    let croppedBlob = null;
+    let uploadFolder = "";
+
+    const el = {
+      staffWarning: document.getElementById("staffWarning"),
+      staffId: document.getElementById("staffId"),
+      category: document.getElementById("category"),
+      caption: document.getElementById("caption"),
+      fileInput: document.getElementById("fileInput"),
+      cropSection: document.getElementById("cropSection"),
+      image: document.getElementById("image"),
+      zoomOut: document.getElementById("zoomOut"),
+      zoomIn: document.getElementById("zoomIn"),
+      adaptCropBtn: document.getElementById("adaptCropBtn"),
+      uploadBtn: document.getElementById("uploadBtn"),
+      clearBtn: document.getElementById("clearBtn"),
+      status: document.getElementById("status"),
+      refreshBtn: document.getElementById("refreshBtn"),
+      uploadsStatus: document.getElementById("uploadsStatus"),
+      uploadsList: document.getElementById("uploadsList")
+    };
+
+    init();
+
+    function init() {
+      renderCategories();
+      initStaffId();
+      bindEvents();
+      loadUploads();
+    }
+
+    function renderCategories() {
+      const categories = window.KETSO_STAFF_CATEGORIES || [];
+      el.category.innerHTML = categories.map((item) =>
+        `<option value="${escapeAttr(item.value)}">${escapeHtml(item.label)}</option>`
+      ).join("");
+    }
+
+    function initStaffId() {
+      const params = new URLSearchParams(window.location.search);
+      const rawStaffId = params.get("staff_id");
+      const staffId = normalizeStaffId(rawStaffId || "ketso_staff");
+      el.staffId.value = staffId || "ketso_staff";
+      el.staffWarning.hidden = Boolean(rawStaffId);
+    }
+
+    function bindEvents() {
+      el.fileInput.addEventListener("change", handleFileSelected);
+      el.zoomIn.addEventListener("click", () => cropper && cropper.zoom(0.18));
+      el.zoomOut.addEventListener("click", () => cropper && cropper.zoom(-0.18));
+      el.adaptCropBtn.addEventListener("click", async () => {
+        const blob = await createCroppedBlob();
+        setStatus(blob ? "Crop updated. Ready to upload." : "Could not update crop.");
+      });
+      el.uploadBtn.addEventListener("click", uploadStaffPhoto);
+      el.clearBtn.addEventListener("click", resetForm);
+      el.refreshBtn.addEventListener("click", loadUploads);
+      el.staffId.addEventListener("change", () => {
+        el.staffId.value = normalizeStaffId(el.staffId.value) || "ketso_staff";
+        el.staffWarning.hidden = el.staffId.value !== "ketso_staff";
+        loadUploads();
+      });
+    }
+
+    function setStatus(message) {
+      el.status.textContent = message;
+    }
+
+    function normalizeStaffId(value) {
+      return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, "_")
+        .replace(/_+/g, "_")
+        .replace(/^_+|_+$/g, "")
+        .slice(0, 48);
+    }
+
+    function safeFileBaseName(name) {
+      return String(name || "staff_photo")
+        .replace(/\.[^/.]+$/, "")
+        .replace(/[^a-zA-Z0-9-_]/g, "_")
+        .toLowerCase();
+    }
+
+    function isSupportedImage(file) {
+      if (!file) return false;
+      const type = (file.type || "").toLowerCase();
+      const name = (file.name || "").toLowerCase();
+      return type === "image/jpeg" ||
+        type === "image/png" ||
+        type === "image/webp" ||
+        name.endsWith(".jpg") ||
+        name.endsWith(".jpeg") ||
+        name.endsWith(".png") ||
+        name.endsWith(".webp");
+    }
+
+    async function handleFileSelected(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      resetImageState();
+
+      if (!isSupportedImage(file)) {
+        el.fileInput.value = "";
+        setStatus("Use JPG, PNG or WebP for staff photos.");
+        return;
+      }
+
+      if (file.size > HARD_MAX_IMAGE_INPUT_BYTES) {
+        el.fileInput.value = "";
+        setStatus("Image too large. Please use an image below 25 MB.");
+        return;
+      }
+
+      selectedFile = file;
+      setStatus("Preparing image...");
+
+      try {
+        originalFile = await resizeOriginalIfNeeded(file);
+        const reader = new FileReader();
+
+        reader.onerror = () => setStatus("The image could not be read.");
+        reader.onload = () => {
+          el.image.onload = async () => {
+            if (cropper) cropper.destroy();
+
+            el.cropSection.hidden = false;
+
+            cropper = new Cropper(el.image, {
+              viewMode: 1,
+              dragMode: "move",
+              autoCropArea: 0.82,
+              responsive: true,
+              restore: false,
+              checkOrientation: true,
+              background: false,
+              zoomable: true,
+              guides: true,
+              center: true,
+              highlight: true,
+              ready: async () => {
+                window.dispatchEvent(new Event("resize"));
+                await createCroppedBlob();
+                setStatus("Image ready. Crop if needed, then upload.");
+              }
+            });
+
+            el.zoomIn.disabled = false;
+            el.zoomOut.disabled = false;
+            el.adaptCropBtn.disabled = false;
+          };
+
+          el.image.src = reader.result;
+        };
+
+        reader.readAsDataURL(originalFile);
+      } catch (err) {
+        setStatus("Image processing failed: " + err.message);
+      }
+    }
+
+    async function resizeOriginalIfNeeded(file) {
+      if (file.size <= MAX_ORIGINAL_BYTES) return file;
+
+      const img = await loadImageFromFile(file);
+      let scale = 0.9;
+      let blob = null;
+
+      while (scale > 0.25) {
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.naturalWidth * scale);
+        canvas.height = Math.round(img.naturalHeight * scale);
+
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        blob = await compressCanvasToMaxBytes(canvas, MAX_ORIGINAL_BYTES);
+        if (blob && blob.size <= MAX_ORIGINAL_BYTES) break;
+        scale -= 0.1;
+      }
+
+      if (!blob || blob.size > MAX_ORIGINAL_BYTES) {
+        throw new Error("Could not reduce original image below 8 MB.");
+      }
+
+      return new File([blob], safeFileBaseName(file.name) + "_original.jpg", { type: "image/jpeg" });
+    }
+
+    function loadImageFromFile(file) {
+      return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          resolve(img);
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error("Could not load image."));
+        };
+        img.src = url;
+      });
+    }
+
+    function blobFromCanvas(canvas, type, quality) {
+      return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+    }
+
+    async function compressCanvasToMaxBytes(canvas, maxBytes) {
+      let quality = 0.86;
+      let blob = await blobFromCanvas(canvas, "image/jpeg", quality);
+
+      while (blob && blob.size > maxBytes && quality > 0.45) {
+        quality -= 0.06;
+        blob = await blobFromCanvas(canvas, "image/jpeg", quality);
+      }
+
+      return blob;
+    }
+
+    async function createCroppedBlob() {
+      if (!cropper) return null;
+
+      const canvas = cropper.getCroppedCanvas({
+        width: 600,
+        height: 600,
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: "high"
+      });
+
+      if (!canvas) return null;
+
+      const blob = await compressCanvasToMaxBytes(canvas, MAX_CROPPED_BYTES);
+      if (!blob || blob.size > MAX_CROPPED_BYTES) return null;
+
+      croppedBlob = blob;
+      el.uploadBtn.disabled = false;
+      return blob;
+    }
+
+    async function uploadStaffPhoto() {
+      const staffId = normalizeStaffId(el.staffId.value);
+
+      if (!staffId) {
+        setStatus("Enter a valid staff identifier.");
+        return;
+      }
+
+      if (!selectedFile || !originalFile) {
+        setStatus("Choose an image first.");
+        return;
+      }
+
+      if (!croppedBlob) {
+        setStatus("Finalising crop...");
+        await createCroppedBlob();
+      }
+
+      if (!croppedBlob) {
+        setStatus("Could not create cropped image. Please adapt the crop and try again.");
+        return;
+      }
+
+      el.uploadBtn.disabled = true;
+      uploadFolder = `staff_uploads/${staffId}/${Date.now()}`;
+
+      try {
+        setStatus("Uploading original image...");
+        const originalUploaded = await uploadFileToR2(originalFile);
+        const originalUrl = R2_PUBLIC_BASE + originalUploaded.key;
+
+        setStatus("Uploading cropped image...");
+        const croppedName = safeFileBaseName(selectedFile.name) + "_600px.jpg";
+        const croppedFile = new File([croppedBlob], croppedName, { type: "image/jpeg" });
+        const croppedUploaded = await uploadFileToR2(croppedFile);
+        const croppedUrl = R2_PUBLIC_BASE + croppedUploaded.key;
+
+        setStatus("Saving staff upload...");
+        const saved = await saveStaffUpload({
+          staff_id: staffId,
+          uploaded_by: staffId,
+          category: el.category.value,
+          caption: el.caption.value.trim(),
+          file_url: croppedUrl,
+          original_file_url: originalUrl,
+          cropped_file_size_bytes: croppedFile.size,
+          original_file_size_bytes: originalFile.size
+        });
+
+        setStatus(`Done. Staff upload saved${saved.review_id ? ` (ID: ${saved.review_id})` : ""}.`);
+        cacheUpload(staffId, saved.upload);
+        resetImageState();
+        el.fileInput.value = "";
+        el.caption.value = "";
+        await loadUploads();
+      } catch (err) {
+        setStatus("Error: " + err.message);
+      } finally {
+        el.uploadBtn.disabled = !croppedBlob;
+      }
+    }
+
+    async function uploadFileToR2(file) {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("folder", uploadFolder);
+
+      const res = await fetch("/upload", {
+        method: "POST",
+        body: fd
+      });
+
+      const data = await readJsonResponse(res, "Upload");
+      if (!res.ok || !data.ok) throw new Error(data.error || "Upload failed.");
+      return data;
+    }
+
+    async function saveStaffUpload(payload) {
+      const res = await fetch("/api/staff-uploads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await readJsonResponse(res, "Staff upload save");
+      if (!res.ok || !data.ok) throw new Error(data.error || "Staff upload save failed.");
+      return data;
+    }
+
+    async function loadUploads() {
+      const staffId = normalizeStaffId(el.staffId.value || "ketso_staff");
+      el.uploadsStatus.textContent = "Loading uploads...";
+      el.uploadsList.innerHTML = "";
+
+      try {
+        const res = await fetch(`/api/staff-uploads?staff_id=${encodeURIComponent(staffId)}&limit=20`);
+        const data = await readJsonResponse(res, "Staff uploads");
+
+        if (!res.ok || !data.ok) {
+          el.uploadsStatus.textContent = data.error || "Could not load staff uploads.";
+          return;
+        }
+
+        const uploads = mergeUploads(data.uploads || [], getCachedUploads(staffId));
+
+        if (!uploads.length) {
+          el.uploadsStatus.textContent = "No staff uploads yet.";
+          return;
+        }
+
+        el.uploadsStatus.textContent = "";
+        el.uploadsList.innerHTML = uploads.map(renderUploadCard).join("");
+      } catch (err) {
+        el.uploadsStatus.textContent = "Error loading uploads: " + err.message;
+      }
+    }
+
+    function renderUploadCard(upload) {
+      const imageUrl = upload.cropped_file_url || upload.file_url || "";
+      const originalUrl = upload.original_file_url || imageUrl;
+      const category = labelCategory(upload.category);
+      const caption = upload.caption ? `<div>${escapeHtml(upload.caption)}</div>` : "";
+      const date = formatDate(upload.created_at_utc || upload.created_at || upload.staff_created_at);
+      const publicStatus = upload.public_gallery_status || "private";
+
+      return `
+        <article class="upload-card">
+          <img src="${escapeAttr(imageUrl)}" alt="Staff upload">
+          <div class="upload-meta">
+            <strong>${escapeHtml(category)}</strong><br>
+            ${caption}
+            <span class="badge">${escapeHtml(publicStatus === "public" ? "Public" : "Private")}</span>
+            <span class="badge">${escapeHtml(upload.verification_status || "not_required")}</span>
+            <div>${escapeHtml(date)}</div>
+            <div class="upload-links">
+              <a href="${escapeAttr(imageUrl)}" target="_blank" rel="noopener">Open image</a>
+              <a href="${escapeAttr(originalUrl)}" target="_blank" rel="noopener">Open original</a>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function cacheUpload(staffId, upload) {
+      if (!upload) return;
+
+      const key = getCacheKey(staffId);
+      const uploads = getCachedUploads(staffId)
+        .filter((item) => String(item.id || item.file_url) !== String(upload.id || upload.file_url));
+
+      uploads.unshift(upload);
+      localStorage.setItem(key, JSON.stringify(uploads.slice(0, 20)));
+    }
+
+    function getCachedUploads(staffId) {
+      try {
+        const value = localStorage.getItem(getCacheKey(staffId));
+        const parsed = value ? JSON.parse(value) : [];
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function mergeUploads(serverUploads, cachedUploads) {
+      const seen = new Set();
+      return [...cachedUploads, ...serverUploads].filter((upload) => {
+        const key = String(upload.id || upload.file_url || upload.cropped_file_url || "");
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+
+    function getCacheKey(staffId) {
+      return `ketso_staff_uploads_${staffId}`;
+    }
+
+    function labelCategory(value) {
+      const found = (window.KETSO_STAFF_CATEGORIES || []).find((item) => item.value === value);
+      return found ? found.label : value || "Staff upload";
+    }
+
+    function resetForm() {
+      el.fileInput.value = "";
+      el.caption.value = "";
+      resetImageState();
+      setStatus("");
+    }
+
+    function resetImageState() {
+      selectedFile = null;
+      originalFile = null;
+      croppedBlob = null;
+      uploadFolder = "";
+      el.uploadBtn.disabled = true;
+      el.zoomIn.disabled = true;
+      el.zoomOut.disabled = true;
+      el.adaptCropBtn.disabled = true;
+      el.cropSection.hidden = true;
+      el.image.removeAttribute("src");
+
+      if (cropper) {
+        cropper.destroy();
+        cropper = null;
+      }
+    }
+
+    async function readJsonResponse(res, label) {
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) return res.json();
+      const text = await res.text();
+      throw new Error(`${label} returned non-JSON response: ${text.slice(0, 160)}`);
+    }
+
+    function formatDate(value) {
+      if (!value) return "";
+      try {
+        return new Date(value).toLocaleString();
+      } catch {
+        return value;
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value);
+    }
+  </script>
+</body>
+</html>
