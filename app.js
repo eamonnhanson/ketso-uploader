@@ -5,6 +5,7 @@ const UPLOADER_API_BASE = "https://ketso-uploader.pages.dev";
 const UPLOAD_API_URLS = [`${UPLOADER_API_BASE}/upload`];
 const REVIEW_API_URL = "https://ptb-tree-map.onrender.com/api/save-photo-review";
 const ACADEMY_STUDENT_API_URL = "https://ptb-tree-map.onrender.com/api/academy-student";
+const ACADEMY_STUDENT_SEARCH_API_URL = "/api/academy-student-search";
 const R2_PUBLIC_BASE = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/";
 
 const STAFF_PASSWORD = "4234";
@@ -21,8 +22,10 @@ let selectedUploadKind = null;
 let staffUnlocked = false;
 let academyToken = null;
 let academyStudent = null;
+let selectedStudent = null;
 let selectedLink = null;
 let searchTimeout = null;
+let studentSearchTimeout = null;
 
 const STUDENT_PURPOSES = {
   onboarding: {
@@ -92,6 +95,11 @@ const el = {
   category: document.getElementById("category"),
   studentPurposePanel: document.getElementById("studentPurposePanel"),
   studentPurpose: document.getElementById("studentPurpose"),
+  studentIdentityPanel: document.getElementById("studentIdentityPanel"),
+  studentNameSearch: document.getElementById("studentNameSearch"),
+  studentEmail: document.getElementById("studentEmail"),
+  studentSearchResults: document.getElementById("studentSearchResults"),
+  selectedStudent: document.getElementById("selectedStudent"),
   forestHeroSection: document.getElementById("forestHeroSection"),
   forestHeroSearch: document.getElementById("forestHeroSearch"),
   searchResults: document.getElementById("searchResults"),
@@ -164,8 +172,25 @@ function getStudentPurpose() {
   return STUDENT_PURPOSES[value] || STUDENT_PURPOSES.onboarding;
 }
 
+function getActiveStudent() {
+  return academyStudent || selectedStudent;
+}
+
+function isOnboardingPurpose() {
+  return getStudentPurpose().lessonKey === "onboarding";
+}
+
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function emailsMatch(left, right) {
+  return normalizeEmail(left) === normalizeEmail(right);
+}
+
 function getRecentUploadKey() {
-  const studentId = academyStudent?.id || academyStudent?.ketso_student_id || "this_device";
+  const activeStudent = getActiveStudent();
+  const studentId = activeStudent?.id || activeStudent?.ketso_student_id || "this_device";
   return `ketso_recent_student_uploads_${studentId}`;
 }
 
@@ -285,7 +310,7 @@ function getFileKind(file) {
 
 function getStudentCategory() {
   const purpose = getStudentPurpose();
-  if (academyStudent) return purpose.category;
+  if (getActiveStudent()) return purpose.category;
   if (purpose) return purpose.studentCategory;
   if (selectedUploadKind === "selfie") return "student_selfie";
   if (selectedUploadKind === "photo") return "student_photo";
@@ -300,7 +325,7 @@ function getActiveCategory() {
 }
 
 function getUploadContext() {
-  if (academyStudent) return getStudentPurpose().uploadContext;
+  if (getActiveStudent()) return getStudentPurpose().uploadContext;
   if (!staffUnlocked) return "student_mobile_upload";
   return "staff_upload";
 }
@@ -531,6 +556,16 @@ function validateBeforeUpload() {
     return false;
   }
 
+  if (!staffUnlocked && isOnboardingPurpose() && !getActiveStudent()) {
+    setStatus("Please select your student name and confirm your email before uploading onboarding.");
+    return false;
+  }
+
+  if (!staffUnlocked && isOnboardingPurpose() && selectedStudent && !emailsMatch(el.studentEmail.value, selectedStudent.email)) {
+    setStatus("The email does not match the selected student. Please check your email or choose the correct name.");
+    return false;
+  }
+
   return true;
 }
 
@@ -600,10 +635,11 @@ async function saveReview(payload) {
 function buildReviewPayload(fileUrl, size, fileType, extra = {}) {
   const category = getActiveCategory();
   const purpose = getStudentPurpose();
-  const studentName = academyStudent?.full_name ||
-    [academyStudent?.first_name, academyStudent?.last_name].filter(Boolean).join(" ") ||
+  const activeStudent = getActiveStudent();
+  const studentName = activeStudent?.full_name ||
+    [activeStudent?.first_name, activeStudent?.last_name].filter(Boolean).join(" ") ||
     null;
-  const academyTrack = academyStudent?.track || academyStudent?.primary_stream || null;
+  const academyTrack = activeStudent?.track || activeStudent?.primary_stream || null;
 
   return {
     category,
@@ -614,19 +650,19 @@ function buildReviewPayload(fileUrl, size, fileType, extra = {}) {
     cropped_file_size_bytes: fileType === "image" ? size : null,
     user_id: selectedLink ? selectedLink.user_id : null,
     tree_id: selectedLink ? selectedLink.tree_id : null,
-    linked_entity_type: academyStudent ? "student" : staffUnlocked && category === "forest_hero" ? "forest_hero" : staffUnlocked ? "staff" : "general",
+    linked_entity_type: activeStudent ? "student" : staffUnlocked && category === "forest_hero" ? "forest_hero" : staffUnlocked ? "staff" : "general",
     linked_entity_name: selectedLink ? selectedLink.display_label : studentName || category,
     uploader_name: studentName,
-    uploader_email: academyStudent?.email || null,
-    academy_student_id: academyStudent?.id || null,
-    academy_cohort: academyStudent?.cohort || null,
+    uploader_email: activeStudent?.email || null,
+    academy_student_id: activeStudent?.id || null,
+    academy_cohort: activeStudent?.cohort || null,
     academy_track: academyTrack,
-    academy_whatsapp: academyStudent?.whatsapp || null,
-    lesson_key: academyStudent || !staffUnlocked ? purpose.lessonKey : null,
-    upload_reason: academyStudent || !staffUnlocked ? el.studentPurpose.value : null,
-    upload_reason_label: academyStudent || !staffUnlocked ? purpose.label : null,
+    academy_whatsapp: activeStudent?.whatsapp || null,
+    lesson_key: activeStudent || !staffUnlocked ? purpose.lessonKey : null,
+    upload_reason: activeStudent || !staffUnlocked ? el.studentPurpose.value : null,
+    upload_reason_label: activeStudent || !staffUnlocked ? purpose.label : null,
     interest_area: academyTrack,
-    consent_given: Boolean(academyStudent),
+    consent_given: Boolean(activeStudent),
     file_type: fileType,
     upload_context: getUploadContext(),
     uploader_role: staffUnlocked ? "staff" : "student",
@@ -635,8 +671,10 @@ function buildReviewPayload(fileUrl, size, fileType, extra = {}) {
 }
 
 function getUploadFolder() {
-  if (academyStudent) {
-    const studentId = academyStudent.ketso_student_id || academyStudent.id || "student";
+  const activeStudent = getActiveStudent();
+
+  if (activeStudent) {
+    const studentId = activeStudent.ketso_student_id || activeStudent.id || "student";
     return `academy/${safeFileBaseName(getStudentPurpose().lessonKey)}/${safeFileBaseName(String(studentId))}`;
   }
 
@@ -682,7 +720,7 @@ async function uploadImage() {
     const fileUrl = R2_PUBLIC_BASE + uploaded.key;
 
     const payload = buildReviewPayload(fileUrl, croppedBlob.size, "image", {
-      upload_type: academyStudent ? "image_photo" : "image_cropped",
+      upload_type: getActiveStudent() ? "image_photo" : "image_cropped",
       original_file_url: originalUrl,
       original_file_size_bytes: originalUploadFile.size
     });
@@ -817,6 +855,88 @@ function updateStaffCategory() {
   el.forestHeroSection.hidden = !(staffUnlocked && el.category.value === "forest_hero");
 }
 
+function updateStudentIdentityPanel() {
+  if (!el.studentIdentityPanel) return;
+
+  const shouldIdentify = !staffUnlocked && !academyStudent && isOnboardingPurpose();
+  el.studentIdentityPanel.hidden = !shouldIdentify;
+
+  if (!shouldIdentify) {
+    selectedStudent = academyStudent || null;
+    el.studentSearchResults.innerHTML = "";
+    el.selectedStudent.hidden = true;
+    el.selectedStudent.innerHTML = "";
+  }
+}
+
+function clearSelectedStudent() {
+  selectedStudent = null;
+  el.selectedStudent.hidden = true;
+  el.selectedStudent.innerHTML = "";
+}
+
+function handleStudentSearchInput() {
+  clearSelectedStudent();
+  const q = el.studentNameSearch.value.trim();
+
+  if (studentSearchTimeout) clearTimeout(studentSearchTimeout);
+
+  if (q.length < 2) {
+    el.studentSearchResults.innerHTML = "";
+    return;
+  }
+
+  studentSearchTimeout = setTimeout(() => runStudentSearch(q), 250);
+}
+
+async function runStudentSearch(q) {
+  el.studentSearchResults.textContent = "Searching students...";
+
+  try {
+    const url = `${ACADEMY_STUDENT_SEARCH_API_URL}?q=${encodeURIComponent(q)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!res.ok || !data.ok) {
+      el.studentSearchResults.textContent = data.error || "Student search is not available yet.";
+      return;
+    }
+
+    const students = data.students || [];
+
+    if (!students.length) {
+      el.studentSearchResults.textContent = "No matching students found.";
+      return;
+    }
+
+    el.studentSearchResults.innerHTML = "";
+    students.slice(0, 12).forEach((student) => {
+      const div = document.createElement("div");
+      div.className = "result-item";
+      div.textContent = `${student.full_name || [student.first_name, student.last_name].filter(Boolean).join(" ") || "Student"}${student.email ? ` (${student.email})` : ""}`;
+      div.addEventListener("click", () => selectStudent(student));
+      el.studentSearchResults.appendChild(div);
+    });
+  } catch (err) {
+    el.studentSearchResults.textContent = "Student search is not available yet. Please use your personal onboarding link.";
+  }
+}
+
+function selectStudent(student) {
+  selectedStudent = student;
+  el.studentNameSearch.value = student.full_name || [student.first_name, student.last_name].filter(Boolean).join(" ");
+  if (student.email && !el.studentEmail.value.trim()) {
+    el.studentEmail.value = student.email;
+  }
+  el.studentSearchResults.innerHTML = "";
+  el.selectedStudent.hidden = false;
+  el.selectedStudent.innerHTML = `
+    <strong>Selected student</strong><br>
+    ${escapeHtml(student.full_name || el.studentNameSearch.value)}<br>
+    <span class="small">${escapeHtml(student.email || "")}</span>
+  `;
+}
+
 function updateUploadActionsForContext() {
   const purpose = getStudentPurpose();
   const isOnboarding = purpose.primaryAction === "selfie";
@@ -850,6 +970,7 @@ function updateUploadActionsForContext() {
   el.cameraAction.style.order = "3";
   el.fileAction.style.order = "4";
   el.textModeBtn.style.order = "5";
+  updateStudentIdentityPanel();
 }
 
 async function runForestHeroSearch(q) {
@@ -898,7 +1019,22 @@ el.staffPassword.addEventListener("keydown", (event) => {
   if (event.key === "Enter") unlockStaff();
 });
 el.category.addEventListener("change", updateStaffCategory);
-el.studentPurpose.addEventListener("change", updateUploadActionsForContext);
+el.studentPurpose.addEventListener("change", () => {
+  clearSelectedStudent();
+  updateUploadActionsForContext();
+});
+el.studentNameSearch.addEventListener("input", handleStudentSearchInput);
+el.studentEmail.addEventListener("input", () => {
+  if (selectedStudent && !emailsMatch(el.studentEmail.value, selectedStudent.email)) {
+    el.selectedStudent.innerHTML = `
+      <strong>Selected student</strong><br>
+      ${escapeHtml(selectedStudent.full_name || "")}<br>
+      <span class="small">Email does not match yet.</span>
+    `;
+  } else if (selectedStudent) {
+    selectStudent(selectedStudent);
+  }
+});
 el.forestHeroSearch.addEventListener("input", () => {
   const q = el.forestHeroSearch.value.trim();
   selectedLink = null;
@@ -954,6 +1090,7 @@ async function initAcademyToken() {
     }
 
     academyStudent = data.student;
+    selectedStudent = academyStudent;
     const name = academyStudent.full_name ||
       [academyStudent.first_name, academyStudent.last_name].filter(Boolean).join(" ") ||
       "Academy student";
@@ -961,6 +1098,7 @@ async function initAcademyToken() {
     el.studentBanner.hidden = false;
     el.studentBanner.textContent = `Academy onboarding for ${name}`;
     updateUploadActionsForContext();
+    updateStudentIdentityPanel();
     renderRecentStudentUploads();
     setStatus("Student loaded. Choose a selfie, photo, video, document or text update.");
   } catch (err) {
@@ -969,5 +1107,6 @@ async function initAcademyToken() {
 }
 
 updateUploadActionsForContext();
+updateStudentIdentityPanel();
 renderRecentStudentUploads();
 initAcademyToken();
