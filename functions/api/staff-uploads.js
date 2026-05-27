@@ -67,6 +67,7 @@ export async function onRequestPost({ request }) {
     }
 
     const caption = cleanCaption(body.caption);
+    const forestHero = cleanForestHero(body.forest_hero);
     const now = new Date().toISOString();
 
     const payload = {
@@ -79,10 +80,11 @@ export async function onRequestPost({ request }) {
       original_file_url: originalFileUrl,
       original_file_size_bytes: numberOrNull(body.original_file_size_bytes),
       cropped_file_size_bytes: numberOrNull(body.cropped_file_size_bytes),
-      user_id: null,
-      tree_id: null,
-      linked_entity_type: "staff",
-      linked_entity_name: staffName,
+      user_id: forestHero ? forestHero.user_id : null,
+      tree_id: forestHero ? forestHero.tree_id : null,
+      linked_entity_type: forestHero ? "forest_hero" : "staff",
+      linked_entity_name: forestHero ? forestHero.display_label : staffName,
+      forest_hero_label: forestHero ? forestHero.display_label : null,
       uploader_name: staffName,
       uploader_email: null,
       file_type: "image",
@@ -183,6 +185,29 @@ function validateR2Url(value, staffId) {
 
 function cleanCaption(value) {
   return String(value || "").trim().slice(0, 500);
+}
+
+function cleanForestHero(value) {
+  if (!value || typeof value !== "object") return null;
+
+  const userId = cleanToken(value.user_id);
+  const treeId = cleanToken(value.tree_id);
+  const displayLabel = String(value.display_label || "").trim().slice(0, 240);
+
+  if (!userId || !treeId || !displayLabel) return null;
+
+  return {
+    user_id: userId,
+    tree_id: treeId,
+    display_label: displayLabel
+  };
+}
+
+function cleanToken(value) {
+  return String(value || "")
+    .trim()
+    .replace(/[^a-zA-Z0-9._:-]/g, "")
+    .slice(0, 80);
 }
 
 function numberOrNull(value) {
