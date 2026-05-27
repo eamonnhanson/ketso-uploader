@@ -47,6 +47,19 @@
       font-size: 20px;
     }
 
+    .recent-panel {
+      margin-bottom: 24px;
+      border: 1px solid #d9ded8;
+      border-radius: 12px;
+      background: #ffffff;
+      padding: 14px;
+    }
+
+    .recent-panel h2 {
+      margin: 0 0 8px;
+      font-size: 20px;
+    }
+
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
@@ -168,15 +181,25 @@
   <div id="pendingGallery" class="grid"></div>
 </section>
 
+<section id="recentApprovedPanel" class="recent-panel" hidden>
+  <h2>Recently approved uploads</h2>
+  <p class="intro">Approved public student uploads, shown directly from the upload review records.</p>
+  <div id="recentApprovedGallery" class="grid"></div>
+</section>
+
 <div id="status">Loading student gallery...</div>
 <div id="gallery" class="grid"></div>
 
 <script>
 const API_URL = "https://ptb-tree-map.onrender.com/api/student-gallery";
+const APPROVED_UPLOADS_URL = "https://ptb-tree-map.onrender.com/api/photo-review-gallery?verification_status=approved&public_gallery_status=public";
 const pendingPanel = document.getElementById("pendingPanel");
 const pendingGallery = document.getElementById("pendingGallery");
+const recentApprovedPanel = document.getElementById("recentApprovedPanel");
+const recentApprovedGallery = document.getElementById("recentApprovedGallery");
 
 renderPendingUploads();
+loadRecentApprovedUploads();
 
 async function loadGallery() {
   const status = document.getElementById("status");
@@ -231,29 +254,95 @@ async function loadGallery() {
       `;
     }).join("");
 
-    document.querySelectorAll(".card").forEach(card => {
-      card.addEventListener("click", () => {
-        const url = card.getAttribute("data-profile-url");
-        if (url && url !== "#") {
-          window.location.href = url;
-        }
-      });
-
-      card.addEventListener("keydown", event => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          const url = card.getAttribute("data-profile-url");
-          if (url && url !== "#") {
-            window.location.href = url;
-          }
-        }
-      });
-    });
+    bindProfileCards(gallery);
 
   } catch (err) {
     console.error("Student gallery error:", err);
     status.textContent = "Error loading gallery.";
   }
+}
+
+async function loadRecentApprovedUploads() {
+  try {
+    const res = await fetch(`${APPROVED_UPLOADS_URL}&t=${Date.now()}`, {
+      cache: "no-store"
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.ok) return;
+
+    const uploads = (data.photos || [])
+      .filter(isApprovedStudentUpload)
+      .sort((a, b) => Date.parse(b.reviewed_at_utc || b.created_at_utc || 0) - Date.parse(a.reviewed_at_utc || a.created_at_utc || 0))
+      .slice(0, 12);
+
+    if (!uploads.length) {
+      recentApprovedPanel.hidden = true;
+      return;
+    }
+
+    recentApprovedPanel.hidden = false;
+    recentApprovedGallery.innerHTML = uploads.map(renderApprovedUpload).join("");
+    bindProfileCards(recentApprovedGallery);
+  } catch (err) {
+    console.warn("Could not load recently approved uploads:", err);
+  }
+}
+
+function isApprovedStudentUpload(upload) {
+  if (!upload) return false;
+  if (upload.upload_context === "staff_upload") return false;
+  if (upload.uploader_role === "staff") return false;
+  if (!upload.academy_student_id && !upload.uploader_name && !upload.linked_entity_name) return false;
+  return upload.public_gallery_status === "public" || upload.verification_status === "approved";
+}
+
+function renderApprovedUpload(upload) {
+  const studentId = upload.academy_student_id || upload.student_id || "";
+  const displayName = getFirstName(upload.uploader_name || upload.linked_entity_name || "Student");
+  const session = displaySession(upload.academy_track || upload.interest_area || upload.track);
+  const imageUrl = upload.cropped_file_url || upload.file_url || upload.original_file_url || "";
+  const profileUrl = studentId
+    ? `/student-profile/?student_id=${encodeURIComponent(studentId)}`
+    : "#";
+
+  return `
+    <div
+      class="card"
+      role="link"
+      tabindex="0"
+      data-profile-url="${escapeAttr(profileUrl)}"
+      aria-label="Open profile for ${escapeAttr(displayName)}"
+    >
+      ${imageUrl ? `<img src="${escapeAttr(imageUrl)}" alt="${escapeAttr(displayName)}">` : ""}
+      <div class="name">${escapeHtml(displayName)}</div>
+      <div class="meta">${escapeHtml(labelLesson(upload.lesson_key))}</div>
+      <div class="meta">${escapeHtml(session)}</div>
+      <div class="points">Approved</div>
+      <div class="view-profile">View profile →</div>
+    </div>
+  `;
+}
+
+function bindProfileCards(root) {
+  root.querySelectorAll(".card").forEach(card => {
+    card.addEventListener("click", () => {
+      const url = card.getAttribute("data-profile-url");
+      if (url && url !== "#") {
+        window.location.href = url;
+      }
+    });
+
+    card.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        const url = card.getAttribute("data-profile-url");
+        if (url && url !== "#") {
+          window.location.href = url;
+        }
+      }
+    });
+  });
 }
 
 function formatPoints(points) {
@@ -278,6 +367,24 @@ function displaySession(value) {
   if (normalized === "networking_advocacy") return "Networking & Advocacy";
 
   return value;
+}
+
+function labelLesson(value) {
+  const map = {
+    onboarding: "Onboarding",
+    lesson_1_child_protection: "Lesson 1: Child Protection",
+    lesson_2_climate_change: "Lesson 2: Climate Change",
+    lesson_3_tree_health: "Lesson 3: Tree Health",
+    lesson_4_tree_planting: "Lesson 4: Tree Planting",
+    lesson_5_carbon_dioxide_increase: "Lesson 5: Carbon Dioxide Increase",
+    tutor_question: "Question to the tutor",
+    lesson_1_climate_change: "Lesson 1 Climate Change",
+    lesson_2_tree_health: "Lesson 2 Tree Health",
+    lesson_3_tree_planting: "Lesson 3 Tree Planting",
+    lesson_4_co2_increase: "Lesson 4 Carbon Dioxide Increase"
+  };
+
+  return map[value] || value || "Approved upload";
 }
 
 function renderBadges(badges) {
