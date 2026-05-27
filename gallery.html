@@ -115,7 +115,7 @@ console.log("Gallery fetch URL:", url);
       return;
     }
 
-    renderGallery(data.photos || []);
+    renderGallery((data.photos || []).filter(isPublicGalleryUpload));
 
   } catch (err) {
     container.textContent = "Failed: " + err.message;
@@ -147,6 +147,11 @@ function renderGallery(photos) {
 
     container.appendChild(div);
   });
+}
+
+function isPublicGalleryUpload(photo) {
+  if (!photo || photo.upload_context !== "staff_upload") return true;
+  return photo.public_gallery_status === "public";
 }
 
 // initial load
