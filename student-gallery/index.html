@@ -154,7 +154,7 @@
 
 <p class="intro">
   Meet students joining the KETSO Academy online tree planting session.
-  Only approved student uploads are shown here.
+  This page shows one card per student. Approved lesson uploads are shown inside each student's profile.
 </p>
 
 <div class="cta">
@@ -183,7 +183,9 @@ async function loadGallery() {
   const gallery = document.getElementById("gallery");
 
   try {
-    const res = await fetch(API_URL);
+    const res = await fetch(`${API_URL}?t=${Date.now()}`, {
+      cache: "no-store"
+    });
     const data = await res.json();
 
     console.log("Student gallery response:", data);
