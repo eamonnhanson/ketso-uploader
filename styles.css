@@ -211,6 +211,22 @@ textarea {
   margin-top: 14px;
 }
 
+.crop-note {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 10px;
+  border: 1px solid #b7dfbd;
+  border-left: 5px solid var(--green);
+  border-radius: 8px;
+  background: #f2f7f1;
+  padding: 10px 12px;
+  color: #183f25;
+}
+
+.crop-note span {
+  color: #31533b;
+}
+
 .crop-workspace {
   overflow: hidden;
   border: 1px solid var(--line);
