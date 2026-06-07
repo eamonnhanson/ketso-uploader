@@ -303,9 +303,6 @@
       <section class="panel" aria-labelledby="upload-title">
         <h2 id="upload-title">Upload staff photo</h2>
 
-        <div id="staffWarning" class="warning" hidden>
-          No staff name was provided. Using KETSO staff for testing. Add ?staff_name=First%20Last to the URL for real staff uploads.
-        </div>
 
         <label for="staffName">Staff name</label>
         <input id="staffName" type="text" autocomplete="name" placeholder="First name Last name">
@@ -368,6 +365,8 @@
     const MAX_CROPPED_BYTES = 500 * 1024;
     const MAX_ORIGINAL_BYTES = 8 * 1024 * 1024;
     const HARD_MAX_IMAGE_INPUT_BYTES = 25 * 1024 * 1024;
+    const DEFAULT_STAFF_NAME = "Amara Abdulai Sesay";
+    const DEFAULT_STAFF_ID = "amara_abdulai_sesay";
 
     let cropper = null;
     let selectedFile = null;
@@ -378,7 +377,6 @@
     let searchTimeout = null;
 
     const el = {
-      staffWarning: document.getElementById("staffWarning"),
       staffName: document.getElementById("staffName"),
       category: document.getElementById("category"),
       forestHeroSection: document.getElementById("forestHeroSection"),
@@ -419,9 +417,8 @@
     function initStaffId() {
       const params = new URLSearchParams(window.location.search);
       const rawStaffName = params.get("staff_name") || params.get("staff_id");
-      const staffName = normalizeStaffName(rawStaffName || "KETSO staff");
-      el.staffName.value = staffName || "KETSO staff";
-      el.staffWarning.hidden = Boolean(rawStaffName);
+      const staffName = normalizeStaffName(rawStaffName || DEFAULT_STAFF_NAME);
+      el.staffName.value = staffName || DEFAULT_STAFF_NAME;
     }
 
     function bindEvents() {
@@ -438,8 +435,7 @@
       el.category.addEventListener("change", updateForestHeroSearch);
       el.forestHeroSearch.addEventListener("input", handleForestHeroSearchInput);
       el.staffName.addEventListener("change", () => {
-        el.staffName.value = normalizeStaffName(el.staffName.value) || "KETSO staff";
-        el.staffWarning.hidden = getStaffId() !== "ketso_staff";
+        el.staffName.value = normalizeStaffName(el.staffName.value) || DEFAULT_STAFF_NAME;
         loadUploads();
       });
       updateForestHeroSearch();
@@ -468,7 +464,7 @@
     }
 
     function getStaffId() {
-      return normalizeStaffId(el.staffName.value || "KETSO staff") || "ketso_staff";
+      return normalizeStaffId(el.staffName.value || DEFAULT_STAFF_NAME) || DEFAULT_STAFF_ID;
     }
 
     function getStaffCategories() {
