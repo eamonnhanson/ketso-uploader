@@ -1,12 +1,14 @@
 import { isAllowedStaffCategory } from "../_shared/staff-categories.js";
 
+const DEFAULT_STAFF_NAME = "Amara Abdulai Sesay";
+const DEFAULT_STAFF_ID = "amara_abdulai_sesay";
 const REVIEW_API_URL = "https://ptb-tree-map.onrender.com/api/save-photo-review";
 const GALLERY_API_URL = "https://ptb-tree-map.onrender.com/api/photo-review-gallery";
 const R2_PUBLIC_BASE = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/";
 
 export async function onRequestGet({ request }) {
   const url = new URL(request.url);
-  const staffId = normalizeStaffId(url.searchParams.get("staff_id") || "ketso_staff");
+  const staffId = normalizeStaffId(url.searchParams.get("staff_id") || DEFAULT_STAFF_ID);
 
   if (!staffId) {
     return jsonResponse({ ok: false, error: "Invalid staff_id" }, 400);
@@ -41,8 +43,8 @@ export async function onRequestGet({ request }) {
 export async function onRequestPost({ request }) {
   try {
     const body = await request.json();
-    const staffId = normalizeStaffId(body.staff_id || body.uploaded_by || "ketso_staff");
-    const staffName = normalizeStaffName(body.staff_name || body.uploader_name || staffId);
+    const staffId = normalizeStaffId(body.staff_id || body.uploaded_by || DEFAULT_STAFF_ID);
+    const staffName = normalizeStaffName(body.staff_name || body.uploader_name || staffId || DEFAULT_STAFF_NAME);
     const staffCategory = String(body.category || "").trim();
 
     if (!staffId) {
@@ -163,7 +165,7 @@ function normalizeStaffName(value) {
     .replace(/[^a-zA-Z0-9 .'-]/g, "")
     .slice(0, 80);
 
-  return normalized || "KETSO staff";
+  return normalized || DEFAULT_STAFF_NAME;
 }
 
 function validateR2Url(value, staffId) {
