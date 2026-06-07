@@ -93,7 +93,7 @@ export async function onRequestPost({ request }) {
       upload_context: "staff_upload",
       verification_status: "not_required",
       review_status: "not_required",
-      public_gallery_status: "private",
+      public_gallery_status: "public",
       uploaded_by: staffId,
       staff_id: staffId,
       staff_name: staffName,
