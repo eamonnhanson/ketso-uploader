@@ -72,13 +72,13 @@
 </head>
 <body>
   <h1>KETSO staff gallery</h1>
-  <p class="intro">Approved public staff uploads. Student uploads are excluded unless they are explicitly handled elsewhere.</p>
+  <p class="intro">Public staff uploads. Student uploads are excluded unless they are explicitly handled elsewhere.</p>
 
   <div id="status">Loading staff gallery...</div>
   <div id="gallery" class="grid"></div>
 
   <script>
-    const API_URL = "https://ptb-tree-map.onrender.com/api/photo-review-gallery?public_gallery_status=public";
+    const API_URL = "https://ptb-tree-map.onrender.com/api/photo-review-gallery?public_gallery_status=public&upload_context=staff_upload";
 
     async function loadGallery() {
       const status = document.getElementById("status");
