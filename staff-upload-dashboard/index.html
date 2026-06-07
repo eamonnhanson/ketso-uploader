@@ -766,17 +766,19 @@
 
         setStatus("Saving staff upload...");
         const saved = await saveStaffUpload({
-          staff_id: staffId,
-          uploaded_by: staffId,
-          staff_name: staffName,
-          category: el.category.value,
-          caption: el.caption.value.trim(),
-          forest_hero: selectedForestHero,
-          file_url: croppedUrl,
-          original_file_url: originalUrl,
-          cropped_file_size_bytes: croppedFile.size,
-          original_file_size_bytes: originalFile.size
-        });
+  staff_id: staffId,
+  uploaded_by: staffId,
+  staff_name: staffName,
+  category: el.category.value,
+  caption: el.caption.value.trim(),
+  forest_hero: selectedForestHero,
+  file_url: croppedUrl,
+  original_file_url: originalUrl,
+  cropped_file_size_bytes: croppedFile.size,
+  original_file_size_bytes: originalFile.size,
+  public_gallery_status: "public",
+  verification_status: "not_required"
+});
 
         setStatus(`Done. Staff upload saved${saved.review_id ? ` (ID: ${saved.review_id})` : ""}.`);
         cacheUpload(staffId, saved.upload);
