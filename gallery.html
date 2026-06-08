@@ -6,155 +6,581 @@
 
 <style>
 body {
-  font-family: Arial;
+  font-family: Arial, sans-serif;
   padding: 20px;
+  max-width: 1500px;
+  margin: 0 auto;
+  background: #ffffff;
+  color: #222;
+}
+
+h1 {
+  margin-bottom: 6px;
+}
+
+.intro {
+  margin-bottom: 18px;
+  color: #444;
+  line-height: 1.5;
+  max-width: 900px;
 }
 
 .controls {
-  margin-bottom: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 14px;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+label {
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: #333;
+}
+
+select,
+input,
+button {
+  padding: 9px 10px;
+  font-size: 14px;
+  border: 1px solid #bbb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+button {
+  background: #00785f;
+  color: #fff;
+  border: none;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #777;
+}
+
+#status {
+  font-weight: bold;
+  margin: 12px 0;
+}
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0 18px;
+}
+
+.summary-item {
+  border: 1px solid #ddd;
+  background: #fafafa;
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 18px;
 }
 
 .item {
-  display: inline-block;
-  width: 220px;
-  margin: 10px;
-  vertical-align: top;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fafafa;
 }
 
-img {
-  width: 200px;
-  height: auto;
+.item img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 10px;
+  background: #eee;
+  border: 1px solid #ddd;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: bold;
+  margin-top: 10px;
+  word-break: break-word;
 }
 
 .small {
   font-size: 12px;
   color: #555;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 7px 0;
+}
+
+.badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #eee;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.badge-staff {
+  background: #e5f0ff;
+  color: #174a8b;
+}
+
+.badge-public {
+  background: #dff4e6;
+  color: #0a6b2b;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.file-link {
+  color: #00785f;
+  font-weight: bold;
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.file-link:hover {
+  text-decoration: underline;
+}
+
+.empty {
+  border: 1px dashed #aaa;
+  padding: 22px;
+  border-radius: 12px;
+  background: #fafafa;
+  color: #555;
+}
+
+@media (max-width: 700px) {
+  body {
+    padding: 14px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
 </head>
 
 <body>
 
-<h2>KETSO gallery</h2>
+<h1>KETSO gallery</h1>
+
+<p class="intro">
+  Public KETSO uploads, including staff uploads. Staff uploads are shown directly when they are public and do not require admin approval.
+</p>
 
 <div class="controls">
-  <select id="filterCategory">
-    <option value="all">All</option>
-    <option value="hoorn_foundation">Hoorn Foundation</option>
-    <option value="plant_een_boom">Plant een Boom</option>
-    <option value="forest_hero">Forest Hero</option>
-    <option value="other">Other</option>
-  </select>
-<select id="filterYear">
-  <option value="">All years</option>
-  <option value="2026">2026</option>
-  <option value="2025">2025</option>
-</select>
+  <div class="field">
+    <label for="filterUploadContext">Upload type</label>
+    <select id="filterUploadContext">
+      <option value="all">All</option>
+      <option value="staff_upload">Staff uploads</option>
+      <option value="academy_onboarding">Academy onboarding</option>
+      <option value="legacy_photo_import">Legacy imports</option>
+      <option value="photo_review">Photo review</option>
+    </select>
+  </div>
 
-<select id="filterMonth">
-  <option value="">All months</option>
-  <option value="01">January</option>
-  <option value="02">February</option>
-  <option value="03">March</option>
-  <option value="04">April</option>
-  <option value="05">May</option>
-  <option value="06">June</option>
-  <option value="07">July</option>
-  <option value="08">August</option>
-  <option value="09">September</option>
-  <option value="10">October</option>
-  <option value="11">November</option>
-  <option value="12">December</option>
-</select>
-  <input type="text" id="searchBox" placeholder="Search...">
+  <div class="field">
+    <label for="filterCategory">Category</label>
+    <select id="filterCategory">
+      <option value="all">All</option>
+    </select>
+  </div>
 
-  <button onclick="loadGallery()">Filter</button>
+  <div class="field">
+    <label for="filterYear">Year</label>
+    <select id="filterYear">
+      <option value="all">All years</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label for="filterMonth">Month</label>
+    <select id="filterMonth">
+      <option value="all">All months</option>
+      <option value="01">January</option>
+      <option value="02">February</option>
+      <option value="03">March</option>
+      <option value="04">April</option>
+      <option value="05">May</option>
+      <option value="06">June</option>
+      <option value="07">July</option>
+      <option value="08">August</option>
+      <option value="09">September</option>
+      <option value="10">October</option>
+      <option value="11">November</option>
+      <option value="12">December</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label for="searchBox">Search</label>
+    <input type="search" id="searchBox" placeholder="Name, category, caption, AI text">
+  </div>
+
+  <div class="field">
+    <label>&nbsp;</label>
+    <button onclick="applyFilters()">Filter</button>
+  </div>
+
+  <div class="field">
+    <label>&nbsp;</label>
+    <button class="secondary" onclick="resetFilters()">Reset filters</button>
+  </div>
 </div>
 
-<div id="gallery">Loading...</div>
+<div id="status">Loading...</div>
+<div id="summary" class="summary"></div>
+<div id="gallery" class="grid"></div>
 
 <script>
 const API = "https://ptb-tree-map.onrender.com/api/photo-review-gallery";
 
+let allPhotos = [];
+
 async function loadGallery() {
+  const status = document.getElementById("status");
   const container = document.getElementById("gallery");
 
-const category = document.getElementById("filterCategory").value;
-const year = document.getElementById("filterYear").value;
-const month = document.getElementById("filterMonth").value;
-const search = document.getElementById("searchBox").value;
-
-const params = new URLSearchParams();
-
-if (category !== "all") {
-  params.set("category", category);
-}
-
-if (year && month) {
-  const lastDay = new Date(Number(year), Number(month), 0).getDate();
-  params.set("date_from", `${year}-${month}-01`);
-  params.set("date_to", `${year}-${month}-${String(lastDay).padStart(2, "0")}`);
-} else if (year) {
-  params.set("date_from", `${year}-01-01`);
-  params.set("date_to", `${year}-12-31`);
-}
-
-if (search.trim()) {
-  params.set("search", search.trim());
-}
-
-const url = `${API}?${params.toString()}`;
-console.log("Gallery fetch URL:", url);
+  status.textContent = "Loading KETSO gallery...";
+  container.innerHTML = "";
+  setSummary([]);
 
   try {
-    const res = await fetch(url);
-    const data = await res.json();
+    const [generalData, staffData] = await Promise.all([
+      fetchJson(`${API}?public_gallery_status=public`),
+      fetchJson(`${API}?public_gallery_status=public&upload_context=staff_upload`)
+    ]);
 
-    if (!data.ok) {
-      container.textContent = "Error loading data";
-      return;
-    }
+    const generalPhotos = generalData.photos || [];
+    const staffPhotos = staffData.photos || [];
 
-    renderGallery((data.photos || []).filter(isPublicGalleryUpload));
+    allPhotos = dedupeById([...generalPhotos, ...staffPhotos])
+      .filter(isPublicVisibleUpload)
+      .filter(hasUsableImage)
+      .sort(sortNewestFirst);
+
+    populateDynamicFilters(allPhotos);
+    applyFilters();
 
   } catch (err) {
-    container.textContent = "Failed: " + err.message;
+    console.error("Gallery load error:", err);
+    status.textContent = "Failed to load gallery: " + err.message;
+    container.innerHTML = `<div class="empty">Could not load the public KETSO gallery.</div>`;
   }
+}
+
+async function fetchJson(url) {
+  console.log("Gallery fetch URL:", url);
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  if (!res.ok || !data.ok) {
+    throw new Error(data.error || `Request failed: ${res.status}`);
+  }
+
+  return data;
+}
+
+function applyFilters() {
+  const uploadContext = getValue("filterUploadContext");
+  const category = getValue("filterCategory");
+  const year = getValue("filterYear");
+  const month = getValue("filterMonth");
+  const search = getValue("searchBox").toLowerCase();
+
+  let filtered = allPhotos.slice();
+
+  if (uploadContext !== "all") {
+    filtered = filtered.filter(photo => (photo.upload_context || "") === uploadContext);
+  }
+
+  if (category !== "all") {
+    filtered = filtered.filter(photo => (photo.category || "") === category);
+  }
+
+  if (year !== "all") {
+    filtered = filtered.filter(photo => getYear(photo.created_at_utc) === year);
+  }
+
+  if (month !== "all") {
+    filtered = filtered.filter(photo => getMonth(photo.created_at_utc) === month);
+  }
+
+  if (search) {
+    filtered = filtered.filter(photo => {
+      const haystack = [
+        photo.category,
+        photo.linked_entity_name,
+        photo.uploader_name,
+        photo.caption,
+        photo.ai_description,
+        photo.upload_context
+      ].join(" ").toLowerCase();
+
+      return haystack.includes(search);
+    });
+  }
+
+  renderGallery(filtered);
 }
 
 function renderGallery(photos) {
+  const status = document.getElementById("status");
   const container = document.getElementById("gallery");
+
   container.innerHTML = "";
+  setSummary(photos);
 
   if (!photos.length) {
-    container.textContent = "No images found.";
+    status.textContent = "No public images found for these filters.";
+    container.innerHTML = `<div class="empty">No images found.</div>`;
     return;
   }
 
-  photos.forEach(p => {
-    const div = document.createElement("div");
-    div.className = "item";
+  status.textContent = `${photos.length} public image(s) found.`;
+  container.innerHTML = photos.map(renderCard).join("");
+}
 
-    div.innerHTML = `
-      <img src="${p.cropped_file_url || p.original_file_url || ""}">
-      <div><strong>${p.category}</strong></div>
-      <div class="small">${p.linked_entity_name || "-"}</div>
-      <div class="small">Original: ${p.original_kb || "-"} KB</div>
-      <div class="small">Cropped: ${p.cropped_kb || "-"} KB</div>
-      <div class="small"><em>${(p.ai_description || "").slice(0,120)}</em></div>
-      <div class="small">${p.created_at_utc}</div>
-    `;
+function renderCard(photo) {
+  const imageUrl = photo.cropped_file_url || photo.original_file_url || "";
+  const originalUrl = photo.original_file_url || "";
+  const title = photo.category || photo.upload_context || "upload";
+  const name = photo.linked_entity_name || photo.uploader_name || "-";
+  const description = photo.caption || photo.ai_description || "";
+  const created = formatDate(photo.created_at_utc || photo.created_at);
+  const uploadContext = photo.upload_context || "-";
 
-    container.appendChild(div);
+  return `
+    <article class="item" id="upload-${escapeHtml(photo.id)}">
+      <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(title)}" loading="lazy">
+
+      <div class="title">${escapeHtml(title)}</div>
+
+      <div class="badges">
+        <span class="badge badge-public">public</span>
+        <span class="badge ${uploadContext === "staff_upload" ? "badge-staff" : ""}">${escapeHtml(uploadContext)}</span>
+      </div>
+
+      <div class="small"><strong>Name:</strong> ${escapeHtml(name)}</div>
+      <div class="small"><strong>Category:</strong> ${escapeHtml(photo.category || "-")}</div>
+      <div class="small"><strong>Date:</strong> ${escapeHtml(created || "-")}</div>
+
+      ${description ? `<div class="small"><em>${escapeHtml(description.slice(0, 180))}</em></div>` : ""}
+
+      <div class="links">
+        ${imageUrl ? `<a class="file-link" href="${escapeHtml(imageUrl)}" target="_blank" rel="noopener">Open image</a>` : ""}
+        ${originalUrl ? `<a class="file-link" href="${escapeHtml(originalUrl)}" target="_blank" rel="noopener">Open original</a>` : ""}
+      </div>
+    </article>
+  `;
+}
+
+function populateDynamicFilters(photos) {
+  populateCategoryFilter(photos);
+  populateYearFilter(photos);
+}
+
+function populateCategoryFilter(photos) {
+  const select = document.getElementById("filterCategory");
+  const current = select.value || "all";
+
+  const categories = Array.from(
+    new Set(
+      photos
+        .map(photo => photo.category)
+        .filter(Boolean)
+        .map(String)
+        .sort()
+    )
+  );
+
+  select.innerHTML = `<option value="all">All</option>` + categories.map(category =>
+    `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`
+  ).join("");
+
+  if (categories.includes(current)) {
+    select.value = current;
+  }
+}
+
+function populateYearFilter(photos) {
+  const select = document.getElementById("filterYear");
+  const current = select.value || "all";
+
+  const years = Array.from(
+    new Set(
+      photos
+        .map(photo => getYear(photo.created_at_utc))
+        .filter(Boolean)
+        .sort()
+        .reverse()
+    )
+  );
+
+  select.innerHTML = `<option value="all">All years</option>` + years.map(year =>
+    `<option value="${escapeHtml(year)}">${escapeHtml(year)}</option>`
+  ).join("");
+
+  if (years.includes(current)) {
+    select.value = current;
+  }
+}
+
+function setSummary(photos) {
+  const summary = document.getElementById("summary");
+
+  if (!photos.length) {
+    summary.innerHTML = "";
+    return;
+  }
+
+  const staff = photos.filter(photo => photo.upload_context === "staff_upload").length;
+  const general = photos.length - staff;
+
+  summary.innerHTML = `
+    <span class="summary-item"><strong>${photos.length}</strong> total</span>
+    <span class="summary-item"><strong>${staff}</strong> staff uploads</span>
+    <span class="summary-item"><strong>${general}</strong> other public uploads</span>
+  `;
+}
+
+function isPublicVisibleUpload(photo) {
+  if (!photo) return false;
+  if (photo.public_gallery_status && photo.public_gallery_status !== "public") return false;
+
+  if (photo.upload_context === "staff_upload") {
+    return photo.verification_status === "not_required" ||
+      photo.verification_status === "approved" ||
+      photo.review_status === "not_required" ||
+      photo.review_status === "approved";
+  }
+
+  return photo.verification_status === "approved" ||
+    photo.review_status === "approved";
+}
+
+function hasUsableImage(photo) {
+  const url = photo.cropped_file_url || photo.original_file_url || "";
+
+  if (!url) return false;
+
+  return /\.(jpg|jpeg|png|webp|gif|avif)(\?|$)/i.test(url);
+}
+
+function dedupeById(photos) {
+  const map = new Map();
+
+  photos.forEach(photo => {
+    if (!photo || photo.id === undefined || photo.id === null) return;
+    map.set(String(photo.id), photo);
   });
+
+  return Array.from(map.values());
 }
 
-function isPublicGalleryUpload(photo) {
-  if (!photo || photo.upload_context !== "staff_upload") return true;
-  return photo.public_gallery_status === "public";
+function sortNewestFirst(a, b) {
+  const dateA = Date.parse(a.created_at_utc || a.created_at || 0);
+  const dateB = Date.parse(b.created_at_utc || b.created_at || 0);
+
+  if (dateA !== dateB) return dateB - dateA;
+
+  return Number(b.id || 0) - Number(a.id || 0);
 }
 
-// initial load
+function resetFilters() {
+  document.getElementById("filterUploadContext").value = "all";
+  document.getElementById("filterCategory").value = "all";
+  document.getElementById("filterYear").value = "all";
+  document.getElementById("filterMonth").value = "all";
+  document.getElementById("searchBox").value = "";
+  applyFilters();
+}
+
+function getValue(id) {
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : "";
+}
+
+function getYear(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return String(date.getFullYear());
+}
+
+function getMonth(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return String(date.getMonth() + 1).padStart(2, "0");
+}
+
+function formatDate(value) {
+  if (!value) return "";
+  try {
+    return new Date(value).toLocaleString();
+  } catch {
+    return value;
+  }
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+[
+  "filterUploadContext",
+  "filterCategory",
+  "filterYear",
+  "filterMonth"
+].forEach(id => {
+  document.getElementById(id).addEventListener("change", applyFilters);
+});
+
+document.getElementById("searchBox").addEventListener("keydown", event => {
+  if (event.key === "Enter") {
+    applyFilters();
+  }
+});
+
 loadGallery();
 </script>
 
