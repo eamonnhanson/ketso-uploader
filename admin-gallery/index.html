@@ -396,7 +396,14 @@
 <script>
 const API_BASE = "https://ptb-tree-map.onrender.com";
 const ADMIN_GALLERY_ENDPOINT = `${API_BASE}/api/photo-review-admin-gallery`;
+let adminKey = localStorage.getItem("ketso_admin_key");
 
+if (!adminKey) {
+  adminKey = prompt("Enter admin key");
+  if (adminKey) {
+    localStorage.setItem("ketso_admin_key", adminKey);
+  }
+}
 let allUploads = [];
 
 async function loadGallery() {
@@ -409,7 +416,21 @@ async function loadGallery() {
 
   try {
     const url = buildUrl();
-    const res = await fetch(url);
+    if (!adminKey) {
+  status.textContent = "No admin key entered.";
+  return;
+}
+
+if (!adminKey) {
+  status.textContent = "No admin key entered.";
+  return;
+}
+
+const res = await fetch(url, {
+  headers: {
+    "x-admin-key": adminKey
+  }
+});
     const data = await res.json();
 
     console.log("Admin gallery response:", data);
