@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>KETSO Academy moderation</title>
+  <title>KETSO admin gallery</title>
 
   <style>
     body {
       font-family: Arial, sans-serif;
       padding: 20px;
-      max-width: 1300px;
+      max-width: 1500px;
       margin: 0 auto;
       background: #ffffff;
       color: #222;
@@ -22,35 +22,62 @@
       margin-bottom: 18px;
       color: #444;
       line-height: 1.5;
-      max-width: 800px;
+      max-width: 950px;
+    }
+
+    .warning {
+      background: #fff5d6;
+      border: 1px solid #f0c36d;
+      border-radius: 10px;
+      padding: 12px;
+      margin: 14px 0 18px;
+      line-height: 1.45;
+      max-width: 950px;
     }
 
     .toolbar {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
       margin: 18px 0;
-      padding: 12px;
+      padding: 14px;
       background: #f5f5f5;
-      border-radius: 10px;
+      border-radius: 12px;
+      border: 1px solid #ddd;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    label {
+      font-size: 12px;
+      font-weight: bold;
+      color: #333;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
     }
 
     select,
+    input,
     button {
       padding: 9px 12px;
       font-size: 14px;
+      border: 1px solid #bbb;
+      border-radius: 8px;
+      background: #fff;
     }
 
     button {
       border: none;
-      border-radius: 7px;
       font-weight: bold;
       cursor: pointer;
     }
 
     .refresh {
-      background: #333;
+      background: #00785f;
       color: white;
     }
 
@@ -59,14 +86,10 @@
       color: white;
     }
 
-    .approve {
-      background: #1f7a3f;
-      color: white;
-    }
-
-    .reject {
-      background: #a11;
-      color: white;
+    .secondary {
+      background: #e6f3ef;
+      color: #006b55;
+      border: 1px solid #b8dcd3;
     }
 
     button:disabled {
@@ -80,9 +103,24 @@
       white-space: pre-line;
     }
 
+    .summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 12px 0 18px;
+    }
+
+    .summary-item {
+      border: 1px solid #ddd;
+      background: #fafafa;
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 13px;
+    }
+
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
       gap: 18px;
     }
 
@@ -91,15 +129,34 @@
       border-radius: 12px;
       padding: 12px;
       background: #fafafa;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
     }
 
-    .card img {
+    .thumb {
       width: 100%;
       aspect-ratio: 1 / 1;
       object-fit: cover;
       border-radius: 10px;
-      margin-bottom: 10px;
       background: #eee;
+      border: 1px solid #ddd;
+    }
+
+    .missing-thumb {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border-radius: 10px;
+      background: #f0f0f0;
+      border: 1px dashed #aaa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #666;
+      font-size: 13px;
+      text-align: center;
+      padding: 10px;
+      box-sizing: border-box;
     }
 
     .meta {
@@ -108,16 +165,11 @@
       line-height: 1.45;
     }
 
-    .actions {
-      margin-top: 10px;
-    }
-
-    .file-link {
-      display: inline-block;
-      margin-top: 8px;
-      color: #1f7a3f;
+    .title {
+      font-size: 16px;
       font-weight: bold;
-      text-decoration: none;
+      margin-bottom: 2px;
+      word-break: break-word;
     }
 
     .small {
@@ -126,13 +178,98 @@
       word-break: break-word;
     }
 
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
     .badge {
       display: inline-block;
-      padding: 3px 7px;
+      padding: 3px 8px;
       border-radius: 999px;
       background: #eee;
       font-size: 12px;
-      margin-top: 4px;
+      font-weight: bold;
+    }
+
+    .badge-public {
+      background: #dff4e6;
+      color: #0a6b2b;
+    }
+
+    .badge-private {
+      background: #ffe8e8;
+      color: #9a1111;
+    }
+
+    .badge-hidden {
+      background: #eeeeee;
+      color: #555;
+    }
+
+    .badge-approved {
+      background: #dff4e6;
+      color: #0a6b2b;
+    }
+
+    .badge-pending {
+      background: #fff0d6;
+      color: #8a5700;
+    }
+
+    .badge-rejected {
+      background: #ffe8e8;
+      color: #9a1111;
+    }
+
+    .badge-not-required {
+      background: #e5f0ff;
+      color: #174a8b;
+    }
+
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: auto;
+    }
+
+    .file-link {
+      display: inline-block;
+      color: #00785f;
+      font-weight: bold;
+      text-decoration: none;
+      font-size: 13px;
+    }
+
+    .file-link:hover {
+      text-decoration: underline;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .approve {
+      background: #1f7a3f;
+      color: white;
+    }
+
+    .reject {
+      background: #a11;
+      color: white;
+    }
+
+    .empty {
+      border: 1px dashed #aaa;
+      padding: 22px;
+      border-radius: 12px;
+      background: #fafafa;
+      color: #555;
     }
 
     @media (max-width: 700px) {
@@ -149,223 +286,362 @@
 
 <body>
 
-<h1>KETSO Academy moderation</h1>
+<h1>KETSO admin gallery</h1>
 
 <p class="intro">
-  Review student uploads before they appear in student profiles. The student gallery shows one card per student;
-  approved lesson uploads appear inside that student's profile after opening "View profile".
+  Superadmin view for records in <strong>photo_uploads_review</strong>. This page is meant to help find uploads across staff,
+  academy, onboarding, legacy imports and public gallery records. Public, private, hidden, pending and rejected records may all be visible here.
 </p>
 
+<div class="warning">
+  This is an admin view, not a public gallery. Public galleries should stay selective. Use this page to inspect, filter and diagnose uploads.
+</div>
+
 <div class="toolbar">
-  <label for="statusFilter"><strong>Status</strong></label>
+  <div class="field">
+    <label for="publicStatusFilter">Public status</label>
+    <select id="publicStatusFilter">
+      <option value="all">All</option>
+      <option value="public">Public</option>
+      <option value="private">Private</option>
+      <option value="hidden">Hidden</option>
+    </select>
+  </div>
 
-  <select id="statusFilter">
-    <option value="submitted_for_review">Submitted for review</option>
-    <option value="pending">Pending</option>
-    <option value="approved">Approved</option>
-    <option value="rejected">Rejected</option>
-    <option value="all">All</option>
-  </select>
+  <div class="field">
+    <label for="verificationStatusFilter">Verification status</label>
+    <select id="verificationStatusFilter">
+      <option value="all">All</option>
+      <option value="approved">Approved</option>
+      <option value="pending">Pending</option>
+      <option value="rejected">Rejected</option>
+      <option value="not_required">Not required</option>
+    </select>
+  </div>
 
-  <button class="refresh" onclick="loadQueue()">Refresh</button>
-  <button class="reset" onclick="resetAdminKey()">Reset admin key</button>
+  <div class="field">
+    <label for="reviewStatusFilter">Review status</label>
+    <select id="reviewStatusFilter">
+      <option value="all">All</option>
+      <option value="approved">Approved</option>
+      <option value="pending">Pending</option>
+      <option value="rejected">Rejected</option>
+      <option value="not_required">Not required</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label for="uploadContextFilter">Upload context</label>
+    <select id="uploadContextFilter">
+      <option value="all">All</option>
+      <option value="staff_upload">Staff upload</option>
+      <option value="academy_upload">Academy upload</option>
+      <option value="academy_onboarding">Academy onboarding</option>
+      <option value="student_mobile_upload">Student mobile upload</option>
+      <option value="legacy_photo_import">Legacy photo import</option>
+      <option value="photo_review">Photo review</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label for="linkedEntityTypeFilter">Linked entity type</label>
+    <select id="linkedEntityTypeFilter">
+      <option value="all">All</option>
+      <option value="staff">Staff</option>
+      <option value="student">Student</option>
+      <option value="academy_upload">Academy upload</option>
+      <option value="academy_onboarding">Academy onboarding</option>
+      <option value="general">General</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label for="fileTypeFilter">File type</label>
+    <select id="fileTypeFilter">
+      <option value="image" selected>Image</option>
+      <option value="all">All</option>
+      <option value="document">Document</option>
+      <option value="text">Text</option>
+      <option value="video">Video</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label for="categoryFilter">Category</label>
+    <select id="categoryFilter">
+      <option value="all">All</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label for="searchInput">Search</label>
+    <input id="searchInput" type="search" placeholder="Name, category, caption, AI text">
+  </div>
+
+  <div class="field">
+    <label>&nbsp;</label>
+    <button class="refresh" onclick="loadGallery()">Refresh</button>
+  </div>
+
+  <div class="field">
+    <label>&nbsp;</label>
+    <button class="reset" onclick="resetFilters()">Reset filters</button>
+  </div>
 </div>
 
 <div id="status">Loading...</div>
-
+<div id="summary" class="summary"></div>
 <div id="grid" class="grid"></div>
 
 <script>
 const API_BASE = "https://ptb-tree-map.onrender.com";
+const ADMIN_GALLERY_ENDPOINT = `${API_BASE}/api/photo-review-admin-gallery`;
 
-let adminKey = localStorage.getItem("ketso_admin_key");
+let allUploads = [];
 
-if (!adminKey) {
-  adminKey = prompt("Enter admin key");
-  if (adminKey) {
-    localStorage.setItem("ketso_admin_key", adminKey);
+async function loadGallery() {
+  const status = document.getElementById("status");
+  const grid = document.getElementById("grid");
+
+  status.textContent = "Loading admin gallery...";
+  grid.innerHTML = "";
+  setSummary([]);
+
+  try {
+    const url = buildUrl();
+    const res = await fetch(url);
+    const data = await res.json();
+
+    console.log("Admin gallery response:", data);
+
+    if (!res.ok || !data.ok) {
+      status.textContent = data.error || "Could not load admin gallery. The backend endpoint may not exist yet.";
+      grid.innerHTML = `
+        <div class="empty">
+          Admin gallery endpoint not available yet.<br>
+          Expected endpoint:<br>
+          <strong>${escapeHtml(ADMIN_GALLERY_ENDPOINT)}</strong>
+        </div>
+      `;
+      return;
+    }
+
+    allUploads = data.photos || data.uploads || [];
+
+    populateCategoryFilter(allUploads);
+
+    if (!allUploads.length) {
+      status.textContent = "No uploads found for these filters.";
+      grid.innerHTML = `<div class="empty">No records found.</div>`;
+      return;
+    }
+
+    status.textContent = `${allUploads.length} upload(s) found.`;
+    setSummary(allUploads);
+    grid.innerHTML = allUploads.map(renderCard).join("");
+
+  } catch (err) {
+    console.error("Admin gallery error:", err);
+    status.textContent = "Error loading admin gallery.";
+    grid.innerHTML = `
+      <div class="empty">
+        Could not load admin gallery. Check whether the backend endpoint exists and whether Render is available.
+      </div>
+    `;
   }
 }
 
-async function loadQueue() {
-  const status = document.getElementById("status");
-  const grid = document.getElementById("grid");
-  const selectedStatus = document.getElementById("statusFilter").value;
+function buildUrl() {
+  const params = new URLSearchParams();
 
-  if (!adminKey) {
-    status.textContent = "No admin key entered.";
+  addParam(params, "public_gallery_status", getValue("publicStatusFilter"));
+  addParam(params, "verification_status", getValue("verificationStatusFilter"));
+  addParam(params, "review_status", getValue("reviewStatusFilter"));
+  addParam(params, "upload_context", getValue("uploadContextFilter"));
+  addParam(params, "linked_entity_type", getValue("linkedEntityTypeFilter"));
+  addParam(params, "file_type", getValue("fileTypeFilter"));
+  addParam(params, "category", getValue("categoryFilter"));
+
+  const search = getValue("searchInput");
+  if (search) {
+    params.set("search", search);
+  }
+
+  params.set("limit", "500");
+
+  return `${ADMIN_GALLERY_ENDPOINT}?${params.toString()}`;
+}
+
+function addParam(params, key, value) {
+  if (!value || value === "all") return;
+  params.set(key, value);
+}
+
+function getValue(id) {
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : "";
+}
+
+function populateCategoryFilter(uploads) {
+  const select = document.getElementById("categoryFilter");
+  const current = select.value || "all";
+
+  const categories = Array.from(
+    new Set(
+      uploads
+        .map(upload => upload.category)
+        .filter(Boolean)
+        .map(String)
+        .sort()
+    )
+  );
+
+  select.innerHTML = `<option value="all">All</option>` + categories.map(category =>
+    `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`
+  ).join("");
+
+  if (categories.includes(current)) {
+    select.value = current;
+  }
+}
+
+function setSummary(uploads) {
+  const summary = document.getElementById("summary");
+
+  if (!uploads.length) {
+    summary.innerHTML = "";
     return;
   }
 
-  status.textContent = "Loading...";
-  grid.innerHTML = "";
+  const counts = {
+    total: uploads.length,
+    public: uploads.filter(u => u.public_gallery_status === "public").length,
+    private: uploads.filter(u => u.public_gallery_status === "private").length,
+    hidden: uploads.filter(u => u.public_gallery_status === "hidden").length,
+    approved: uploads.filter(u => u.verification_status === "approved" || u.review_status === "approved").length,
+    pending: uploads.filter(u => u.verification_status === "pending" || u.review_status === "pending").length,
+    rejected: uploads.filter(u => u.verification_status === "rejected" || u.review_status === "rejected").length,
+    staff: uploads.filter(u => u.upload_context === "staff_upload" || u.linked_entity_type === "staff").length,
+    academy: uploads.filter(u => u.upload_context === "academy_upload").length
+  };
 
-  try {
-    const res = await fetch(
-      `${API_BASE}/api/academy-moderation-queue?status=${encodeURIComponent(selectedStatus)}`,
-      {
-        headers: {
-          "x-admin-key": adminKey
-        }
-      }
-    );
-
-    const data = await res.json();
-
-    console.log("Moderation queue response:", data);
-
-    if (!res.ok || !data.ok) {
-      status.textContent = data.error || "Could not load moderation queue.";
-      return;
-    }
-
-    const includeStaffUploads = new URLSearchParams(window.location.search).get("include_staff_uploads") === "1";
-    const uploads = (data.uploads || []).filter(upload =>
-      includeStaffUploads || !isDefaultHiddenStaffUpload(upload)
-    );
-
-    if (!uploads.length) {
-      status.textContent = "No uploads found for this status.";
-      return;
-    }
-
-    status.textContent = `${uploads.length} upload(s) found.`;
-
-    grid.innerHTML = uploads.map(renderCard).join("");
-
-  } catch (err) {
-    console.error("Moderation queue error:", err);
-    status.textContent = "Error loading moderation queue.";
-  }
-}
-
-function renderCard(u) {
-  const imageUrl = u.cropped_file_url || "";
-  const name = u.uploader_name || "Unknown student";
-  const email = u.uploader_email || "";
-  const session = displaySession(u.academy_track);
-  const cohort = u.academy_cohort || "";
-  const status = u.verification_status || "";
-  const publicStatus = u.public_gallery_status || "";
-  const created = formatDate(u.created_at_utc);
-  const confirmed = formatDate(u.student_confirmed_at);
-  const reviewed = formatDate(u.reviewed_at_utc);
-
-  return `
-    <div class="card" id="upload-${u.id}">
-      <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)}">
-
-      <div class="meta">
-        <strong>ID:</strong> ${u.id}<br>
-        <strong>Name:</strong> ${escapeHtml(name)}<br>
-        ${email ? `<strong>Email:</strong> ${escapeHtml(email)}<br>` : ""}
-        <strong>Session:</strong> ${escapeHtml(session)}<br>
-        ${cohort ? `<strong>Cohort:</strong> ${escapeHtml(cohort)}<br>` : ""}
-
-        <span class="badge">${escapeHtml(status)}</span>
-        <span class="badge">${escapeHtml(publicStatus)}</span>
-
-        <div class="small">
-          Created: ${escapeHtml(created)}<br>
-          ${confirmed ? `Submitted: ${escapeHtml(confirmed)}<br>` : ""}
-          ${reviewed ? `Reviewed: ${escapeHtml(reviewed)}<br>` : ""}
-          ${u.reviewed_by ? `Reviewed by: ${escapeHtml(u.reviewed_by)}<br>` : ""}
-        </div>
-      </div>
-
-      <div class="actions">
-        <button class="approve" onclick="approveUpload(${u.id})">Approve public</button>
-        <button class="reject" onclick="rejectUpload(${u.id})">Reject</button>
-        ${
-          u.academy_student_id
-            ? `<a class="file-link" href="/student-profile/?student_id=${encodeURIComponent(u.academy_student_id)}" target="_blank">Open student profile</a>`
-            : ""
-        }
-      </div>
-    </div>
+  summary.innerHTML = `
+    <span class="summary-item"><strong>${counts.total}</strong> total</span>
+    <span class="summary-item"><strong>${counts.public}</strong> public</span>
+    <span class="summary-item"><strong>${counts.private}</strong> private</span>
+    <span class="summary-item"><strong>${counts.hidden}</strong> hidden</span>
+    <span class="summary-item"><strong>${counts.approved}</strong> approved</span>
+    <span class="summary-item"><strong>${counts.pending}</strong> pending</span>
+    <span class="summary-item"><strong>${counts.rejected}</strong> rejected</span>
+    <span class="summary-item"><strong>${counts.staff}</strong> staff</span>
+    <span class="summary-item"><strong>${counts.academy}</strong> academy</span>
   `;
 }
 
-function isDefaultHiddenStaffUpload(upload) {
-  return upload &&
-    upload.upload_context === "staff_upload" &&
-    upload.verification_status === "not_required";
+function renderCard(upload) {
+  const imageUrl = upload.cropped_file_url || upload.original_file_url || "";
+  const originalUrl = upload.original_file_url || "";
+  const title = upload.category || upload.linked_entity_type || "upload";
+  const name = upload.linked_entity_name || upload.uploader_name || "Unknown";
+  const description = upload.caption || upload.ai_description || "";
+  const created = formatDate(upload.created_at_utc || upload.created_at);
+  const fileType = upload.file_type || guessFileType(imageUrl);
+
+  return `
+    <article class="card" id="upload-${escapeHtml(upload.id)}">
+      ${renderThumbnail(imageUrl, title, fileType)}
+
+      <div class="title">${escapeHtml(title)}</div>
+
+      <div class="badges">
+        ${badge(upload.public_gallery_status, "public")}
+        ${badge(upload.verification_status, "status")}
+        ${badge(upload.review_status, "status")}
+        ${badge(upload.upload_context, "neutral")}
+      </div>
+
+      <div class="meta">
+        <strong>ID:</strong> ${escapeHtml(upload.id)}<br>
+        <strong>Type:</strong> ${escapeHtml(upload.linked_entity_type || "-")}<br>
+        <strong>Name:</strong> ${escapeHtml(name)}<br>
+        <strong>Category:</strong> ${escapeHtml(upload.category || "-")}<br>
+        <strong>File:</strong> ${escapeHtml(fileType || "-")}<br>
+        ${upload.academy_student_id ? `<strong>Student ID:</strong> ${escapeHtml(upload.academy_student_id)}<br>` : ""}
+        ${upload.uploader_name ? `<strong>Uploader:</strong> ${escapeHtml(upload.uploader_name)}<br>` : ""}
+        ${upload.uploader_email ? `<strong>Email:</strong> ${escapeHtml(upload.uploader_email)}<br>` : ""}
+      </div>
+
+      ${description ? `<div class="small">${escapeHtml(description)}</div>` : ""}
+
+      <div class="small">
+        Created: ${escapeHtml(created || "-")}<br>
+        ${upload.reviewed_at_utc ? `Reviewed: ${escapeHtml(formatDate(upload.reviewed_at_utc))}<br>` : ""}
+        ${upload.reviewed_by ? `Reviewed by: ${escapeHtml(upload.reviewed_by)}<br>` : ""}
+      </div>
+
+      <div class="links">
+        ${imageUrl ? `<a class="file-link" href="${escapeHtml(imageUrl)}" target="_blank" rel="noopener">Open image</a>` : ""}
+        ${originalUrl ? `<a class="file-link" href="${escapeHtml(originalUrl)}" target="_blank" rel="noopener">Open original</a>` : ""}
+        ${upload.academy_student_id ? `<a class="file-link" href="/student-profile/?student_id=${encodeURIComponent(upload.academy_student_id)}" target="_blank">Student profile</a>` : ""}
+      </div>
+    </article>
+  `;
 }
 
-async function approveUpload(id) {
-  if (!confirm("Approve this upload and make it visible in the student gallery?")) {
-    return;
+function renderThumbnail(imageUrl, title, fileType) {
+  if (!imageUrl) {
+    return `<div class="missing-thumb">No file URL</div>`;
   }
 
-  await updateUpload(id, "/api/academy-approve-upload", "Approved", {
-    public_gallery_status: "public"
-  });
-}
-
-async function rejectUpload(id) {
-  if (!confirm("Reject this upload and keep it private?")) {
-    return;
+  if (fileType && fileType !== "image") {
+    return `<div class="missing-thumb">${escapeHtml(fileType)} file<br>Open original</div>`;
   }
 
-  await updateUpload(id, "/api/academy-reject-upload", "Rejected");
+  return `<img class="thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(title)}" loading="lazy" onerror="this.outerHTML='<div class=&quot;missing-thumb&quot;>Image failed to load<br>metadata still visible</div>'">`;
 }
 
-async function updateUpload(id, endpoint, label, extraPayload = {}) {
-  const status = document.getElementById("status");
+function badge(value, type) {
+  if (!value) return "";
 
-  try {
-    status.textContent = `${label} upload ${id}...`;
+  const normalized = String(value).toLowerCase();
+  let className = "badge";
 
-    const query = adminKey ? `?admin_key=${encodeURIComponent(adminKey)}` : "";
-    const res = await fetch(`${API_BASE}${endpoint}${query}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-key": adminKey
-      },
-      body: JSON.stringify({
-        review_id: id,
-        reviewed_by: "eamonn",
-        ...extraPayload
-      })
-    });
-
-    const data = await res.json();
-
-    console.log(`${label} response:`, data);
-
-    if (!res.ok || !data.ok) {
-      status.textContent = data.error || `${label} failed.`;
-      return;
-    }
-
-    const card = document.getElementById(`upload-${id}`);
-    if (card) {
-      card.remove();
-    }
-
-    status.textContent = `${label}: upload ${id}. If this was a lesson upload, open the student's profile from the gallery to see it.`;
-
-  } catch (err) {
-    console.error(`${label} error:`, err);
-    status.textContent = `${label} failed because of a network or server error.`;
+  if (type === "public") {
+    if (normalized === "public") className += " badge-public";
+    if (normalized === "private") className += " badge-private";
+    if (normalized === "hidden") className += " badge-hidden";
   }
-}
 
-function resetAdminKey() {
-  localStorage.removeItem("ketso_admin_key");
-  adminKey = prompt("Enter admin key");
-  if (adminKey) {
-    localStorage.setItem("ketso_admin_key", adminKey);
-    loadQueue();
+  if (type === "status") {
+    if (normalized === "approved") className += " badge-approved";
+    if (normalized === "pending") className += " badge-pending";
+    if (normalized === "rejected") className += " badge-rejected";
+    if (normalized === "not_required") className += " badge-not-required";
   }
+
+  return `<span class="${className}">${escapeHtml(value)}</span>`;
 }
 
-function displaySession(value) {
-  if (!value) return "KETSO Academy";
-  if (value === "forest_heroes") return "Online tree planting session";
-  if (value === "Forest Heroes") return "Online tree planting session";
-  return value;
+function resetFilters() {
+  document.getElementById("publicStatusFilter").value = "all";
+  document.getElementById("verificationStatusFilter").value = "all";
+  document.getElementById("reviewStatusFilter").value = "all";
+  document.getElementById("uploadContextFilter").value = "all";
+  document.getElementById("linkedEntityTypeFilter").value = "all";
+  document.getElementById("fileTypeFilter").value = "image";
+  document.getElementById("categoryFilter").value = "all";
+  document.getElementById("searchInput").value = "";
+  loadGallery();
+}
+
+function guessFileType(url) {
+  const value = String(url || "").toLowerCase();
+
+  if (value.match(/\.(jpg|jpeg|png|webp|gif|avif)(\?|$)/)) return "image";
+  if (value.match(/\.(pdf|doc|docx|txt)(\?|$)/)) return "document";
+  if (value.match(/\.(mp4|mov|webm)(\?|$)/)) return "video";
+
+  return "";
 }
 
 function formatDate(value) {
@@ -378,7 +654,7 @@ function formatDate(value) {
 }
 
 function escapeHtml(value) {
-  return String(value || "")
+  return String(value ?? "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -386,7 +662,25 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-loadQueue();
+[
+  "publicStatusFilter",
+  "verificationStatusFilter",
+  "reviewStatusFilter",
+  "uploadContextFilter",
+  "linkedEntityTypeFilter",
+  "fileTypeFilter",
+  "categoryFilter"
+].forEach(id => {
+  document.getElementById(id).addEventListener("change", loadGallery);
+});
+
+document.getElementById("searchInput").addEventListener("keydown", event => {
+  if (event.key === "Enter") {
+    loadGallery();
+  }
+});
+
+loadGallery();
 </script>
 
 </body>
