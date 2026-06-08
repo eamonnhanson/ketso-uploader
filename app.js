@@ -904,17 +904,15 @@ async function uploadTypedText() {
 }
 
 function unlockStaff() {
-  if (el.staffPassword.value !== STAFF_PASSWORD) {
+  const password = (el.staffPassword.value || "").trim();
+
+  if (password !== STAFF_PASSWORD) {
     el.staffMessage.textContent = "Wrong password.";
     return;
   }
 
-  staffUnlocked = true;
-  el.staffMessage.textContent = "Staff options unlocked.";
-  el.staffOptions.hidden = false;
-  el.studentPurposePanel.hidden = true;
-  if (el.recentUploadsPanel) el.recentUploadsPanel.hidden = true;
-  updateStaffCategory();
+  el.staffMessage.textContent = "Opening staff upload dashboard...";
+  window.location.href = "/staff-upload-dashboard/";
 }
 
 function updateStaffCategory() {
