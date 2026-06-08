@@ -219,7 +219,20 @@
       justify-content: space-between;
       margin-bottom: 12px;
     }
+.gallery-link {
+  display: inline-block;
+  margin: 10px 0 18px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #00785f;
+  color: #ffffff;
+  font-weight: bold;
+  text-decoration: none;
+}
 
+.gallery-link:hover {
+  text-decoration: underline;
+}
     .upload-list {
       display: grid;
       gap: 10px;
@@ -297,6 +310,7 @@
     <header>
       <h1>KETSO staff upload dashboard</h1>
       <p class="intro">Upload staff photos, crop them, and see your recent staff uploads.</p>
+      <a class="gallery-link" href="/gallery" target="_blank" rel="noopener">Open gallery</a>
     </header>
 
     <div class="dashboard">
