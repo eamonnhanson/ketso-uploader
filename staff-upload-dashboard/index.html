@@ -795,13 +795,21 @@
 });
 
         setStatus(`Done. Staff upload saved${saved.review_id ? ` (ID: ${saved.review_id})` : ""}.`);
+
         cacheUpload(staffId, saved.upload);
         resetImageState();
         el.fileInput.value = "";
         el.caption.value = "";
-        await loadUploads();
+
+        try {
+          await loadUploads();
+        } catch (refreshErr) {
+          console.warn("Staff uploads refresh failed after successful upload:", refreshErr);
+          el.uploadsStatus.textContent = "Upload saved, but the recent uploads list could not refresh. Press Refresh or open the gallery.";
+          setStatus(`Done. Staff upload saved${saved.review_id ? ` (ID: ${saved.review_id})` : ""}.`);
+        }
       } catch (err) {
-        setStatus("Error: " + err.message);
+        setStatus("Upload failed before it could be saved: " + err.message);
       } finally {
         el.uploadBtn.disabled = !croppedBlob;
       }
@@ -840,7 +848,7 @@
       el.uploadsList.innerHTML = "";
 
       try {
-        const res = await fetch(`/api/staff-uploads?staff_id=${encodeURIComponent(staffId)}&limit=20`);
+        const res = await fetch(`/api/staff-uploads?staff_id=${encodeURIComponent(staffId)}&limit=50`);
         const data = await readJsonResponse(res, "Staff uploads");
 
         if (!res.ok || !data.ok) {
@@ -904,7 +912,7 @@
         .filter((item) => String(item.id || item.file_url) !== String(upload.id || upload.file_url));
 
       uploads.unshift(upload);
-      localStorage.setItem(key, JSON.stringify(uploads.slice(0, 20)));
+      localStorage.setItem(key, JSON.stringify(uploads.slice(0, 50)));
     }
 
     function getCachedUploads(staffId) {
