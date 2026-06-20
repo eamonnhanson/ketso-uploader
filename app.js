@@ -78,6 +78,30 @@ const STUDENT_PURPOSES = {
     lessonKey: "lesson_5_carbon_dioxide_increase",
     primaryAction: "photo"
   },
+  lesson_6_soil_condition: {
+    label: "Lesson 6: Soil Condition",
+    category: "academy_lesson_6_soil_condition",
+    studentCategory: "student_lesson_6_soil_condition",
+    uploadContext: "academy_lesson_upload",
+    lessonKey: "lesson_6_soil_condition",
+    primaryAction: "photo"
+  },
+  lesson_7_mulching: {
+    label: "Lesson 7: Mulching",
+    category: "academy_lesson_7_mulching",
+    studentCategory: "student_lesson_7_mulching",
+    uploadContext: "academy_lesson_upload",
+    lessonKey: "lesson_7_mulching",
+    primaryAction: "photo"
+  },
+  lesson_8_erosion_control: {
+    label: "Lesson 8: Erosion Control",
+    category: "academy_lesson_8_erosion_control",
+    studentCategory: "student_lesson_8_erosion_control",
+    uploadContext: "academy_lesson_upload",
+    lessonKey: "lesson_8_erosion_control",
+    primaryAction: "photo"
+  },
   tutor_question: {
     label: "A question to the tutor",
     category: "academy_tutor_question",
