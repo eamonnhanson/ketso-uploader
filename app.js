@@ -153,11 +153,33 @@ const el = {
   uploadBtn: document.getElementById("uploadBtn"),
   directUploadBtn: document.getElementById("directUploadBtn"),
   textUploadBtn: document.getElementById("textUploadBtn"),
+  uploadSuccessPanel: document.getElementById("uploadSuccessPanel"),
   status: document.getElementById("status")
 };
 
 function setStatus(lines) {
   el.status.textContent = Array.isArray(lines) ? lines.filter(Boolean).join("\n") : lines;
+}
+
+function showUploadSuccess(saved) {
+  const reviewLink = saved?.review_id
+    ? `/academy-my-upload/?review_id=${encodeURIComponent(saved.review_id)}`
+    : "";
+
+  if (el.uploadSuccessPanel) {
+    el.uploadSuccessPanel.hidden = false;
+    el.uploadSuccessPanel.innerHTML = `
+      <strong>Upload sent to tutor</strong>
+      <p>Your work has been sent to the tutor for review.</p>
+      <p>It can take up to 24 hours before it appears in the student gallery.</p>
+      <p>You can already see your own upload below under <strong>My recent uploads</strong>.</p>
+      ${reviewLink ? `<p><a href="${escapeHtml(reviewLink)}">View my upload</a></p>` : ""}
+    `;
+
+    el.uploadSuccessPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  setStatus(saved?.review_id ? `Saved for review (ID: ${saved.review_id})` : "Saved for review.");
 }
 
 function renderOnboardingPrompt(target, message) {
@@ -829,13 +851,7 @@ async function uploadImage() {
       created_at: new Date().toLocaleString()
     });
 
-    setStatus([
-      "Done.",
-      `Category: ${getActiveCategory()}`,
-      `Original uploaded as: ${originalUploaded.key}`,
-      `Cropped uploaded as: ${uploaded.key}`,
-      `Saved for review (ID: ${saved.review_id})`
-    ]);
+    showUploadSuccess(saved);
   } catch (err) {
     setStatus(`Photo upload failed before the review could be saved: ${err.message}`);
   } finally {
@@ -871,13 +887,7 @@ async function uploadDirectFile() {
       created_at: new Date().toLocaleString()
     });
 
-    setStatus([
-      "Done.",
-      `Category: ${getActiveCategory()}`,
-      `File type: ${fileKind}`,
-      `Uploaded as: ${uploaded.key}`,
-      `Saved for review (ID: ${saved.review_id})`
-    ]);
+    showUploadSuccess(saved);
   } catch (err) {
     setStatus(`File upload failed before the review could be saved: ${err.message}`);
   } finally {
@@ -914,12 +924,7 @@ async function uploadTypedText() {
       created_at: new Date().toLocaleString()
     });
 
-    setStatus([
-      "Done.",
-      `Category: ${getActiveCategory()}`,
-      `Uploaded as: ${uploaded.key}`,
-      `Saved for review (ID: ${saved.review_id})`
-    ]);
+    showUploadSuccess(saved);
   } catch (err) {
     setStatus(`Text upload failed before the review could be saved: ${err.message}`);
   } finally {
