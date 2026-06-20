@@ -300,7 +300,78 @@ function getRecentStudentUploads() {
   }
 }
 
-function renderRecentStudentUploads() {
+function formatRecentUploadStatus(remoteUpload, localUpload = {}) {
+  const statuses = [
+    remoteUpload?.verification_status,
+    remoteUpload?.review_status,
+    remoteUpload?.public_gallery_status,
+    localUpload?.status
+  ]
+    .filter(Boolean)
+    .map((value) => String(value).toLowerCase().trim());
+
+  if (statuses.includes("rejected")) return "Rejected";
+  if (statuses.includes("approved") || statuses.includes("public")) return "Approved";
+
+  if (
+    statuses.includes("submitted_for_review") ||
+    statuses.includes("submitted for review") ||
+    statuses.includes("pending")
+  ) {
+    return "Waiting for approval";
+  }
+
+  return localUpload?.status || "Waiting for approval";
+}
+
+async function syncRecentStudentUploadStatuses() {
+  if (staffUnlocked || recentUploadStatusSyncRunning) return;
+
+  const uploads = getRecentStudentUploads();
+  const uploadsWithReviewId = uploads.filter((upload) => upload.review_id);
+
+  if (!uploadsWithReviewId.length) return;
+
+  recentUploadStatusSyncRunning = true;
+
+  try {
+    let changed = false;
+
+    const updated = await Promise.all(uploads.map(async (upload) => {
+      if (!upload.review_id) return upload;
+
+      try {
+        const res = await fetch(`${SEARCH_API_BASE}/api/academy-upload-review?review_id=${encodeURIComponent(upload.review_id)}`);
+        const data = await res.json();
+
+        if (!res.ok || !data.ok || !data.upload) return upload;
+
+        const remoteUpload = data.upload;
+        const nextUpload = {
+          ...upload,
+          status: formatRecentUploadStatus(remoteUpload, upload),
+          verification_status: remoteUpload.verification_status || upload.verification_status,
+          review_status: remoteUpload.review_status || upload.review_status,
+          public_gallery_status: remoteUpload.public_gallery_status || upload.public_gallery_status
+        };
+
+        if (JSON.stringify(nextUpload) !== JSON.stringify(upload)) changed = true;
+        return nextUpload;
+      } catch {
+        return upload;
+      }
+    }));
+
+    if (changed) {
+      localStorage.setItem(getRecentUploadKey(), JSON.stringify(updated.slice(0, 8)));
+      renderRecentStudentUploads({ sync: false });
+    }
+  } finally {
+    recentUploadStatusSyncRunning = false;
+  }
+}
+
+function renderRecentStudentUploads(options = {}) {
   if (!el.recentUploadsPanel || staffUnlocked) return;
 
   const uploads = getRecentStudentUploads();
@@ -329,6 +400,10 @@ function renderRecentStudentUploads() {
       </article>
     `;
   }).join("");
+
+  if (options.sync !== false) {
+    syncRecentStudentUploadStatuses();
+  }
 }
 
 function resetSelection() {
