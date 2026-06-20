@@ -24,6 +24,7 @@ let selectedUploadKind = null;
 let staffUnlocked = false;
 let academyToken = null;
 let academyStudent = null;
+let recentUploadStatusSyncRunning = false;
 let selectedStudent = null;
 let selectedLink = null;
 let searchTimeout = null;
