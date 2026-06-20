@@ -863,7 +863,7 @@ uploadBtn.addEventListener("click", async function () {
       'View student gallery</a>';
 
   } catch (err) {
-    status.textContent = "Error: " + err.message;
+    status.textContent = "Upload failed before the review could be saved: " + err.message;
   } finally {
     uploadBtn.disabled = false;
   }

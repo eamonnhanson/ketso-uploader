@@ -813,7 +813,7 @@ async function uploadImage() {
       `Saved for review (ID: ${saved.review_id})`
     ]);
   } catch (err) {
-    setStatus(`Error: ${err.message}`);
+    setStatus(`Photo upload failed before the review could be saved: ${err.message}`);
   } finally {
     el.uploadBtn.disabled = false;
   }
@@ -855,7 +855,7 @@ async function uploadDirectFile() {
       `Saved for review (ID: ${saved.review_id})`
     ]);
   } catch (err) {
-    setStatus(`Error: ${err.message}`);
+    setStatus(`File upload failed before the review could be saved: ${err.message}`);
   } finally {
     el.directUploadBtn.disabled = false;
   }
@@ -897,7 +897,7 @@ async function uploadTypedText() {
       `Saved for review (ID: ${saved.review_id})`
     ]);
   } catch (err) {
-    setStatus(`Error: ${err.message}`);
+    setStatus(`Text upload failed before the review could be saved: ${err.message}`);
   } finally {
     el.textUploadBtn.disabled = false;
   }
