@@ -29,6 +29,7 @@ let selectedStudent = null;
 let selectedLink = null;
 let searchTimeout = null;
 let studentSearchTimeout = null;
+let activeCourseKey = window.KETSO_DEFAULT_COURSE || "online_tree_planting";
 
 const STUDENT_PURPOSES = {
   onboarding: {
@@ -112,6 +113,20 @@ const STUDENT_PURPOSES = {
     primaryAction: "text"
   }
 };
+
+const ARBORICULTURE_PURPOSES = Object.fromEntries(
+  (window.KETSO_ACADEMY_COURSES?.arboriculture_1?.lessons || []).map(([lessonKey, label]) => [
+    lessonKey,
+    {
+      label,
+      category: lessonKey === "onboarding" ? "academy_onboarding" : "academy_upload",
+      studentCategory: lessonKey === "onboarding" ? "student_onboarding" : "academy_upload",
+      uploadContext: lessonKey === "onboarding" ? "academy_onboarding" : "academy_lesson_upload",
+      lessonKey,
+      primaryAction: lessonKey === "tutor_question" ? "text" : lessonKey === "onboarding" ? "selfie" : "photo"
+    }
+  ])
+);
 
 const el = {
   studentBanner: document.getElementById("studentBanner"),
@@ -231,7 +246,17 @@ function getUrlToken() {
 
 function getStudentPurpose() {
   const value = el.studentPurpose?.value || "onboarding";
-  return STUDENT_PURPOSES[value] || STUDENT_PURPOSES.onboarding;
+  const purposes = activeCourseKey === "arboriculture_1" ? ARBORICULTURE_PURPOSES : STUDENT_PURPOSES;
+  return purposes[value] || purposes.onboarding || STUDENT_PURPOSES.onboarding;
+}
+
+function renderCoursePurposes() {
+  const course = window.KETSO_ACADEMY_COURSES?.[activeCourseKey];
+  if (!course || !el.studentPurpose) return;
+  el.studentPurpose.innerHTML = course.lessons
+    .filter(([key]) => key !== "evaluation")
+    .map(([key, label]) => `<option value="${escapeHtml(key)}">${escapeHtml(label)}</option>`)
+    .join("");
 }
 
 function getActiveStudent() {
@@ -849,6 +874,7 @@ function buildReviewPayload(fileUrl, size, fileType, extra = {}) {
     uploader_email: activeStudent?.email || null,
     academy_student_id: activeStudent?.id || null,
     academy_cohort: activeStudent?.cohort || null,
+    course_key: activeCourseKey,
     academy_track: academyTrack,
     academy_whatsapp: activeStudent?.whatsapp || null,
     lesson_key: activeStudent || !staffUnlocked ? purpose.lessonKey : null,
@@ -868,7 +894,7 @@ function getUploadFolder() {
 
   if (activeStudent) {
     const studentId = activeStudent.ketso_student_id || activeStudent.id || activeStudent.email || activeStudent.full_name || "student";
-    return `academy/${safeFileBaseName(getStudentPurpose().lessonKey)}/${safeFileBaseName(String(studentId))}`;
+    return `academy/${safeFileBaseName(activeCourseKey)}/${safeFileBaseName(getStudentPurpose().lessonKey)}/${safeFileBaseName(String(studentId))}`;
   }
 
   if (staffUnlocked) {
@@ -1273,13 +1299,16 @@ async function initAcademyToken() {
     }
 
     academyStudent = data.student;
+    activeCourseKey = data.enrollment?.course_key || window.KETSO_DEFAULT_COURSE || "online_tree_planting";
+    renderCoursePurposes();
     selectedStudent = academyStudent;
     const name = academyStudent.full_name ||
       [academyStudent.first_name, academyStudent.last_name].filter(Boolean).join(" ") ||
       "Academy student";
 
     el.studentBanner.hidden = false;
-    el.studentBanner.textContent = `Academy onboarding for ${name}`;
+    const courseName = window.KETSO_ACADEMY_COURSES?.[activeCourseKey]?.name || "Online tree planting";
+    el.studentBanner.textContent = `${courseName} uploads for ${name}`;
     updateUploadActionsForContext();
     updateStudentIdentityPanel();
     renderRecentStudentUploads();
@@ -1292,4 +1321,5 @@ async function initAcademyToken() {
 updateUploadActionsForContext();
 updateStudentIdentityPanel();
 renderRecentStudentUploads();
+renderCoursePurposes();
 initAcademyToken();

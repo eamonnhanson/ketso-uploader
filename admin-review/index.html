@@ -155,6 +155,11 @@
     <option value="rejected">Rejected</option>
     <option value="all">All</option>
   </select>
+  <select id="courseFilter">
+    <option value="all">All courses</option>
+    <option value="online_tree_planting">Online tree planting</option>
+    <option value="arboriculture_1">Arboriculture I</option>
+  </select>
   <button id="loadBtn">Load uploads</button>
 </div>
 
@@ -166,6 +171,7 @@ const API_BASE = "https://ptb-tree-map.onrender.com";
 
 const adminKeyInput = document.getElementById("adminKey");
 const statusFilter = document.getElementById("statusFilter");
+const courseFilter = document.getElementById("courseFilter");
 const loadBtn = document.getElementById("loadBtn");
 const statusBox = document.getElementById("status");
 const uploadsBox = document.getElementById("uploads");
@@ -185,7 +191,7 @@ async function loadUploads() {
   uploadsBox.innerHTML = "";
 
   try {
-    const url = `${API_BASE}/api/academy-moderation-queue?status=${encodeURIComponent(status)}&admin_key=${encodeURIComponent(adminKey)}`;
+    const url = `${API_BASE}/api/academy-moderation-queue?status=${encodeURIComponent(status)}&course_key=${encodeURIComponent(courseFilter.value)}&admin_key=${encodeURIComponent(adminKey)}`;
     const res = await fetch(url);
     const data = await res.json();
 
@@ -245,6 +251,7 @@ function renderUpload(upload) {
           <strong>Category:</strong> ${escapeHtml(upload.category || "")}<br>
           <strong>Student ID:</strong> ${escapeHtml(upload.academy_student_id || "")}<br>
           <strong>Cohort:</strong> ${escapeHtml(upload.academy_cohort || "")}<br>
+          <strong>Course:</strong> ${escapeHtml(labelCourse(upload.course_key))}<br>
           <strong>Interest:</strong> ${escapeHtml(labelInterest(upload.interest_area || upload.academy_track))}<br>
           <strong>Lesson:</strong> ${escapeHtml(labelLesson(upload.lesson_key))}<br>
           <strong>Upload type:</strong> ${escapeHtml(upload.upload_type || upload.file_type || "")}<br>
@@ -403,10 +410,22 @@ function labelLesson(value) {
     lesson_2_tree_health: "Lesson 2 Tree Health",
     lesson_3_tree_planting: "Lesson 3 Tree Planting",
     lesson_4_co2_increase: "Lesson 4 We cause Carbon Dioxide Increase",
+    arb1_module_1_tree_biology: "Module 1: Tree biology and young tree failure",
+    arb1_module_2_tree_identification: "Module 2: Tree identification",
+    arb1_module_3_soil_and_roots: "Module 3: Soil and roots",
+    arb1_module_4_tree_selection: "Module 4: Choosing the right tree",
+    arb1_module_5_tree_planting: "Module 5: Tree planting",
+    arb1_module_6_tree_care: "Module 6: Young tree care",
+    arb1_module_7_tree_health: "Module 7: Tree health assessment",
+    arb1_module_8_pruning: "Module 8: Basic pruning",
     evaluation: "Evaluation"
   };
 
   return map[value] || value || "Not set";
+}
+
+function labelCourse(value) {
+  return value === "arboriculture_1" ? "Arboriculture I" : "Online tree planting";
 }
 
 function labelInterest(value) {
