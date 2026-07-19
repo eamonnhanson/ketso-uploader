@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>KETSO upload</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
-  <link rel="stylesheet" href="styles.css?v=20260527-identity-required-2">
+  <link rel="stylesheet" href="styles.css?v=20260719-programme-selector-1">
 </head>
 <body>
   <main class="app-shell">
@@ -16,7 +16,46 @@
 
     <section id="studentBanner" class="student-banner" hidden aria-live="polite"></section>
 
-    <section class="staff-card" aria-labelledby="staff-title">
+    <section id="programmeSelector" class="programme-selector" aria-labelledby="programme-title">
+      <div class="programme-heading">
+        <div>
+          <p class="eyebrow">Step 1</p>
+          <h2 id="programme-title">Choose your programme</h2>
+        </div>
+        <p>Select where your upload belongs.</p>
+      </div>
+
+      <div class="programme-grid" role="group" aria-label="Upload programme">
+        <button type="button" class="programme-card" data-programme="online_tree_planting" aria-pressed="false">
+          <span class="programme-icon" aria-hidden="true">🌱</span>
+          <span class="programme-copy">
+            <strong>Online Agroforestry Training</strong>
+            <small>Online lessons, onboarding and tutor questions</small>
+          </span>
+          <span class="programme-check" aria-hidden="true">✓</span>
+        </button>
+
+        <button type="button" class="programme-card" data-programme="arboriculture_1" aria-pressed="false">
+          <span class="programme-icon" aria-hidden="true">🎓</span>
+          <span class="programme-copy">
+            <strong>Distance Certificate Course Agroforestry</strong>
+            <small>Assignments for Modules 1–8</small>
+          </span>
+          <span class="programme-check" aria-hidden="true">✓</span>
+        </button>
+
+        <button type="button" class="programme-card programme-card-staff" data-programme="staff" aria-pressed="false">
+          <span class="programme-icon" aria-hidden="true">🛠️</span>
+          <span class="programme-copy">
+            <strong>KETSO staff</strong>
+            <small>Fieldwork and project updates</small>
+          </span>
+          <span class="programme-check" aria-hidden="true">✓</span>
+        </button>
+      </div>
+    </section>
+
+    <section id="staffCard" class="staff-card" aria-labelledby="staff-title" hidden>
       <details id="staffDetails">
         <summary id="staff-title">KETSO staff</summary>
         <div class="staff-login" id="staffLogin">
@@ -57,8 +96,9 @@
       <div id="selectedHero" class="selected-item" hidden></div>
     </section>
 
-    <section class="panel primary-panel" aria-labelledby="upload-title">
-      <h2 id="upload-title">What do you want to upload?</h2>
+    <section id="primaryPanel" class="panel primary-panel" aria-labelledby="upload-title" hidden>
+      <p class="eyebrow">Step 2</p>
+      <h2 id="upload-title">Choose your assignment</h2>
       <div id="studentPurposePanel" class="student-purpose">
         <label for="studentPurpose">What is this upload for?</label>
         <select id="studentPurpose">
@@ -156,6 +196,6 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
   <script src="/shared/academy-courses.js"></script>
-  <script src="app.js?v=20260719-courses-1" defer></script>
+  <script src="app.js?v=20260719-programme-selector-1" defer></script>
 </body>
 </html>
