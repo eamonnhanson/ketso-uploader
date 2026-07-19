@@ -31,6 +31,12 @@ let searchTimeout = null;
 let studentSearchTimeout = null;
 let activeCourseKey = window.KETSO_DEFAULT_COURSE || "online_tree_planting";
 
+const PROGRAMME_LABELS = Object.freeze({
+  online_tree_planting: "Online Agroforestry Training",
+  arboriculture_1: "Distance Certificate Course Agroforestry",
+  staff: "KETSO staff"
+});
+
 const STUDENT_PURPOSES = {
   onboarding: {
     label: "Selfie or photo to complete onboarding",
@@ -130,6 +136,12 @@ const ARBORICULTURE_PURPOSES = Object.fromEntries(
 
 const el = {
   studentBanner: document.getElementById("studentBanner"),
+  programmeSelector: document.getElementById("programmeSelector"),
+  programmeButtons: [...document.querySelectorAll("[data-programme]")],
+  staffCard: document.getElementById("staffCard"),
+  staffDetails: document.getElementById("staffDetails"),
+  primaryPanel: document.getElementById("primaryPanel"),
+  uploadTitle: document.getElementById("upload-title"),
   staffPassword: document.getElementById("staffPassword"),
   staffUnlockBtn: document.getElementById("staffUnlockBtn"),
   staffMessage: document.getElementById("staffMessage"),
@@ -257,6 +269,58 @@ function renderCoursePurposes() {
     .filter(([key]) => key !== "evaluation")
     .map(([key, label]) => `<option value="${escapeHtml(key)}">${escapeHtml(label)}</option>`)
     .join("");
+}
+
+function setProgrammeSelection(programmeKey, options = {}) {
+  const isStaff = programmeKey === "staff";
+  const isCourse = programmeKey === "online_tree_planting" || programmeKey === "arboriculture_1";
+  if (!isStaff && !isCourse) return;
+
+  el.programmeButtons.forEach((button) => {
+    button.setAttribute("aria-pressed", String(button.dataset.programme === programmeKey));
+  });
+
+  el.staffCard.hidden = !isStaff;
+  el.primaryPanel.hidden = !isCourse;
+  el.forestHeroSection.hidden = true;
+
+  if (isStaff) {
+    el.staffDetails.open = true;
+    el.studentBanner.hidden = true;
+    el.recentUploadsPanel.hidden = true;
+    if (!options.preserveStatus) setStatus("Enter the KETSO staff password to continue.");
+    setTimeout(() => el.staffPassword.focus(), 0);
+    return;
+  }
+
+  activeCourseKey = programmeKey;
+  el.staffDetails.open = false;
+  renderCoursePurposes();
+  updateStudentIdentityPanel();
+  updateUploadActionsForContext();
+  renderRecentStudentUploads();
+
+  const programmeName = PROGRAMME_LABELS[programmeKey];
+  el.uploadTitle.textContent = programmeKey === "arboriculture_1"
+    ? "Choose your module assignment"
+    : "Choose your lesson";
+
+  if (academyStudent) {
+    const name = academyStudent.full_name ||
+      [academyStudent.first_name, academyStudent.last_name].filter(Boolean).join(" ") ||
+      "Academy student";
+    el.studentBanner.hidden = false;
+    el.studentBanner.textContent = `${programmeName} uploads for ${name}`;
+  } else {
+    el.studentBanner.hidden = false;
+    el.studentBanner.textContent = `${programmeName} selected`;
+  }
+
+  if (!options.preserveStatus) {
+    setStatus(`Choose your ${programmeKey === "arboriculture_1" ? "module" : "lesson"}, then confirm your student profile.`);
+  }
+
+  el.primaryPanel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function getActiveStudent() {
@@ -1224,6 +1288,9 @@ async function runForestHeroSearch(q) {
 }
 
 el.staffUnlockBtn.addEventListener("click", unlockStaff);
+el.programmeButtons.forEach((button) => {
+  button.addEventListener("click", () => setProgrammeSelection(button.dataset.programme));
+});
 el.staffPassword.addEventListener("keydown", (event) => {
   if (event.key === "Enter") unlockStaff();
 });
@@ -1300,14 +1367,14 @@ async function initAcademyToken() {
 
     academyStudent = data.student;
     activeCourseKey = data.enrollment?.course_key || window.KETSO_DEFAULT_COURSE || "online_tree_planting";
-    renderCoursePurposes();
+    setProgrammeSelection(activeCourseKey, { preserveStatus: true });
     selectedStudent = academyStudent;
     const name = academyStudent.full_name ||
       [academyStudent.first_name, academyStudent.last_name].filter(Boolean).join(" ") ||
       "Academy student";
 
     el.studentBanner.hidden = false;
-    const courseName = window.KETSO_ACADEMY_COURSES?.[activeCourseKey]?.name || "Online tree planting";
+    const courseName = PROGRAMME_LABELS[activeCourseKey] || "Online Agroforestry Training";
     el.studentBanner.textContent = `${courseName} uploads for ${name}`;
     updateUploadActionsForContext();
     updateStudentIdentityPanel();
@@ -1318,8 +1385,6 @@ async function initAcademyToken() {
   }
 }
 
-updateUploadActionsForContext();
 updateStudentIdentityPanel();
 renderRecentStudentUploads();
-renderCoursePurposes();
 initAcademyToken();
