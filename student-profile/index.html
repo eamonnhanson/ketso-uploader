@@ -119,6 +119,7 @@ const API_BASE = "https://ptb-tree-map.onrender.com";
 
 const params = new URLSearchParams(window.location.search);
 const studentId = params.get("student_id");
+const courseKey = params.get("course_key") === "arboriculture_1" ? "arboriculture_1" : "online_tree_planting";
 
 const app = document.getElementById("app");
 
@@ -130,7 +131,7 @@ if (!studentId) {
 
 async function loadProfile(id) {
   try {
-    const res = await fetch(`${API_BASE}/api/student-profile/${encodeURIComponent(id)}`);
+    const res = await fetch(`${API_BASE}/api/student-profile/${encodeURIComponent(id)}?course_key=${encodeURIComponent(courseKey)}`);
     const data = await res.json();
 
     if (!res.ok || !data.ok) {
@@ -138,19 +139,27 @@ async function loadProfile(id) {
       return;
     }
 
-renderProfile(data.student, data.uploads || [], data.point_events || []);
+renderProfile(data.student, data.uploads || [], data.point_events || [], data.course, data.progress);
   } catch (err) {
     app.innerHTML = "Error loading profile: " + err.message;
   }
 }
 
-function renderProfile(student, uploads, pointEvents) {
+function renderProfile(student, uploads, pointEvents, course, progress) {
+  const approved = Number(progress?.approved_lessons || 0);
+  const required = Number(progress?.required_lessons || 0);
   app.innerHTML = `
     <div class="profile-box">
       <h1>${escapeHtml(student.full_name || "Student")}</h1>
       <div class="meta">Cohort: ${escapeHtml(student.cohort || "Not set")}</div>
       <div class="meta">Stream / track: ${escapeHtml(student.track || "Not set")}</div>
+      <div class="meta">Course: ${escapeHtml(course?.name || "Online tree planting")}</div>
       <div class="points">⭐ ${student.total_points || 0} point(s)</div>
+      <div class="meta">Progress: ${approved} of ${required} required lessons approved</div>
+      <p>
+        <a class="button" href="?student_id=${encodeURIComponent(student.id)}&course_key=online_tree_planting">Online tree planting</a>
+        <a class="button" href="?student_id=${encodeURIComponent(student.id)}&course_key=arboriculture_1">Arboriculture I</a>
+      </p>
     </div>
 
     ${renderPointsExplanation(student, pointEvents)}
@@ -245,6 +254,14 @@ function labelLesson(value) {
     lesson_2_tree_health: "Lesson 2 Tree Health",
     lesson_3_tree_planting: "Lesson 3 Tree Planting",
     lesson_4_co2_increase: "Lesson 4 We cause Carbon Dioxide Increase",
+    arb1_module_1_tree_biology: "Module 1: Tree biology and young tree failure",
+    arb1_module_2_tree_identification: "Module 2: Tree identification",
+    arb1_module_3_soil_and_roots: "Module 3: Soil and roots",
+    arb1_module_4_tree_selection: "Module 4: Choosing the right tree",
+    arb1_module_5_tree_planting: "Module 5: Tree planting",
+    arb1_module_6_tree_care: "Module 6: Young tree care",
+    arb1_module_7_tree_health: "Module 7: Tree health assessment",
+    arb1_module_8_pruning: "Module 8: Basic pruning",
     evaluation: "Evaluation"
   };
 

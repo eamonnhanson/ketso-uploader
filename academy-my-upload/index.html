@@ -95,6 +95,7 @@ async function loadUpload() {
       <div class="card">
         <strong>Name:</strong> ${u.uploader_name || ""}<br>
         <strong>Online session:</strong> ${u.academy_track || ""}<br>
+        <strong>Course:</strong> ${u.course_key === "arboriculture_1" ? "Arboriculture I" : "Online tree planting"}<br>
         <strong>Cohort:</strong> ${u.academy_cohort || ""}<br>
        <strong>Status:</strong> <span id="uploadStatus">${u.verification_status || "pending"}</span><br>
 

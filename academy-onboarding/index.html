@@ -244,6 +244,7 @@
 <p id="status"></p>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+<script src="/shared/academy-courses.js"></script>
 
 <script>
 let cropper = null;
@@ -254,6 +255,7 @@ let selectedFile = null;
 const REVIEW_API_URL = "https://ptb-tree-map.onrender.com/api/save-photo-review";
 const R2_PUBLIC_BASE = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/";
 const UPLOAD_FOLDER = "ketso-academy/uploads";
+let activeCourseKey = window.KETSO_DEFAULT_COURSE || "online_tree_planting";
 
 const MAX_IMAGE_ORIGINAL_BYTES = 8 * 1024 * 1024;
 const MAX_CROPPED_BYTES = 500 * 1024;
@@ -310,12 +312,18 @@ async function loadStudentFromToken() {
 
     const s = data.student;
     window.loadedStudent = s;
+    activeCourseKey = data.enrollment?.course_key || window.KETSO_DEFAULT_COURSE || "online_tree_planting";
+    renderCourseLessons(activeCourseKey);
 
     fullName.value = s.full_name || "";
     email.value = s.email || "";
     whatsapp.value = s.whatsapp || "";
 
     const normalizedInterest = String(s.track || s.stream || "").trim().toLowerCase();
+
+    if (activeCourseKey === "arboriculture_1") {
+      interestArea.value = "distance_certificate_course";
+    } else
 
     if (normalizedInterest.includes("forest") || normalizedInterest.includes("tree")) {
       interestArea.value = "online_tree_planting";
@@ -327,7 +335,7 @@ async function loadStudentFromToken() {
       interestArea.value = "networking_advocacy";
     }
 
-    status.textContent = "Your details have been loaded. Please choose a topic and upload your work.";
+    status.textContent = `Your details have been loaded for ${courseName(activeCourseKey)}. Please choose a topic and upload your work.`;
 
   } catch (err) {
     console.error("loadStudentFromToken error:", err);
@@ -336,6 +344,18 @@ async function loadStudentFromToken() {
 }
 
 loadStudentFromToken();
+
+function courseName(courseKey) {
+  return window.KETSO_ACADEMY_COURSES?.[courseKey]?.name || "Online tree planting";
+}
+
+function renderCourseLessons(courseKey) {
+  if (courseKey === "online_tree_planting") return;
+  const lessons = window.KETSO_ACADEMY_COURSES?.[courseKey]?.lessons || [];
+  lessonKey.innerHTML = '<option value="">Select topic</option>' + lessons
+    .map(([key, label]) => `<option value="${key}">${label}</option>`)
+    .join("");
+}
 
 function safeFileBaseName(name) {
   return name
@@ -797,6 +817,7 @@ uploadBtn.addEventListener("click", async function () {
 
       academy_student_id: window.loadedStudent?.id || null,
       academy_cohort: window.loadedStudent?.cohort || null,
+      course_key: activeCourseKey,
 
       file_url: R2_PUBLIC_BASE + mainUploadData.key,
       cropped_file_url: R2_PUBLIC_BASE + mainUploadData.key,

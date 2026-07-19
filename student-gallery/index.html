@@ -175,6 +175,14 @@
   Post a short TikTok video and use the hashtag <strong>#KETSOAcademy</strong>.
 </div>
 
+<p>
+  <label for="courseFilter"><strong>Course</strong></label>
+  <select id="courseFilter">
+    <option value="online_tree_planting">Online tree planting</option>
+    <option value="arboriculture_1">Arboriculture I</option>
+  </select>
+</p>
+
 <section id="pendingPanel" class="pending-panel" hidden style="display: none !important;">
   <h2>Your uploads waiting for approval</h2>
   <p class="intro">These uploads were sent from this browser. They may appear in the public gallery after KETSO approval.</p>
@@ -193,6 +201,7 @@
 <script>
 const API_URL = "https://ptb-tree-map.onrender.com/api/student-gallery";
 const APPROVED_UPLOADS_URL = "https://ptb-tree-map.onrender.com/api/photo-review-gallery";
+const courseFilter = document.getElementById("courseFilter");
 const pendingPanel = document.getElementById("pendingPanel");
 const pendingGallery = document.getElementById("pendingGallery");
 const recentApprovedPanel = document.getElementById("recentApprovedPanel");
@@ -206,7 +215,7 @@ async function loadGallery() {
   const gallery = document.getElementById("gallery");
 
   try {
-    const res = await fetch(`${API_URL}?t=${Date.now()}`, {
+    const res = await fetch(`${API_URL}?course_key=${encodeURIComponent(courseFilter.value)}&t=${Date.now()}`, {
       cache: "no-store"
     });
     const data = await res.json();
@@ -230,10 +239,12 @@ async function loadGallery() {
     gallery.innerHTML = photos.map(photo => {
       const studentId = photo.academy_student_id || photo.student_id || photo.id;
       const displayName = getFirstName(photo.uploader_name || photo.linked_entity_name || photo.full_name || "Student");
-      const session = displaySession(photo.academy_track || photo.interest_area || photo.track);
+      const session = courseFilter.value === "arboriculture_1"
+        ? "Arboriculture I"
+        : displaySession(photo.academy_track || photo.interest_area || photo.track);
       const imageUrl = photo.cropped_file_url || photo.file_url || "";
       const profileUrl = studentId
-        ? `/student-profile/?student_id=${encodeURIComponent(studentId)}`
+        ? `/student-profile/?student_id=${encodeURIComponent(studentId)}&course_key=${encodeURIComponent(courseFilter.value)}`
         : "#";
 
       return `
@@ -264,7 +275,7 @@ async function loadGallery() {
 
 async function loadRecentApprovedUploads() {
   try {
-    const res = await fetch(`${APPROVED_UPLOADS_URL}?t=${Date.now()}`, {
+    const res = await fetch(`${APPROVED_UPLOADS_URL}?student_uploads=1&course_key=${encodeURIComponent(courseFilter.value)}&t=${Date.now()}`, {
       cache: "no-store"
     });
     const data = await res.json();
@@ -323,10 +334,12 @@ function isAcademyStudentUpload(upload) {
 function renderApprovedUpload(upload) {
   const studentId = upload.academy_student_id || upload.student_id || "";
   const displayName = getFirstName(upload.uploader_name || upload.linked_entity_name || "Student");
-  const session = displaySession(upload.academy_track || upload.interest_area || upload.track);
+  const session = courseFilter.value === "arboriculture_1"
+    ? "Arboriculture I"
+    : displaySession(upload.academy_track || upload.interest_area || upload.track);
   const imageUrl = upload.cropped_file_url || upload.file_url || upload.original_file_url || "";
   const profileUrl = studentId
-    ? `/student-profile/?student_id=${encodeURIComponent(studentId)}`
+    ? `/student-profile/?student_id=${encodeURIComponent(studentId)}&course_key=${encodeURIComponent(courseFilter.value)}`
     : "#";
 
   return `
@@ -405,6 +418,14 @@ function labelLesson(value) {
     lesson_2_tree_health: "Lesson 2 Tree Health",
     lesson_3_tree_planting: "Lesson 3 Tree Planting",
     lesson_4_co2_increase: "Lesson 4 Carbon Dioxide Increase"
+    ,arb1_module_1_tree_biology: "Module 1: Tree biology and young tree failure"
+    ,arb1_module_2_tree_identification: "Module 2: Tree identification"
+    ,arb1_module_3_soil_and_roots: "Module 3: Soil and roots"
+    ,arb1_module_4_tree_selection: "Module 4: Choosing the right tree"
+    ,arb1_module_5_tree_planting: "Module 5: Tree planting"
+    ,arb1_module_6_tree_care: "Module 6: Young tree care"
+    ,arb1_module_7_tree_health: "Module 7: Tree health assessment"
+    ,arb1_module_8_pruning: "Module 8: Basic pruning"
   };
 
   return map[value] || value || "Approved upload";
@@ -498,6 +519,12 @@ function escapeHtml(value) {
 function escapeAttr(value) {
   return escapeHtml(value);
 }
+
+courseFilter.addEventListener("change", () => {
+  document.getElementById("gallery").innerHTML = "";
+  loadGallery();
+  loadRecentApprovedUploads();
+});
 
 loadGallery();
 </script>
