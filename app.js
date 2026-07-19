@@ -770,12 +770,12 @@ function validateBeforeUpload() {
     return false;
   }
 
-  if (!staffUnlocked && selectedStudent?.email && !emailsMatch(el.studentEmail.value, selectedStudent.email)) {
+  if (!staffUnlocked && !academyStudent && selectedStudent?.email && !emailsMatch(el.studentEmail.value, selectedStudent.email)) {
     setStatus("The email does not match the selected student. Please check your email or choose the correct name.");
     return false;
   }
 
-  if (!staffUnlocked && selectedStudent && !selectedStudent.email) {
+  if (!staffUnlocked && !academyStudent && selectedStudent && !selectedStudent.email) {
     setStatus([
       "This student record has no email, so it cannot be verified here.",
       "Please complete onboarding first or ask KETSO to update your student record:",
