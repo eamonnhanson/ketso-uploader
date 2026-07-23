@@ -268,7 +268,11 @@ function renderUpload(upload) {
         ${duplicateWarning}
 
         <div class="actions">
-          <button class="approve" data-action="approve-public" data-id="${escapeAttr(upload.id)}">Approve public</button>
+          ${
+          upload.upload_type === "question_to_tutor"
+          ? ""
+          : `<button class="approve" data-action="approve-public" data-id="${escapeAttr(upload.id)}">Approve public</button>`
+          }
           <button data-action="approve-private" data-id="${escapeAttr(upload.id)}">Approve private</button>
           <button data-action="hide" data-id="${escapeAttr(upload.id)}">Hide</button>
           <button class="reject" data-action="reject" data-id="${escapeAttr(upload.id)}">Reject</button>
