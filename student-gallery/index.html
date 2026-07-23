@@ -47,19 +47,6 @@
       font-size: 20px;
     }
 
-    .recent-panel {
-      margin-bottom: 24px;
-      border: 1px solid #d9ded8;
-      border-radius: 12px;
-      background: #ffffff;
-      padding: 14px;
-    }
-
-    .recent-panel h2 {
-      margin: 0 0 8px;
-      font-size: 20px;
-    }
-
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
@@ -189,15 +176,6 @@
   <div id="pendingGallery" class="grid"></div>
 </section>
 
-<section id="recentApprovedPanel" class="recent-panel" hidden>
-  <h2>Recently approved student work</h2>
-  <p class="intro">
-    These cards show recently approved assignments and photos.
-    The same student may appear more than once after completing several lessons.
-  </p>
-  <div id="recentApprovedGallery" class="grid"></div>
-</section>
-
 <section class="student-profiles-section">
   <h2>Student profiles</h2>
   <p class="intro">
@@ -213,11 +191,8 @@ const APPROVED_UPLOADS_URL = "https://ptb-tree-map.onrender.com/api/photo-review
 const courseFilter = document.getElementById("courseFilter");
 const pendingPanel = document.getElementById("pendingPanel");
 const pendingGallery = document.getElementById("pendingGallery");
-const recentApprovedPanel = document.getElementById("recentApprovedPanel");
-const recentApprovedGallery = document.getElementById("recentApprovedGallery");
 
 renderPendingUploads();
-loadRecentApprovedUploads();
 
 async function loadGallery() {
   const status = document.getElementById("status");
@@ -237,34 +212,37 @@ async function loadGallery() {
     }
 
     const photos = data.photos || [];
+    const latestApprovedUploads = await loadLatestApprovedUploads();
 
     const uniqueStudents = Array.from(
-  new Map(
-    photos.map(photo => {
-      const studentId =
-        photo.academy_student_id ||
-        photo.student_id ||
-        photo.id;
+      new Map(
+        photos.map(photo => [getStudentKey(photo, true), photo])
+      ).values()
+    );
 
-      return [String(studentId), photo];
-    })
-  ).values()
-);
-
-if (!uniqueStudents.length) {
-      status.textContent = "No approved student uploads yet.";
+    if (!uniqueStudents.length) {
+      status.textContent = "No student profiles yet.";
       return;
     }
 
     status.textContent = "";
 
     gallery.innerHTML = uniqueStudents.map(photo => {
-      const studentId = photo.academy_student_id || photo.student_id || photo.id;
-      const displayName = getFirstName(photo.uploader_name || photo.linked_entity_name || photo.full_name || "Student");
+      const studentId = getStudentId(photo, true);
+      const displayName = String(
+        photo.full_name ||
+        photo.uploader_name ||
+        photo.linked_entity_name ||
+        "Student"
+      ).trim();
       const session = courseFilter.value === "arboriculture_1"
         ? "Arboriculture I"
         : displaySession(photo.academy_track || photo.interest_area || photo.track);
-      const imageUrl = photo.cropped_file_url || photo.file_url || "";
+      const latestUpload = latestApprovedUploads.get(getStudentKey(photo, true));
+      const imageUrl = getUploadImageUrl(latestUpload) ||
+        photo.cropped_file_url ||
+        photo.file_url ||
+        "";
       const profileUrl = studentId
         ? `/student-profile/?student_id=${encodeURIComponent(studentId)}&course_key=${encodeURIComponent(courseFilter.value)}`
         : "#";
@@ -277,7 +255,7 @@ if (!uniqueStudents.length) {
           data-profile-url="${escapeAttr(profileUrl)}"
           aria-label="Open profile for ${escapeAttr(displayName)}"
         >
-          <img src="${escapeAttr(imageUrl)}" alt="${escapeAttr(displayName)}">
+          ${imageUrl ? `<img src="${escapeAttr(imageUrl)}" alt="${escapeAttr(displayName)}">` : ""}
           <div class="name">${escapeHtml(displayName)}</div>
           <div class="meta">${escapeHtml(session)}</div>
           <div class="points">⭐ ${formatPoints(photo.total_points || 0)}</div>
@@ -295,31 +273,107 @@ if (!uniqueStudents.length) {
   }
 }
 
-async function loadRecentApprovedUploads() {
+async function loadLatestApprovedUploads() {
   try {
     const res = await fetch(`${APPROVED_UPLOADS_URL}?student_uploads=1&course_key=${encodeURIComponent(courseFilter.value)}&t=${Date.now()}`, {
       cache: "no-store"
     });
     const data = await res.json();
 
-    if (!res.ok || !data.ok) return;
+    if (!res.ok || !data.ok) {
+      return new Map();
+    }
 
     const uploads = (data.photos || [])
       .filter(isApprovedStudentUpload)
-      .sort((a, b) => Date.parse(b.reviewed_at_utc || b.created_at_utc || 0) - Date.parse(a.reviewed_at_utc || a.created_at_utc || 0))
-      .slice(0, 12);
+      .filter(upload => getStudentKey(upload) && getUploadImageUrl(upload))
+      .sort((a, b) => getUploadTime(b) - getUploadTime(a));
 
-    if (!uploads.length) {
-      recentApprovedPanel.hidden = true;
-      return;
-    }
+    const latestByStudent = new Map();
 
-    recentApprovedPanel.hidden = false;
-    recentApprovedGallery.innerHTML = uploads.map(renderApprovedUpload).join("");
-    bindProfileCards(recentApprovedGallery);
+    uploads.forEach(upload => {
+      const studentKey = getStudentKey(upload);
+
+      if (!latestByStudent.has(studentKey)) {
+        latestByStudent.set(studentKey, upload);
+      }
+    });
+
+    return latestByStudent;
   } catch (err) {
-    console.warn("Could not load recently approved uploads:", err);
+    console.warn("Could not load approved student uploads:", err);
+    return new Map();
   }
+}
+
+function getStudentId(record, allowRecordId = false) {
+  if (!record) return "";
+
+  const linkedEntityType = String(record.linked_entity_type || "").toLowerCase();
+
+  return record.academy_student_id ||
+    record.student_id ||
+    (linkedEntityType === "student" ? record.linked_entity_id : "") ||
+    (allowRecordId ? record.id : "") ||
+    "";
+}
+
+function getStudentKey(record, allowRecordId = false) {
+  if (!record) return "";
+
+  const studentId = getStudentId(record, allowRecordId);
+
+  if (studentId) {
+    return `student:${String(studentId)}`;
+  }
+
+  const email = String(record.email || record.student_email || "").trim().toLowerCase();
+
+  if (email) {
+    return `email:${email}`;
+  }
+
+  const fullName = String(
+    record.full_name ||
+    record.uploader_name ||
+    record.linked_entity_name ||
+    ""
+  ).trim().toLowerCase();
+
+  return fullName ? `name:${fullName}` : "";
+}
+
+function getUploadImageUrl(upload) {
+  if (!upload) return "";
+
+  if (upload.cropped_file_url) {
+    return upload.cropped_file_url;
+  }
+
+  const fileType = String(upload.file_type || "").toLowerCase();
+  const uploadType = String(upload.upload_type || "").toLowerCase();
+  const isKnownNonImage =
+    fileType.includes("video") ||
+    fileType.includes("document") ||
+    fileType.includes("pdf") ||
+    uploadType.includes("video") ||
+    uploadType.includes("document") ||
+    uploadType.includes("pdf");
+
+  if (isKnownNonImage) {
+    return "";
+  }
+
+  return upload.file_url || upload.original_file_url || "";
+}
+
+function getUploadTime(upload) {
+  return Date.parse(
+    upload.reviewed_at_utc ||
+    upload.updated_at_utc ||
+    upload.created_at_utc ||
+    0
+  ) || 0;
 }
 
 function isApprovedStudentUpload(upload) {
@@ -353,40 +407,6 @@ function isAcademyStudentUpload(upload) {
     category.startsWith("student_lesson_");
 }
 
-function renderApprovedUpload(upload) {
-  const studentId = upload.academy_student_id || upload.student_id || "";
-  const fullName =
-  upload.uploader_name ||
-  upload.linked_entity_name ||
-  "Student";
-
-const displayName = getFirstName(fullName);
-  const session = courseFilter.value === "arboriculture_1"
-    ? "Arboriculture I"
-    : displaySession(upload.academy_track || upload.interest_area || upload.track);
-  const imageUrl = upload.cropped_file_url || upload.file_url || upload.original_file_url || "";
-  const profileUrl = studentId
-    ? `/student-profile/?student_id=${encodeURIComponent(studentId)}&course_key=${encodeURIComponent(courseFilter.value)}`
-    : "#";
-
-  return `
-    <div
-      class="card"
-      role="link"
-      tabindex="0"
-      data-profile-url="${escapeAttr(profileUrl)}"
-      aria-label="Open profile for ${escapeAttr(displayName)}"
-    >
-      ${imageUrl ? `<img src="${escapeAttr(imageUrl)}" alt="${escapeAttr(displayName)}">` : ""}
-     <div class="name">${escapeHtml(labelLesson(upload.lesson_key))}</div>
-    <div class="meta">Uploaded by ${escapeHtml(fullName)}</div>
-    <div class="meta">${escapeHtml(session)}</div>
-    <div class="points">Approved student work</div>
-    <div class="view-profile">View ${escapeHtml(displayName)}'s profile →</div>
-    </div>
-  `;
-}
-
 function bindProfileCards(root) {
   root.querySelectorAll(".card").forEach(card => {
     card.addEventListener("click", () => {
@@ -413,10 +433,6 @@ function formatPoints(points) {
   return points === 1 ? "1 point" : `${points} points`;
 }
 
-function getFirstName(name) {
-  return String(name || "Student").trim().split(/\s+/)[0];
-}
-
 function displaySession(value) {
   if (!value) return "KETSO Academy";
 
@@ -430,32 +446,6 @@ function displaySession(value) {
   if (normalized === "networking_advocacy") return "Networking & Advocacy";
 
   return value;
-}
-
-function labelLesson(value) {
-  const map = {
-    onboarding: "Onboarding",
-    lesson_1_child_protection: "Lesson 1: Child Protection",
-    lesson_2_climate_change: "Lesson 2: Climate Change",
-    lesson_3_tree_health: "Lesson 3: Tree Health",
-    lesson_4_tree_planting: "Lesson 4: Tree Planting",
-    lesson_5_carbon_dioxide_increase: "Lesson 5: Carbon Dioxide Increase",
-    tutor_question: "Question to the tutor",
-    lesson_1_climate_change: "Lesson 1 Climate Change",
-    lesson_2_tree_health: "Lesson 2 Tree Health",
-    lesson_3_tree_planting: "Lesson 3 Tree Planting",
-    lesson_4_co2_increase: "Lesson 4 Carbon Dioxide Increase"
-    ,arb1_module_1_tree_biology: "Module 1: Tree biology and young tree failure"
-    ,arb1_module_2_tree_identification: "Module 2: Tree identification"
-    ,arb1_module_3_soil_and_roots: "Module 3: Soil and roots"
-    ,arb1_module_4_tree_selection: "Module 4: Choosing the right tree"
-    ,arb1_module_5_tree_planting: "Module 5: Tree planting"
-    ,arb1_module_6_tree_care: "Module 6: Young tree care"
-    ,arb1_module_7_tree_health: "Module 7: Tree health assessment"
-    ,arb1_module_8_pruning: "Module 8: Basic pruning"
-  };
-
-  return map[value] || value || "Approved upload";
 }
 
 function renderBadges(badges) {
@@ -550,7 +540,6 @@ function escapeAttr(value) {
 courseFilter.addEventListener("change", () => {
   document.getElementById("gallery").innerHTML = "";
   loadGallery();
-  loadRecentApprovedUploads();
 });
 
 loadGallery();
