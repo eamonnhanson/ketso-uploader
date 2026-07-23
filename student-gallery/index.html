@@ -190,13 +190,22 @@
 </section>
 
 <section id="recentApprovedPanel" class="recent-panel" hidden>
-  <h2>Recently approved uploads</h2>
-  <p class="intro">Approved public student uploads, shown directly from the upload review records.</p>
+  <h2>Recently approved student work</h2>
+  <p class="intro">
+    These cards show recently approved assignments and photos.
+    The same student may appear more than once after completing several lessons.
+  </p>
   <div id="recentApprovedGallery" class="grid"></div>
 </section>
 
-<div id="status">Loading student gallery...</div>
-<div id="gallery" class="grid"></div>
+<section class="student-profiles-section">
+  <h2>Student profiles</h2>
+  <p class="intro">
+    Each student appears once below. Open a profile to see all approved work from that student.
+  </p>
+  <div id="status">Loading student profiles...</div>
+  <div id="gallery" class="grid"></div>
+</section>
 
 <script>
 const API_URL = "https://ptb-tree-map.onrender.com/api/student-gallery";
@@ -229,14 +238,27 @@ async function loadGallery() {
 
     const photos = data.photos || [];
 
-    if (!photos.length) {
+    const uniqueStudents = Array.from(
+  new Map(
+    photos.map(photo => {
+      const studentId =
+        photo.academy_student_id ||
+        photo.student_id ||
+        photo.id;
+
+      return [String(studentId), photo];
+    })
+  ).values()
+);
+
+if (!uniqueStudents.length) {
       status.textContent = "No approved student uploads yet.";
       return;
     }
 
     status.textContent = "";
 
-    gallery.innerHTML = photos.map(photo => {
+    gallery.innerHTML = uniqueStudents.map(photo => {
       const studentId = photo.academy_student_id || photo.student_id || photo.id;
       const displayName = getFirstName(photo.uploader_name || photo.linked_entity_name || photo.full_name || "Student");
       const session = courseFilter.value === "arboriculture_1"
@@ -260,7 +282,7 @@ async function loadGallery() {
           <div class="meta">${escapeHtml(session)}</div>
           <div class="points">⭐ ${formatPoints(photo.total_points || 0)}</div>
           ${renderBadges(photo.badges)}
-          <div class="view-profile">View profile →</div>
+          <div class="view-profile">View ${escapeHtml(displayName)}'s profile →</div>
         </div>
       `;
     }).join("");
@@ -333,7 +355,12 @@ function isAcademyStudentUpload(upload) {
 
 function renderApprovedUpload(upload) {
   const studentId = upload.academy_student_id || upload.student_id || "";
-  const displayName = getFirstName(upload.uploader_name || upload.linked_entity_name || "Student");
+  const fullName =
+  upload.uploader_name ||
+  upload.linked_entity_name ||
+  "Student";
+
+const displayName = getFirstName(fullName);
   const session = courseFilter.value === "arboriculture_1"
     ? "Arboriculture I"
     : displaySession(upload.academy_track || upload.interest_area || upload.track);
@@ -351,11 +378,11 @@ function renderApprovedUpload(upload) {
       aria-label="Open profile for ${escapeAttr(displayName)}"
     >
       ${imageUrl ? `<img src="${escapeAttr(imageUrl)}" alt="${escapeAttr(displayName)}">` : ""}
-      <div class="name">${escapeHtml(displayName)}</div>
-      <div class="meta">${escapeHtml(labelLesson(upload.lesson_key))}</div>
-      <div class="meta">${escapeHtml(session)}</div>
-      <div class="points">Approved</div>
-      <div class="view-profile">View profile →</div>
+     <div class="name">${escapeHtml(labelLesson(upload.lesson_key))}</div>
+    <div class="meta">Uploaded by ${escapeHtml(fullName)}</div>
+    <div class="meta">${escapeHtml(session)}</div>
+    <div class="points">Approved student work</div>
+    <div class="view-profile">View ${escapeHtml(displayName)}'s profile →</div>
     </div>
   `;
 }
