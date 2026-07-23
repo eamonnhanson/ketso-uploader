@@ -722,10 +722,12 @@ function validateBeforeUpload() {
     return "Please enter a valid email address.";
   }
 
-  if (!whatsapp.value.trim()) {
-    return "Please enter your WhatsApp number.";
+  if (
+  activeCourseKey !== "arboriculture_1" &&
+  !whatsapp.value.trim()
+  ) {
+  return "Please enter your WhatsApp number.";
   }
-
   if (!interestArea.value) {
     return "Please select your interest.";
   }
