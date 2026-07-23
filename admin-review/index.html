@@ -269,7 +269,7 @@ function renderUpload(upload) {
 
         <div class="actions">
           ${
-          upload.upload_type === "question_to_tutor"
+          (upload.upload_type === "question_to_tutor" || upload.lesson_key === "tutor_question")
           ? ""
           : `<button class="approve" data-action="approve-public" data-id="${escapeAttr(upload.id)}">Approve public</button>`
           }
