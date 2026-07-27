@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>KETSO student questions</title>
+  <style>
+    :root { --forest:#203A29; --orange:#CF6600; --mist:#E8EFEA; --paper:#F7F5EF; --text:#1E211E; --muted:#536057; }
+    body { font-family:Arial,sans-serif; color:var(--text); background:var(--paper); margin:0; }
+    main { max-width:980px; margin:auto; padding:24px; }
+    h1,h2 { color:var(--forest); }
+    .controls,.actions { display:flex; gap:10px; flex-wrap:wrap; margin:20px 0; align-items:center; }
+    input,select,textarea,button { font:inherit; padding:10px; border-radius:7px; border:1px solid #a8b2aa; }
+    input { min-width:260px; }
+    textarea { width:100%; min-height:120px; box-sizing:border-box; }
+    button { background:var(--forest); color:white; border:0; font-weight:bold; cursor:pointer; }
+    button.secondary { background:#5b655e; }
+    button:disabled { opacity:.55; cursor:wait; }
+    .card { background:white; border:1px solid #d4dbd5; border-radius:12px; padding:18px; margin:14px 0; }
+    .meta { color:var(--muted); font-size:.9rem; overflow-wrap:anywhere; }
+    .question { white-space:pre-wrap; overflow-wrap:anywhere; background:var(--mist); padding:12px; border-radius:8px; }
+    .status { display:inline-block; padding:4px 9px; border-radius:20px; background:var(--mist); font-weight:bold; }
+    .notification { font-weight:bold; }
+    #message { font-weight:bold; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Student questions</h1>
+  <p>Private tutor queue. Every answer must be checked and sent by the tutor.</p>
+  <div class="controls">
+    <input id="adminKey" type="password" autocomplete="current-password" placeholder="Admin key">
+    <select id="statusFilter" aria-label="Question status">
+      <option value="new">New</option>
+      <option value="answered">Answered</option>
+      <option value="closed">Closed</option>
+      <option value="all">All</option>
+    </select>
+    <button id="load" type="button">Load questions</button>
+  </div>
+  <p id="message" aria-live="polite">Enter the admin key.</p>
+  <div id="questions"></div>
+</main>
+<script>
+"use strict";
+const API = "https://ptb-tree-map.onrender.com";
+const keyEl = document.getElementById("adminKey");
+const statusEl = document.getElementById("statusFilter");
+const messageEl = document.getElementById("message");
+const questionsEl = document.getElementById("questions");
+document.getElementById("load").addEventListener("click", loadQuestions);
+statusEl.addEventListener("change", () => {
+  if (keyEl.value.trim()) loadQuestions();
+});
+keyEl.addEventListener("keydown", event => {
+  if (event.key === "Enter") loadQuestions();
+});
+
+async function request(path, options = {}) {
+  const key = keyEl.value.trim();
+  const headers = { ...(options.headers || {}), "X-Admin-Key": key };
+  const response = await fetch(`${API}${path}`, { ...options, headers });
+  const data = await response.json();
+  if (!response.ok || !data.ok) throw new Error(data.error || "Request failed.");
+  return data;
+}
+
+async function loadQuestions() {
+  if (!keyEl.value.trim()) {
+    messageEl.textContent = "Enter the admin key.";
+    return;
+  }
+  messageEl.textContent = "Loading...";
+  questionsEl.replaceChildren();
+  try {
+    const data = await request(`/api/academy-tutor-questions?status=${encodeURIComponent(statusEl.value)}`);
+    messageEl.textContent = `${data.questions.length} question(s).`;
+    questionsEl.innerHTML = data.questions.map(renderQuestion).join("");
+    document.querySelectorAll("[data-answer]").forEach(button =>
+      button.addEventListener("click", () => sendAnswer(button.dataset.answer, button))
+    );
+    document.querySelectorAll("[data-close]").forEach(button =>
+      button.addEventListener("click", () => closeQuestion(button.dataset.close, button))
+    );
+  } catch (error) {
+    messageEl.textContent = error.message;
+  }
+}
+
+function renderQuestion(q) {
+  const answerId = `answer-${q.id}`;
+  return `<article class="card">
+    <h2>${escapeHtml(q.student_name)} <small>#${escapeHtml(q.student_id)}</small></h2>
+    <p class="meta">${escapeHtml(q.course_name || q.course_key)} ·
+      ${escapeHtml(q.module_name || q.module_key)} · ${formatDate(q.created_at)} ·
+      <span class="status">${escapeHtml(q.status)}</span></p>
+    <div class="question">${escapeHtml(q.question_text)}</div>
+    <p class="notification">Tutor email: ${escapeHtml(notificationLabel(q.tutor_notification_status))}</p>
+    ${q.answer_text
+      ? `<p><strong>Answer</strong></p><div class="question">${escapeHtml(q.answer_text)}</div>
+         <p class="meta">Answered ${formatDate(q.answered_at)}</p>
+         <p class="notification">Student email: ${escapeHtml(notificationLabel(q.student_notification_status))}</p>`
+      : `<p><label for="${answerId}"><strong>Your answer</strong></label></p>
+         <textarea id="${answerId}" maxlength="10000"></textarea>
+         <div class="actions"><button type="button" data-answer="${q.id}">Send answer</button></div>`}
+    ${q.status !== "closed"
+      ? `<div class="actions"><button type="button" class="secondary" data-close="${q.id}">Close question</button></div>`
+      : ""}
+  </article>`;
+}
+
+async function sendAnswer(id, button) {
+  const field = document.getElementById(`answer-${id}`);
+  const answer = field.value.trim();
+  if (!answer) {
+    messageEl.textContent = "Write an answer first.";
+    field.focus();
+    return;
+  }
+  if (!confirm("Send this checked answer to the student?")) return;
+  button.disabled = true;
+  const requestId = crypto.randomUUID ? crypto.randomUUID() :
+    `answer_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  try {
+    const data = await request(`/api/academy-tutor-questions/${encodeURIComponent(id)}/answer`, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({ answer, answered_by:"Eamonn", request_id:requestId })
+    });
+    messageEl.textContent = data.notification_sent
+      ? "Answer saved. The student email was accepted by the notification service."
+      : "Answer saved. The student email was not accepted or is not configured.";
+    await loadQuestions();
+  } catch (error) {
+    messageEl.textContent = error.message;
+    button.disabled = false;
+  }
+}
+
+async function closeQuestion(id, button) {
+  if (!confirm("Close this question?")) return;
+  button.disabled = true;
+  try {
+    await request(`/api/academy-tutor-questions/${encodeURIComponent(id)}/close`, {
+      method:"POST"
+    });
+    messageEl.textContent = "Question closed.";
+    await loadQuestions();
+  } catch (error) {
+    messageEl.textContent = error.message;
+    button.disabled = false;
+  }
+}
+
+function notificationLabel(value) {
+  return ({
+    accepted:"accepted",
+    failed:"failed",
+    not_configured:"not configured",
+    pending:"pending"
+  })[value] || "unknown";
+}
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;").replaceAll("'","&#039;");
+}
+function formatDate(value) {
+  return value ? new Date(value).toLocaleString() : "";
+}
+</script>
+</body>
+</html>

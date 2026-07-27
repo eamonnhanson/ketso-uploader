@@ -115,6 +115,11 @@
         </select>
       </div>
 
+      <div id="questionModulePanel" class="student-purpose" hidden>
+        <label for="questionModule">Which lesson or module is your question about?</label>
+        <select id="questionModule"></select>
+      </div>
+
       <section id="studentIdentityPanel" class="student-identity" hidden>
         <label for="studentNameSearch">Student name</label>
         <input id="studentNameSearch" type="text" autocomplete="name" placeholder="Start typing your first name">
@@ -145,7 +150,7 @@
 
     <section id="textPanel" class="panel" hidden>
       <label for="textEntry">Text update</label>
-      <textarea id="textEntry" rows="7" placeholder="Type your update here"></textarea>
+      <textarea id="textEntry" rows="7" maxlength="5000" placeholder="Type your update here"></textarea>
       <p class="small">You can type here, or use the document upload button above.</p>
     </section>
 
@@ -195,7 +200,7 @@
   </main>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-  <script src="/shared/academy-courses.js"></script>
-  <script src="app.js?v=20260719-programme-selector-1" defer></script>
+  <script src="/shared/academy-courses.js?v=20260727-tutor-questions-1"></script>
+  <script src="app.js?v=20260727-tutor-questions-1" defer></script>
 </body>
 </html>
