@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>My KETSO questions</title>
+  <style>
+    :root { --forest:#203A29; --mist:#E8EFEA; --paper:#F7F5EF; --text:#1E211E; --muted:#536057; }
+    body { font-family:Arial,sans-serif; color:var(--text); background:var(--paper); margin:0; }
+    main { max-width:780px; margin:auto; padding:24px; }
+    h1,h2 { color:var(--forest); }
+    h2 { font-size:1.15rem; margin-bottom:8px; }
+    .card { background:white; border:1px solid #d4dbd5; border-radius:12px; padding:18px; margin:14px 0; }
+    .box { white-space:pre-wrap; overflow-wrap:anywhere; background:var(--mist); padding:12px; border-radius:8px; }
+    .meta { color:var(--muted); font-size:.9rem; }
+    .answer { border-left:5px solid var(--forest); }
+    .status { display:inline-block; padding:3px 8px; border-radius:20px; background:var(--mist); font-weight:bold; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>My questions</h1>
+  <p>Your questions and tutor answers are private. Keep your personal course link private.</p>
+  <p id="message" aria-live="polite">Loading...</p>
+  <div id="questions"></div>
+</main>
+<script>
+"use strict";
+const API = "https://ptb-tree-map.onrender.com";
+const token = new URLSearchParams(location.search).get("token") || "";
+const message = document.getElementById("message");
+const questions = document.getElementById("questions");
+
+(async () => {
+  if (!token) {
+    message.textContent = "Open this page through your personal KETSO course link.";
+    return;
+  }
+  try {
+    const res = await fetch(`${API}/api/academy-tutor-questions/my`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      message.textContent = data.error || "Questions could not be loaded.";
+      return;
+    }
+    message.textContent = data.questions.length
+      ? `${data.questions.length} question(s)`
+      : "You have not asked a tutor question yet.";
+    questions.innerHTML = data.questions.map(renderQuestion).join("");
+  } catch (_error) {
+    message.textContent = "Questions could not be loaded. Please try again.";
+  }
+})();
+
+function renderQuestion(q) {
+  return `<article class="card">
+    <h2>${escapeHtml(q.module_name || "General question")}</h2>
+    <p class="meta">${escapeHtml(q.course_name || q.course_key)} · ${formatDate(q.created_at)}
+      · <span class="status">${escapeHtml(statusLabel(q.status))}</span></p>
+    <div class="box">${escapeHtml(q.question_text)}</div>
+    ${q.answer_text
+      ? `<h2>Tutor answer</h2><div class="box answer">${escapeHtml(q.answer_text)}</div>
+         <p class="meta">Answered ${formatDate(q.answered_at)}</p>`
+      : `<p><strong>The tutor has not answered yet.</strong></p>`}
+  </article>`;
+}
+function statusLabel(value) {
+  return ({ new:"Sent to tutor", answered:"Answered", closed:"Closed" })[value] || value;
+}
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;").replaceAll("'","&#039;");
+}
+function formatDate(value) {
+  return value ? new Date(value).toLocaleString() : "";
+}
+</script>
+</body>
+</html>

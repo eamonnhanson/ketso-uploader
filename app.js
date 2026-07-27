@@ -10,7 +10,6 @@ const R2_PUBLIC_BASE = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/";
 const ONBOARDING_FORM_URL = "https://forms.zohopublic.eu/greenmakombeh/form/KETSOacademy/formperma/Qt8SERehFwXmL4fYledPgJO-1QOC9wurOwpZydf68LA";
 const ONBOARDING_HELP_VIDEO_URL = "https://www.tiktok.com/@plantatreenow/video/7638751146852633878?is_from_webapp=1&sender_device=pc&web_id=7548932980812826144";
 
-const STAFF_PASSWORD = "4234";
 const MAX_CROPPED_BYTES = 500 * 1024;
 const HARD_MAX_IMAGE_INPUT_BYTES = 25 * 1024 * 1024;
 const HARD_MAX_DIRECT_FILE_BYTES = 50 * 1024 * 1024;
@@ -24,6 +23,7 @@ let selectedUploadKind = null;
 let staffUnlocked = false;
 let academyToken = null;
 let academyStudent = null;
+let pendingTutorRequestId = null;
 let recentUploadStatusSyncRunning = false;
 let selectedStudent = null;
 let selectedLink = null;
@@ -149,6 +149,8 @@ const el = {
   category: document.getElementById("category"),
   studentPurposePanel: document.getElementById("studentPurposePanel"),
   studentPurpose: document.getElementById("studentPurpose"),
+  questionModulePanel: document.getElementById("questionModulePanel"),
+  questionModule: document.getElementById("questionModule"),
   studentIdentityPanel: document.getElementById("studentIdentityPanel"),
   studentNameSearch: document.getElementById("studentNameSearch"),
   studentEmail: document.getElementById("studentEmail"),
@@ -190,6 +192,20 @@ function setStatus(lines) {
 }
 
 function showUploadSuccess(saved) {
+  if (saved?.question) {
+    if (el.uploadSuccessPanel) {
+      el.uploadSuccessPanel.hidden = false;
+      el.uploadSuccessPanel.innerHTML = `
+        <strong>Question sent to the tutor</strong>
+        <p>Your question has been saved privately. It does not need gallery approval.</p>
+        <p>${saved.notification_sent ? "The tutor has been notified by email." : "Your question is in the tutor queue."} You can follow the status and read the answer on <a href="/my-questions/?token=${encodeURIComponent(academyToken || "")}">My questions</a>.</p>
+      `;
+      el.uploadSuccessPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    setStatus(`Question sent (ID: ${saved.question.id}).`);
+    return;
+  }
+
   const reviewLink = saved?.review_id
     ? `/academy-my-upload/?review_id=${encodeURIComponent(saved.review_id)}`
     : "";
@@ -269,6 +285,33 @@ function renderCoursePurposes() {
     .filter(([key]) => key !== "evaluation")
     .map(([key, label]) => `<option value="${escapeHtml(key)}">${escapeHtml(label)}</option>`)
     .join("");
+  renderQuestionModules();
+  updateQuestionContext();
+}
+
+function renderQuestionModules() {
+  const course = window.KETSO_ACADEMY_COURSES?.[activeCourseKey];
+  if (!course || !el.questionModule) return;
+  const modules = course.lessons.filter(([key]) =>
+    !["onboarding", "tutor_question", "evaluation"].includes(key)
+  );
+  el.questionModule.innerHTML = [
+    '<option value="general">General question</option>',
+    ...modules.map(([key, label]) =>
+      `<option value="${escapeHtml(key)}">${escapeHtml(label)}</option>`
+    )
+  ].join("");
+}
+
+function updateQuestionContext() {
+  const isQuestion = getStudentPurpose().lessonKey === "tutor_question";
+  if (el.questionModulePanel) el.questionModulePanel.hidden = !isQuestion;
+  if (isQuestion) {
+    el.textModeBtn.textContent = "Type your question";
+  } else {
+    el.textModeBtn.textContent = "Type text";
+    pendingTutorRequestId = null;
+  }
 }
 
 function setProgrammeSelection(programmeKey, options = {}) {
@@ -797,7 +840,9 @@ function openTextMode() {
   el.textUploadBtn.hidden = false;
   el.textUploadBtn.disabled = true;
   el.textEntry.focus();
-  setStatus("Type your text update, then upload.");
+  setStatus(getStudentPurpose().lessonKey === "tutor_question"
+    ? "Type your private question, then send it to the tutor."
+    : "Type your text update, then upload.");
 }
 
 function validateBeforeUpload() {
@@ -1073,6 +1118,39 @@ async function uploadTypedText() {
   el.textUploadBtn.disabled = true;
 
   try {
+    if (getStudentPurpose().lessonKey === "tutor_question") {
+      if (!academyToken) {
+        throw new Error("Open your personal KETSO course link before sending a tutor question.");
+      }
+      const moduleKey = el.questionModule?.value || "";
+      if (!moduleKey) {
+        throw new Error("Choose the lesson or module for your question.");
+      }
+      pendingTutorRequestId = pendingTutorRequestId ||
+        (crypto.randomUUID ? crypto.randomUUID() :
+          `question_${Date.now()}_${Math.random().toString(36).slice(2)}`);
+      setStatus("Sending question to tutor...");
+      const response = await fetch(`${SEARCH_API_BASE}/api/academy-tutor-questions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: academyToken,
+          course_key: activeCourseKey,
+          module_key: moduleKey,
+          request_id: pendingTutorRequestId,
+          question: text
+        })
+      });
+      const saved = await response.json();
+      if (!response.ok || !saved.ok) {
+        throw new Error(saved.error || "The question could not be sent.");
+      }
+      showUploadSuccess(saved);
+      el.textEntry.value = "";
+      pendingTutorRequestId = null;
+      return;
+    }
+
     setStatus("Uploading text...");
     const file = new File([text], `student_text_${Date.now()}.txt`, { type: "text/plain" });
     const uploaded = await uploadFileToR2(file, "Text");
@@ -1098,16 +1176,32 @@ async function uploadTypedText() {
   }
 }
 
-function unlockStaff() {
+async function unlockStaff() {
   const password = (el.staffPassword.value || "").trim();
-
-  if (password !== STAFF_PASSWORD) {
-    el.staffMessage.textContent = "Wrong password.";
+  if (!password) {
+    el.staffMessage.textContent = "Enter the staff password.";
     return;
   }
-
-  el.staffMessage.textContent = "Opening staff upload dashboard...";
-  window.location.href = "/staff-upload-dashboard/";
+  el.staffUnlockBtn.disabled = true;
+  el.staffMessage.textContent = "Checking password...";
+  try {
+    const response = await fetch(`${SEARCH_API_BASE}/api/academy-staff-auth`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password })
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      el.staffMessage.textContent = data.error || "Wrong password.";
+      return;
+    }
+    el.staffMessage.textContent = "Opening staff upload dashboard...";
+    window.location.href = "/staff-upload-dashboard/";
+  } catch (_error) {
+    el.staffMessage.textContent = "Staff access could not be checked. Please try again.";
+  } finally {
+    el.staffUnlockBtn.disabled = false;
+  }
 }
 
 function updateStaffCategory() {
@@ -1297,6 +1391,7 @@ el.staffPassword.addEventListener("keydown", (event) => {
 el.category.addEventListener("change", updateStaffCategory);
 el.studentPurpose.addEventListener("change", () => {
   clearSelectedStudent();
+  updateQuestionContext();
   updateUploadActionsForContext();
 });
 el.studentNameSearch.addEventListener("input", handleStudentSearchInput);
