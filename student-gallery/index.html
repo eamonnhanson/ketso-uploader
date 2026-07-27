@@ -188,6 +188,7 @@
 <script>
 const API_URL = "https://ptb-tree-map.onrender.com/api/student-gallery";
 const APPROVED_UPLOADS_URL = "https://ptb-tree-map.onrender.com/api/photo-review-gallery";
+const PUBLIC_TUTOR_QUESTIONS_URL = "https://ptb-tree-map.onrender.com/api/academy-tutor-questions/public";
 const courseFilter = document.getElementById("courseFilter");
 const pendingPanel = document.getElementById("pendingPanel");
 const pendingGallery = document.getElementById("pendingGallery");
@@ -212,13 +213,26 @@ async function loadGallery() {
     }
 
     const photos = data.photos || [];
-    const latestApprovedUploads = await loadLatestApprovedUploads();
+    const [latestApprovedUploads, tutorQuestions] = await Promise.all([
+      loadLatestApprovedUploads(),
+      loadPublicTutorQuestions()
+    ]);
 
-    const uniqueStudents = Array.from(
-      new Map(
-        photos.map(photo => [getStudentKey(photo, true), photo])
-      ).values()
-    );
+    const studentsById = new Map();
+
+    photos.forEach(photo => {
+      const key = getStudentKey(photo, true);
+      if (key) studentsById.set(key, photo);
+    });
+
+    tutorQuestions.forEach(question => {
+      const key = getStudentKey(question);
+      if (key && !studentsById.has(key)) {
+        studentsById.set(key, question);
+      }
+    });
+
+    const uniqueStudents = Array.from(studentsById.values());
 
     if (!uniqueStudents.length) {
       status.textContent = "No student profiles yet.";
@@ -231,6 +245,7 @@ async function loadGallery() {
       const studentId = getStudentId(photo, true);
       const displayName = String(
         photo.full_name ||
+        photo.student_name ||
         photo.uploader_name ||
         photo.linked_entity_name ||
         "Student"
@@ -270,6 +285,30 @@ async function loadGallery() {
   } catch (err) {
     console.error("Student gallery error:", err);
     status.textContent = "Error loading gallery.";
+  }
+}
+
+async function loadPublicTutorQuestions() {
+  try {
+    const res = await fetch(`${PUBLIC_TUTOR_QUESTIONS_URL}?course_key=${encodeURIComponent(courseFilter.value)}&t=${Date.now()}`, {
+      cache: "no-store"
+    });
+    const data = await res.json();
+
+    if (!res.ok || data.ok === false) {
+      return [];
+    }
+
+    const questions = Array.isArray(data)
+      ? data
+      : data.questions || data.tutor_questions || [];
+
+    return Array.isArray(questions)
+      ? questions.filter(question => getStudentId(question))
+      : [];
+  } catch (err) {
+    console.warn("Could not load public tutor questions:", err);
+    return [];
   }
 }
 
@@ -335,6 +374,7 @@ function getStudentKey(record, allowRecordId = false) {
 
   const fullName = String(
     record.full_name ||
+    record.student_name ||
     record.uploader_name ||
     record.linked_entity_name ||
     ""

@@ -67,6 +67,36 @@
       background: #fff;
     }
 
+    .question-card {
+      border-color: #b9d9c1;
+      background: #f7fbf8;
+    }
+
+    .question-label {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #dff0e3;
+      color: #176634;
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    .question-text,
+    .answer-text {
+      line-height: 1.5;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .answer-text {
+      margin-top: 10px;
+      padding: 10px;
+      background: #fff;
+      border-left: 4px solid #1f7a3f;
+    }
+
     .upload-card img {
       max-width: 100%;
       border-radius: 8px;
@@ -116,6 +146,7 @@
 
 <script>
 const API_BASE = "https://ptb-tree-map.onrender.com";
+const PUBLIC_TUTOR_QUESTIONS_URL = `${API_BASE}/api/academy-tutor-questions/public`;
 
 const params = new URLSearchParams(window.location.search);
 const studentId = params.get("student_id");
@@ -130,22 +161,70 @@ if (!studentId) {
 }
 
 async function loadProfile(id) {
+  const [profileResult, questions] = await Promise.all([
+    loadStudentProfile(id),
+    loadPublicTutorQuestions(id)
+  ]);
+
+  if (!profileResult && !questions.length) {
+    app.innerHTML = "Could not load student profile.";
+    return;
+  }
+
+  const fallbackStudent = {
+    id,
+    full_name: questions[0]?.student_name || "Student",
+    total_points: 0
+  };
+
+  renderProfile(
+    profileResult?.student || fallbackStudent,
+    profileResult?.uploads || [],
+    profileResult?.point_events || [],
+    profileResult?.course,
+    profileResult?.progress,
+    questions
+  );
+}
+
+async function loadStudentProfile(id) {
   try {
     const res = await fetch(`${API_BASE}/api/student-profile/${encodeURIComponent(id)}?course_key=${encodeURIComponent(courseKey)}`);
     const data = await res.json();
-
-    if (!res.ok || !data.ok) {
-      app.innerHTML = "Could not load student profile.";
-      return;
-    }
-
-renderProfile(data.student, data.uploads || [], data.point_events || [], data.course, data.progress);
+    return res.ok && data.ok ? data : null;
   } catch (err) {
-    app.innerHTML = "Error loading profile: " + err.message;
+    console.warn("Could not load student profile details:", err);
+    return null;
   }
 }
 
-function renderProfile(student, uploads, pointEvents, course, progress) {
+async function loadPublicTutorQuestions(id) {
+  try {
+    const res = await fetch(`${PUBLIC_TUTOR_QUESTIONS_URL}?course_key=${encodeURIComponent(courseKey)}&t=${Date.now()}`, {
+      cache: "no-store"
+    });
+    const data = await res.json();
+
+    if (!res.ok || data.ok === false) {
+      return [];
+    }
+
+    const questions = Array.isArray(data)
+      ? data
+      : data.questions || data.tutor_questions || [];
+
+    if (!Array.isArray(questions)) {
+      return [];
+    }
+
+    return questions.filter(question => String(question.student_id || question.academy_student_id || "") === String(id));
+  } catch (err) {
+    console.warn("Could not load public tutor questions:", err);
+    return [];
+  }
+}
+
+function renderProfile(student, uploads, pointEvents, course, progress, tutorQuestions) {
   const approved = Number(progress?.approved_lessons || 0);
   const required = Number(progress?.required_lessons || 0);
   app.innerHTML = `
@@ -166,7 +245,33 @@ function renderProfile(student, uploads, pointEvents, course, progress) {
 
     <h2>Approved uploads</h2>
     ${uploads.length ? uploads.map(renderUpload).join("") : "<p>No approved uploads yet.</p>"}
+
+    <h2>Questions and answers</h2>
+    ${tutorQuestions.length ? tutorQuestions.map(renderTutorQuestion).join("") : "<p>No public questions and answers yet.</p>"}
   `;
+}
+
+function renderTutorQuestion(question) {
+  const courseName = question.course_name || "Course not listed";
+  const answeredAt = formatDate(question.answered_at);
+
+  return `
+    <article class="upload-card question-card">
+      <div class="question-label">Question and answer</div>
+      <div><strong>${escapeHtml(question.student_name || "Student")}</strong></div>
+      <div class="meta"><strong>Course:</strong> ${escapeHtml(courseName)}</div>
+      ${question.module_name ? `<div class="meta"><strong>Module:</strong> ${escapeHtml(question.module_name)}</div>` : ""}
+      <div class="question-text"><strong>Question:</strong><br>${escapeHtml(question.question_text || "Question not available.")}</div>
+      <div class="answer-text"><strong>Tutor answer:</strong><br>${escapeHtml(question.answer_text || "Answer not available.")}</div>
+      <div class="meta"><strong>Answered:</strong> ${escapeHtml(answeredAt || "Date not available")}</div>
+    </article>
+  `;
+}
+
+function formatDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
 }
 function renderPointsExplanation(student, pointEvents) {
   const events = Array.isArray(pointEvents) ? pointEvents : [];
