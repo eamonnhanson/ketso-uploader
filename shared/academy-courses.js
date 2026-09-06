@@ -33,6 +33,16 @@
         ["tutor_question", "A question to the tutor"],
         ["evaluation", "Evaluation"]
       ]
+    },
+    donor_investor_funding: {
+      name: "Communicate effectively with donors and investors",
+      lessons: [
+        ["onboarding", "Onboarding"],
+        ["donor_module_1_report_writing", "Module 1: Report writing"],
+        ["donor_module_2_proposal_writing", "Module 2: Proposal writing"],
+        ["donor_module_3_business_plan", "Module 3: Writing a business plan"],
+        ["donor_module_4_income_generation_fundraising", "Module 4: Income generating and fundraising"]
+      ]
     }
   };
 
