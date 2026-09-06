@@ -323,6 +323,8 @@ async function loadStudentFromToken() {
 
     if (activeCourseKey === "arboriculture_1") {
       interestArea.value = "distance_certificate_course";
+    } else if (activeCourseKey === "donor_investor_funding") {
+      interestArea.value = "donor_investor_funding";
     } else
 
     if (normalizedInterest.includes("forest") || normalizedInterest.includes("tree")) {
@@ -350,12 +352,32 @@ function courseName(courseKey) {
 }
 
 function renderCourseLessons(courseKey) {
-  if (courseKey === "online_tree_planting") return;
   const lessons = window.KETSO_ACADEMY_COURSES?.[courseKey]?.lessons || [];
   lessonKey.innerHTML = '<option value="">Select topic</option>' + lessons
     .map(([key, label]) => `<option value="${key}">${label}</option>`)
     .join("");
 }
+
+function courseKeyFromInterest(value) {
+  if (value === "distance_certificate_course") {
+    return "arboriculture_1";
+  }
+
+  if (value === "donor_investor_funding") {
+    return "donor_investor_funding";
+  }
+
+  if (value === "online_tree_planting") {
+    return "online_tree_planting";
+  }
+
+  return window.KETSO_DEFAULT_COURSE;
+}
+
+interestArea.addEventListener("change", () => {
+  activeCourseKey = courseKeyFromInterest(interestArea.value);
+  renderCourseLessons(activeCourseKey);
+});
 
 function safeFileBaseName(name) {
   return name

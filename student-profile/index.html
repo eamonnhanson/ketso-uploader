@@ -144,13 +144,17 @@
   Loading profile...
 </div>
 
+<script src="/shared/academy-courses.js"></script>
 <script>
 const API_BASE = "https://ptb-tree-map.onrender.com";
 const PUBLIC_TUTOR_QUESTIONS_URL = `${API_BASE}/api/academy-tutor-questions/public`;
 
 const params = new URLSearchParams(window.location.search);
 const studentId = params.get("student_id");
-const courseKey = params.get("course_key") === "arboriculture_1" ? "arboriculture_1" : "online_tree_planting";
+const requestedCourseKey = params.get("course_key");
+const courseKey = window.KETSO_ACADEMY_COURSES?.[requestedCourseKey]
+  ? requestedCourseKey
+  : window.KETSO_DEFAULT_COURSE;
 
 const app = document.getElementById("app");
 
@@ -235,10 +239,7 @@ function renderProfile(student, uploads, pointEvents, course, progress, tutorQue
       <div class="meta">Course: ${escapeHtml(course?.name || "Online tree planting")}</div>
       <div class="points">⭐ ${student.total_points || 0} point(s)</div>
       <div class="meta">Progress: ${approved} of ${required} required lessons approved</div>
-      <p>
-        <a class="button" href="?student_id=${encodeURIComponent(student.id)}&course_key=online_tree_planting">Online tree planting</a>
-        <a class="button" href="?student_id=${encodeURIComponent(student.id)}&course_key=arboriculture_1">Arboriculture I</a>
-      </p>
+      <p>${renderCourseLinks(student.id)}</p>
     </div>
 
     ${renderPointsExplanation(student, pointEvents)}
@@ -249,6 +250,14 @@ function renderProfile(student, uploads, pointEvents, course, progress, tutorQue
     <h2>Questions and answers</h2>
     ${tutorQuestions.length ? tutorQuestions.map(renderTutorQuestion).join("") : "<p>No public questions and answers yet.</p>"}
   `;
+}
+
+function renderCourseLinks(id) {
+  return Object.entries(window.KETSO_ACADEMY_COURSES || {})
+    .map(([key, definition]) =>
+      `<a class="button" href="?student_id=${encodeURIComponent(id)}&course_key=${encodeURIComponent(key)}">${escapeHtml(definition.name)}</a>`
+    )
+    .join("\n");
 }
 
 function renderTutorQuestion(question) {
@@ -353,6 +362,10 @@ function renderUpload(upload) {
 }
 
 function labelLesson(value) {
+  const configuredLesson = window.KETSO_ACADEMY_COURSES?.[courseKey]?.lessons
+    ?.find(([key]) => key === value);
+  if (configuredLesson) return configuredLesson[1];
+
   const map = {
     onboarding: "Onboarding",
     lesson_1_climate_change: "Lesson 1 Climate Change",

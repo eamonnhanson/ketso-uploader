@@ -167,6 +167,7 @@
   <select id="courseFilter">
     <option value="online_tree_planting">Online tree planting</option>
     <option value="arboriculture_1">Arboriculture I</option>
+    <option value="donor_investor_funding">Communicate effectively with donors and investors</option>
   </select>
 </p>
 
@@ -185,6 +186,7 @@
   <div id="gallery" class="grid"></div>
 </section>
 
+<script src="/shared/academy-courses.js"></script>
 <script>
 const API_URL = "https://ptb-tree-map.onrender.com/api/student-gallery";
 const APPROVED_UPLOADS_URL = "https://ptb-tree-map.onrender.com/api/photo-review-gallery";
@@ -250,9 +252,8 @@ async function loadGallery() {
         photo.linked_entity_name ||
         "Student"
       ).trim();
-      const session = courseFilter.value === "arboriculture_1"
-        ? "Arboriculture I"
-        : displaySession(photo.academy_track || photo.interest_area || photo.track);
+      const session = window.KETSO_ACADEMY_COURSES?.[courseFilter.value]?.name ||
+        displaySession(photo.academy_track || photo.interest_area || photo.track);
       const latestUpload = latestApprovedUploads.get(getStudentKey(photo, true));
       const imageUrl = getUploadImageUrl(latestUpload) ||
         photo.cropped_file_url ||
