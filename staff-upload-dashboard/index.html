@@ -137,6 +137,8 @@
       color: var(--ink);
     }
 
+    :focus-visible { outline: 3px solid #15562b; outline-offset: 3px; }
+
     button:disabled {
       cursor: not-allowed;
       opacity: 0.55;
@@ -203,6 +205,8 @@
     }
 
     .result-item {
+      color: var(--ink);
+      text-align: left;
       cursor: pointer;
     }
 
@@ -309,7 +313,7 @@
   <main class="shell">
     <header>
       <h1>KETSO staff upload dashboard</h1>
-      <p class="intro">Upload staff photos, crop them, and see your recent staff uploads.</p>
+      <p class="intro">Send a field photo to KETSO and Plant N Boom, then check that it was received.</p>
       <a class="gallery-link" href="/gallery" target="_blank" rel="noopener">Open gallery</a>
     </header>
 
@@ -332,11 +336,12 @@
           <div id="selectedHero" class="selected-item" hidden></div>
         </section>
 
-        <label for="caption">Caption</label>
-        <textarea id="caption" maxlength="500" placeholder="Optional short note"></textarea>
+        <label for="caption">What does this photo show?</label>
+        <textarea id="caption" maxlength="500" placeholder="Add a short note about the work"></textarea>
 
-        <label for="fileInput">Choose image</label>
-        <input id="fileInput" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
+        <label for="fileInput">Choose photo</label>
+        <p id="photoHint" class="small">JPG, PNG or WebP, up to 25 MB before resizing. Photos above 8 MB are resized. The full photo and a smaller preview are sent. Videos are not supported here yet.</p>
+        <input id="fileInput" aria-describedby="photoHint" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
 
         <section id="cropSection" class="crop-section" hidden>
           <label>Crop image</label>
@@ -352,11 +357,13 @@
         </section>
 
         <div class="actions">
-          <button id="uploadBtn" type="button" disabled>Upload</button>
-          <button id="clearBtn" type="button" class="button-soft">Clear/reset</button>
+          <button id="uploadBtn" type="button" disabled>Send photo</button>
+          <button id="clearBtn" type="button" class="button-soft">Remove photo</button>
         </div>
 
-        <p id="status" class="status" aria-live="polite"></p>
+        <p class="small">Staff photos can appear in the public gallery. Keep this page open until you see “Photo received”. Your selection is not saved if you close or refresh this page.</p>
+        <p id="status" class="status" role="status" aria-live="polite" tabindex="-1"></p>
+        <p id="receiptHelp" class="small" hidden></p>
       </section>
 
       <section class="panel" aria-labelledby="uploads-title">
@@ -365,7 +372,8 @@
           <button id="refreshBtn" type="button" class="button-soft">Refresh</button>
         </div>
 
-        <div id="uploadsStatus" class="status">Loading uploads...</div>
+        <p class="small">Recent uploads for this staff name. This is not a complete submission history.</p>
+        <div id="uploadsStatus" class="status" role="status">Loading uploads...</div>
         <div id="uploadsList" class="upload-list"></div>
       </section>
     </div>
@@ -373,6 +381,7 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
   <script src="/shared/staff-categories.js"></script>
+  <script src="/shared/staff-photo-submission.js?v=1"></script>
   <script>
     const R2_PUBLIC_BASE = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/";
     const SEARCH_API_BASE = "https://ptb-tree-map.onrender.com";
@@ -389,6 +398,10 @@
     let uploadFolder = "";
     let selectedForestHero = null;
     let searchTimeout = null;
+    let submission = null;
+    let busy = false;
+    let preparing = false;
+    let selectionVersion = 0;
 
     const el = {
       staffName: document.getElementById("staffName"),
@@ -407,6 +420,7 @@
       uploadBtn: document.getElementById("uploadBtn"),
       clearBtn: document.getElementById("clearBtn"),
       status: document.getElementById("status"),
+      receiptHelp: document.getElementById("receiptHelp"),
       refreshBtn: document.getElementById("refreshBtn"),
       uploadsStatus: document.getElementById("uploadsStatus"),
       uploadsList: document.getElementById("uploadsList")
@@ -440,11 +454,20 @@
       el.zoomIn.addEventListener("click", () => cropper && cropper.zoom(0.18));
       el.zoomOut.addEventListener("click", () => cropper && cropper.zoom(-0.18));
       el.adaptCropBtn.addEventListener("click", async () => {
-        const blob = await createCroppedBlob();
-        setStatus(blob ? "Crop updated. Ready to upload." : "Could not update crop.");
+        if (busy || preparing || submission) return;
+        preparing = true;
+        el.uploadBtn.disabled = true;
+        try {
+          const blob = await createCroppedBlob();
+          setStatus(blob ? "Preview updated. Ready to send." : "Could not update preview. Try a different photo.");
+        } catch (_) { setStatus("Could not update preview. Try a different photo."); }
+        finally { preparing = false; el.uploadBtn.disabled = !croppedBlob; }
       });
       el.uploadBtn.addEventListener("click", uploadStaffPhoto);
       el.clearBtn.addEventListener("click", resetForm);
+      window.addEventListener("beforeunload", (event) => {
+        if (busy || (submission && !submission.received)) { event.preventDefault(); event.returnValue = ""; }
+      });
       el.refreshBtn.addEventListener("click", loadUploads);
       el.category.addEventListener("change", updateForestHeroSearch);
       el.forestHeroSearch.addEventListener("input", handleForestHeroSearchInput);
@@ -549,7 +572,9 @@
 
         el.searchResults.innerHTML = "";
         results.forEach((item) => {
-          const div = document.createElement("div");
+          const div = document.createElement("button");
+          div.type = "button";
+          div.disabled = Boolean(submission);
           div.className = "result-item";
           div.textContent = item.display_label;
           div.addEventListener("click", () => selectForestHero(item));
@@ -561,12 +586,13 @@
     }
 
     function selectForestHero(item) {
+      if (submission || busy) return;
       selectedForestHero = item;
       el.selectedHero.hidden = false;
       el.selectedHero.innerHTML = `
         <strong>Selected Forest Hero</strong><br>
         ${escapeHtml(item.display_label)}<br>
-        <span class="small">user_id: ${escapeHtml(item.user_id)}, tree_id: ${escapeHtml(item.tree_id)}</span>
+        <span class="small">This photo will be linked to the selected tree.</span>
       `;
       el.searchResults.innerHTML = "";
     }
@@ -580,22 +606,13 @@
 
     function isSupportedImage(file) {
       if (!file) return false;
-      const type = (file.type || "").toLowerCase();
-      const name = (file.name || "").toLowerCase();
-      return type === "image/jpeg" ||
-        type === "image/png" ||
-        type === "image/webp" ||
-        name.endsWith(".jpg") ||
-        name.endsWith(".jpeg") ||
-        name.endsWith(".png") ||
-        name.endsWith(".webp");
+      const extensions = { "image/jpeg": /\.jpe?g$/i, "image/png": /\.png$/i, "image/webp": /\.webp$/i };
+      return Boolean(extensions[file.type]?.test(file.name)) && file.size > 0;
     }
 
     async function handleFileSelected(event) {
       const file = event.target.files && event.target.files[0];
-      if (!file) return;
-
-      resetImageState();
+      if (!file || submission || busy) return;
 
       if (!isSupportedImage(file)) {
         el.fileInput.value = "";
@@ -609,16 +626,24 @@
         return;
       }
 
+      resetImageState();
+      const version = ++selectionVersion;
+      preparing = true;
       selectedFile = file;
-      setStatus("Preparing image...");
+      el.uploadBtn.disabled = true;
+      setStatus("Preparing photo…");
 
       try {
-        originalFile = await resizeOriginalIfNeeded(file);
+        const prepared = await resizeOriginalIfNeeded(file);
+        if (version !== selectionVersion) return;
+        originalFile = prepared;
         const reader = new FileReader();
 
-        reader.onerror = () => setStatus("The image could not be read.");
+        reader.onerror = () => { if (version === selectionVersion) { preparing = false; setStatus("We could not open this photo. Choose a different JPG, PNG or WebP photo."); } };
         reader.onload = () => {
+          if (version !== selectionVersion) return;
           el.image.onload = async () => {
+            if (version !== selectionVersion) return;
             if (cropper) cropper.destroy();
 
             el.cropSection.hidden = false;
@@ -626,7 +651,7 @@
             cropper = new Cropper(el.image, {
               viewMode: 1,
               dragMode: "move",
-              autoCropArea: 0.82,
+              autoCropArea: 1,
               responsive: true,
               restore: false,
               checkOrientation: true,
@@ -637,8 +662,18 @@
               highlight: true,
               ready: async () => {
                 window.dispatchEvent(new Event("resize"));
-                await createCroppedBlob();
-                setStatus("Image ready. Crop if needed, then upload.");
+                if (version !== selectionVersion) return;
+                try {
+                  const blob = await createCroppedBlob();
+                  if (version !== selectionVersion) return;
+                  preparing = false;
+                  el.uploadBtn.disabled = !blob;
+                  setStatus(blob ? "Photo selected. Check the preview, then send your photo." : "We could not prepare the preview. Try a smaller photo.");
+                } catch (_) {
+                  if (version !== selectionVersion) return;
+                  preparing = false;
+                  setStatus("We could not prepare the preview. Choose a different photo.");
+                }
               }
             });
 
@@ -652,7 +687,9 @@
 
         reader.readAsDataURL(originalFile);
       } catch (err) {
-        setStatus("Image processing failed: " + err.message);
+        if (version !== selectionVersion) return;
+        preparing = false;
+        setStatus("We could not prepare this photo. Try a smaller JPG, PNG or WebP photo.");
       }
     }
 
@@ -716,7 +753,8 @@
     }
 
     async function createCroppedBlob() {
-      if (!cropper) return null;
+      if (!cropper || submission) return null;
+      const version = selectionVersion;
 
       const canvas = cropper.getCroppedCanvas({
         width: 600,
@@ -730,116 +768,101 @@
       const blob = await compressCanvasToMaxBytes(canvas, MAX_CROPPED_BYTES);
       if (!blob || blob.size > MAX_CROPPED_BYTES) return null;
 
+      if (version !== selectionVersion || submission) return null;
       croppedBlob = blob;
-      el.uploadBtn.disabled = false;
+      el.uploadBtn.disabled = preparing || busy;
       return blob;
     }
 
+    function lockSelection(locked) {
+      [el.staffName, el.category, el.caption, el.fileInput, el.forestHeroSearch,
+        el.zoomIn, el.zoomOut, el.adaptCropBtn].forEach(control => { control.disabled = locked; });
+      el.clearBtn.disabled = locked;
+      if (cropper) locked ? cropper.disable() : cropper.enable();
+    }
+
     async function uploadStaffPhoto() {
+      if (busy || preparing || submission?.received) return;
       const staffName = normalizeStaffName(el.staffName.value);
       const staffId = getStaffId();
-
-      if (!staffName || !staffId) {
-        setStatus("Enter a valid staff name.");
-        return;
+      if (!staffName || !/^[a-z0-9][a-z0-9_-]{1,47}$/.test(staffId)) {
+        setStatus("Enter your first and last name."); el.staffName.focus(); return;
       }
-
-      if (!selectedFile || !originalFile) {
-        setStatus("Choose an image first.");
-        return;
-      }
-
+      if (!selectedFile || !originalFile || !croppedBlob) { setStatus("Choose a photo first."); return; }
       if (el.category.value === "forest_hero" && !selectedForestHero) {
-        setStatus("Select a Forest Hero / tree before uploading.");
-        return;
+        setStatus("Choose a Forest Hero / tree before sending this photo."); el.forestHeroSearch.focus(); return;
       }
-
-      if (!croppedBlob) {
-        setStatus("Finalising crop...");
-        await createCroppedBlob();
+      if (!submission) {
+        const croppedFile = new File([croppedBlob], safeFileBaseName(selectedFile.name) + "_600px.jpg", { type: "image/jpeg" });
+        uploadFolder = "staff_uploads/" + staffId + "/" + crypto.randomUUID();
+        submission = KetsoStaffPhotoSubmission.createSubmission({
+          original: originalFile, cropped: croppedFile, folder: uploadFolder,
+          metadata: { staff_id: staffId, staff_name: staffName, category: el.category.value,
+            caption: el.caption.value.trim(), forest_hero: selectedForestHero,
+            original_file_size_bytes: originalFile.size, cropped_file_size_bytes: croppedFile.size },
+          upload: uploadFileToR2, save: saveStaffUpload, recover: recoverStaffUpload, onStatus: setStatus
+        });
       }
-
-      if (!croppedBlob) {
-        setStatus("Could not create cropped image. Please adapt the crop and try again.");
-        return;
-      }
-
+      busy = true;
+      lockSelection(true);
       el.uploadBtn.disabled = true;
-      uploadFolder = `staff_uploads/${staffId}/${Date.now()}`;
-
+      el.receiptHelp.hidden = true;
       try {
-        setStatus("Uploading original image...");
-        const originalUploaded = await uploadFileToR2(originalFile);
-        const originalUrl = R2_PUBLIC_BASE + originalUploaded.key;
-
-        setStatus("Uploading cropped image...");
-        const croppedName = safeFileBaseName(selectedFile.name) + "_600px.jpg";
-        const croppedFile = new File([croppedBlob], croppedName, { type: "image/jpeg" });
-        const croppedUploaded = await uploadFileToR2(croppedFile);
-        const croppedUrl = R2_PUBLIC_BASE + croppedUploaded.key;
-
-        setStatus("Saving staff upload...");
-        const saved = await saveStaffUpload({
-  staff_id: staffId,
-  uploaded_by: staffId,
-  staff_name: staffName,
-  category: el.category.value,
-  caption: el.caption.value.trim(),
-  forest_hero: selectedForestHero,
-  file_url: croppedUrl,
-  original_file_url: originalUrl,
-  cropped_file_size_bytes: croppedFile.size,
-  original_file_size_bytes: originalFile.size,
-  public_gallery_status: "public",
-  verification_status: "not_required"
-});
-
-        setStatus(`Done. Staff upload saved${saved.review_id ? ` (ID: ${saved.review_id})` : ""}.`);
-
-        cacheUpload(staffId, saved.upload);
-        resetImageState();
-        el.fileInput.value = "";
-        el.caption.value = "";
-
-        try {
-          await loadUploads();
-        } catch (refreshErr) {
-          console.warn("Staff uploads refresh failed after successful upload:", refreshErr);
-          el.uploadsStatus.textContent = "Upload saved, but the recent uploads list could not refresh. Press Refresh or open the gallery.";
-          setStatus(`Done. Staff upload saved${saved.review_id ? ` (ID: ${saved.review_id})` : ""}.`);
+        const saved = await submission.run();
+        setStatus("Photo received (submission " + saved.review_id + "). You do not need to send it again.");
+        el.uploadBtn.textContent = "Photo received";
+        el.clearBtn.textContent = "Send another photo";
+        // Local history is optional. Its failure must never invalidate server receipt.
+        try { cacheUpload(staffId, saved.upload); } catch (_) {
+          el.receiptHelp.hidden = false;
+          el.receiptHelp.textContent = "Your photo was received, but this browser could not remember it in recent uploads.";
         }
-      } catch (err) {
-        setStatus("Upload failed before it could be saved: " + err.message);
+        loadUploads();
+        el.status.focus();
+      } catch (_) {
+        if (submission.saveAttempted) {
+          setStatus("We could not confirm receipt. Your photo and details are still on this page. Check the receipt before sending again.");
+          el.uploadBtn.textContent = "Check receipt";
+          el.receiptHelp.textContent = "Keep this page open. If the receipt cannot be confirmed, ask KETSO to check this photo before making another submission. File reference: " + uploadFolder;
+          el.receiptHelp.hidden = false;
+        } else {
+          setStatus("Your upload stopped. Your photo and details are still on this page. Check your connection, then try again.");
+          el.uploadBtn.textContent = "Try again";
+        }
+        el.status.focus();
       } finally {
-        el.uploadBtn.disabled = !croppedBlob;
+        busy = false;
+        el.uploadBtn.disabled = submission.received;
+        // Do not let an uncertain save be replaced by a different submission.
+        el.clearBtn.disabled = submission.saveAttempted && !submission.received;
       }
     }
 
-    async function uploadFileToR2(file) {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("folder", uploadFolder);
-
-      const res = await fetch("/upload", {
-        method: "POST",
-        body: fd
-      });
-
-      const data = await readJsonResponse(res, "Upload");
-      if (!res.ok || !data.ok) throw new Error(data.error || "Upload failed.");
-      return data;
+    async function requestJson(url, options = {}, timeout = 60000) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeout);
+      try {
+        const response = await fetch(url, { ...options, signal: controller.signal });
+        const data = await readJsonResponse(response);
+        if (!response.ok || data?.ok !== true) throw new Error("Request not confirmed");
+        return data;
+      } finally { clearTimeout(timer); }
     }
 
-    async function saveStaffUpload(payload) {
-      const res = await fetch("/api/staff-uploads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+    async function uploadFileToR2(file, folder) {
+      const fd = new FormData(); fd.append("file", file); fd.append("folder", folder);
+      const data = await requestJson("/upload", { method: "POST", body: fd }, 180000);
+      if (typeof data.key !== "string" || !data.key.startsWith(folder + "/")) throw new Error("Invalid object receipt");
+      return data.key;
+    }
 
-      const data = await readJsonResponse(res, "Staff upload save");
-      if (!res.ok || !data.ok) throw new Error(data.error || "Staff upload save failed.");
-      return data;
+    async function saveStaffUpload(metadata, keys) {
+      return requestJson("/api/staff-uploads", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...metadata, file_url: R2_PUBLIC_BASE + keys.croppedKey, original_file_url: R2_PUBLIC_BASE + keys.originalKey }) });
+    }
+
+    async function recoverStaffUpload(metadata, keys) {
+      return requestJson("/api/staff-uploads?staff_id=" + encodeURIComponent(metadata.staff_id) + "&file_url=" + encodeURIComponent(R2_PUBLIC_BASE + keys.croppedKey));
     }
 
     async function loadUploads() {
@@ -869,12 +892,12 @@
         const cachedUploads = getCachedUploads(staffId);
 
         if (cachedUploads.length) {
-          el.uploadsStatus.textContent = "Showing recent uploads saved in this browser. The staff uploads API is not available yet.";
+          el.uploadsStatus.textContent = "Showing recent uploads saved in this browser. We could not refresh the list. Check your connection and press Refresh.";
           el.uploadsList.innerHTML = cachedUploads.map(renderUploadCard).join("");
           return;
         }
 
-        el.uploadsStatus.textContent = "Could not load staff uploads. Make sure the Cloudflare Function /api/staff-uploads is deployed.";
+        el.uploadsStatus.textContent = "Could not load staff uploads. Check your connection and press Refresh.";
       }
     }
 
@@ -927,7 +950,7 @@
 
     function mergeUploads(serverUploads, cachedUploads) {
       const seen = new Set();
-      return [...cachedUploads, ...serverUploads].filter((upload) => {
+      return [...serverUploads, ...cachedUploads].filter((upload) => {
         const key = String(upload.id || upload.file_url || upload.cropped_file_url || "");
         if (!key || seen.has(key)) return false;
         seen.add(key);
@@ -945,14 +968,25 @@
     }
 
     function resetForm() {
+      if (busy || (submission?.saveAttempted && !submission.received)) return;
+      const wasReceived = submission?.received;
+      submission = null;
+      lockSelection(false);
+      el.uploadBtn.textContent = "Send photo";
+      el.clearBtn.textContent = "Remove photo";
+      el.receiptHelp.hidden = true;
       el.fileInput.value = "";
-      el.caption.value = "";
-      updateForestHeroSearch();
+      if (wasReceived) {
+        el.caption.value = "";
+        updateForestHeroSearch();
+      }
       resetImageState();
       setStatus("");
     }
 
     function resetImageState() {
+      selectionVersion++;
+      preparing = false;
       selectedFile = null;
       originalFile = null;
       croppedBlob = null;
@@ -973,8 +1007,7 @@
     async function readJsonResponse(res, label) {
       const contentType = res.headers.get("content-type") || "";
       if (contentType.includes("application/json")) return res.json();
-      const text = await res.text();
-      throw new Error(`${label} API is not returning JSON. It may not be deployed yet.`);
+      throw new Error("The service did not confirm this request.");
     }
 
     function formatDate(value) {

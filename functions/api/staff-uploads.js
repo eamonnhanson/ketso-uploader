@@ -14,19 +14,38 @@ export async function onRequestGet({ request }) {
     return jsonResponse({ ok: false, error: "Invalid staff_id" }, 400);
   }
 
+  const requestedFile = url.searchParams.get("file_url");
+  const receiptFile = requestedFile ? validateR2Url(requestedFile, staffId) : null;
+  if (requestedFile && !receiptFile) {
+    return jsonResponse({ ok: false, error: "Invalid file_url" }, 400);
+  }
+
   const limit = clampLimit(url.searchParams.get("limit"));
   const galleryUrl = new URL(GALLERY_API_URL);
   galleryUrl.searchParams.set("upload_context", "staff_upload");
 
   try {
-    const res = await fetch(galleryUrl.toString());
+    const res = await fetch(galleryUrl.toString(), { signal: AbortSignal.timeout(25000) });
     const data = await safeJson(res);
 
-    if (!res.ok || !data || data.ok === false) {
+    if (!res.ok || data?.ok !== true) {
       return jsonResponse({
         ok: false,
         error: data?.error || "Could not load staff uploads"
-      }, res.status || 502);
+      }, res.ok ? 502 : res.status);
+    }
+
+    if (receiptFile) {
+      const received = (data.photos || data.uploads || []).find(upload =>
+        isStaffUploadFor(upload, staffId) &&
+        (upload.cropped_file_url || upload.file_url) === receiptFile &&
+        /^[1-9]\d*$/.test(String(upload.id || ""))
+      );
+      // This bounded public feed is evidence of receipt when a match exists.
+      // Absence is NOT evidence of non-receipt: never authorize a blind retry.
+      return jsonResponse(received
+        ? { ok: true, received: true, review_id: received.id, upload: received }
+        : { ok: true, received: false, retry_safe: false }, 200);
     }
 
     const uploads = (data.photos || data.uploads || [])
@@ -106,24 +125,26 @@ export async function onRequestPost({ request }) {
     const res = await fetch(REVIEW_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(50000)
     });
 
     const data = await safeJson(res);
 
-    if (!res.ok || !data) {
+    const reviewId = data?.review_id || data?.id;
+    if (!res.ok || data?.ok !== true || !/^[1-9]\d*$/.test(String(reviewId || ""))) {
       return jsonResponse({
         ok: false,
         error: data?.error || "Could not save staff upload metadata"
-      }, res.status || 502);
+      }, res.ok ? 502 : res.status);
     }
 
     return jsonResponse({
       ok: true,
-      review_id: data.review_id || data.id || null,
+      review_id: reviewId,
       upload: {
         ...payload,
-        id: data.review_id || data.id || null
+        id: reviewId
       }
     }, 200);
   } catch (err) {
