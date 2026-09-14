@@ -1,6 +1,6 @@
 {
   "name": "ketso-uploader",
   "private": true,
-  "scripts": { "test": "node --test test/*.test.cjs" },
+  "scripts": { "test": "node --test" },
   "engines": { "node": ">=22.7" }
 }

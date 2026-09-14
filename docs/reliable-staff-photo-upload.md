@@ -44,7 +44,7 @@ When no matching entry is found:
 
 ## Verification
 
-Use Node 24 LTS (Node 22.7+ supports module detection). No new runtime libraries or npm install needed.
+Use Node 22.7+ (Node 24 LTS recommended). Cloudflare Pages Functions are explicitly ESM through `functions/package.json`; the root package remains CommonJS so the existing `.cjs` tests and browser-shared helper keep their module contract. `npm test` uses Node's built-in test discovery rather than a shell glob, so it runs consistently in PowerShell, macOS and Linux. No new runtime libraries or npm install needed.
 
 ```sh
 npm test
@@ -62,7 +62,7 @@ The fixture serves local source and blocks external API requests with CSP. Only 
 
 Automated tests cover the controller, actual inline page handlers with DOM/service doubles, and the actual Cloudflare wrapper with mocked fetch. No production integration tests. Real Android camera/picker, GPS, TalkBack, tab discard and constrained field networks still require device testing.
 
-Validation on 14 September 2026: `npm test` passed all 21 tests on Node 24.19.0. Node emits a module-detection warning for existing ES-module Functions under the mixed-format repository; tests still pass. Browser fixtures at 360 and 412 CSS pixels reproduced partial-file recovery, lost-save-response receipt recovery and an unknown receipt that never resubmits. These are desktop browser viewports, not physical Android tests. Screenshots: [received at 360 px](staff-photo-received-360.png), [unconfirmed at 412 px](staff-photo-unconfirmed-412.png). Yellow controls are test-only.
+Validation on 14 September 2026: the complete Node test suite covers the staff handler, submission recovery and browser fixtures. Browser fixtures at 360 and 412 CSS pixels reproduced partial-file recovery, lost-save-response receipt recovery and an unknown receipt that never resubmits. These are desktop browser viewports, not physical Android tests. Screenshots: [received at 360 px](staff-photo-received-360.png), [unconfirmed at 412 px](staff-photo-unconfirmed-412.png). Yellow controls are test-only.
 
 ## Continue on another computer
 
