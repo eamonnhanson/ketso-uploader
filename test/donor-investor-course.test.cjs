@@ -12,17 +12,21 @@ vm.runInNewContext(courseSource, { window });
 const courseKey = "donor_investor_funding";
 const expectedLessons = [
   ["onboarding", "Onboarding"],
-  ["donor_module_1_report_writing", "Part 1: Cover page"],
-  ["donor_module_2_proposal_writing", "Part 2: Results"],
-  ["donor_module_3_business_plan", "Part 3: Impact"],
-  ["donor_module_4_income_generation_fundraising", "Part 4: Conclusions"],
-  ["donor_module_5_finances", "Part 5: Finances"]
+  ["donor_module_1_report_writing", "Module 1: Report writing"],
+  ["donor_module_2_proposal_writing", "Module 2: Proposal writing"],
+  ["donor_module_3_business_plan", "Module 3: Writing a business plan"],
+  ["donor_module_4_income_generation_fundraising", "Module 4: Income generating and fundraising"]
 ];
 
 test("shared config exposes the donor course under its canonical identifier", () => {
   const course = window.KETSO_ACADEMY_COURSES[courseKey];
   assert.equal(course.name, "Communicate effectively with donors and investors");
   assert.deepEqual(JSON.parse(JSON.stringify(course.lessons)), expectedLessons);
+  assert.deepEqual(JSON.parse(JSON.stringify(course.submissionSections)), [
+    ["onboarding", "Onboarding"], ["cover_page", "Part 1: Cover page"],
+    ["results", "Part 2: Results"], ["impact", "Part 3: Impact"],
+    ["conclusions", "Part 4: Conclusions"], ["finances", "Part 5: Finances"]
+  ]);
   assert.equal(Object.keys(window.KETSO_ACADEMY_COURSES).length, 3);
 });
 
@@ -52,6 +56,7 @@ assert.match(
   assert.match(startPage, /Communicate effectively with donors and investors/);
   assert.match(app, /coursePurposes\(activeCourseKey\)/);
   assert.match(app, /course_key: activeCourseKey/);
+  assert.match(app, /submission_section: purpose\.submissionSection \|\| null/);
   assert.match(app, /lesson_key: activeStudent \|\| !staffUnlocked \? purpose\.lessonKey/);
   assert.match(gallery, /option value="donor_investor_funding"/);
   assert.match(gallery, /student-profile\/\?student_id=.*course_key=/s);

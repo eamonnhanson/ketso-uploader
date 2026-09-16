@@ -135,6 +135,12 @@ const ARBORICULTURE_PURPOSES = Object.fromEntries(
 );
 
 function coursePurposes(courseKey) {
+  const sections = window.KETSO_ACADEMY_COURSES?.[courseKey]?.submissionSections;
+  if (sections) return Object.fromEntries(sections.map(([submissionSection, label]) => [submissionSection, {
+    label, category: "academy_upload", studentCategory: "academy_upload",
+    uploadContext: "academy_lesson_upload", lessonKey: null, submissionSection,
+    primaryAction: submissionSection === "onboarding" ? "selfie" : "photo"
+  }]));
   return Object.fromEntries(
     (window.KETSO_ACADEMY_COURSES?.[courseKey]?.lessons || []).map(([lessonKey, label]) => [
       lessonKey,
@@ -1007,6 +1013,7 @@ function buildReviewPayload(fileUrl, size, fileType, extra = {}) {
     academy_track: academyTrack,
     academy_whatsapp: activeStudent?.whatsapp || null,
     lesson_key: activeStudent || !staffUnlocked ? purpose.lessonKey : null,
+    submission_section: purpose.submissionSection || null,
     upload_reason: activeStudent || !staffUnlocked ? el.studentPurpose.value : null,
     upload_reason_label: activeStudent || !staffUnlocked ? purpose.label : null,
     interest_area: academyTrack,
