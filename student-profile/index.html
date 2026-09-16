@@ -332,7 +332,7 @@ function labelPointEvent(event) {
   return event.event_label || key || "Academy activity";
 }
 function renderUpload(upload) {
-  const lesson = labelLesson(upload.lesson_key);
+  const lesson = upload.submission_section_label || labelSubmissionSection(upload.submission_section) || labelLesson(upload.lesson_key);
   const uploadType = upload.upload_type || upload.file_type || "upload";
   const fileUrl = upload.cropped_file_url || upload.original_file_url;
 
@@ -359,6 +359,12 @@ function renderUpload(upload) {
       }
     </div>
   `;
+}
+
+function labelSubmissionSection(value) {
+  const configuredSection = window.KETSO_ACADEMY_COURSES?.[courseKey]?.submissionSections
+    ?.find(([key]) => key === value);
+  return configuredSection?.[1] || "";
 }
 
 function labelLesson(value) {

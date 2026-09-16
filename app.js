@@ -134,6 +134,28 @@ const ARBORICULTURE_PURPOSES = Object.fromEntries(
   ])
 );
 
+function coursePurposes(courseKey) {
+  const sections = window.KETSO_ACADEMY_COURSES?.[courseKey]?.submissionSections;
+  if (sections) return Object.fromEntries(sections.map(([submissionSection, label]) => [submissionSection, {
+    label, category: "academy_upload", studentCategory: "academy_upload",
+    uploadContext: "academy_lesson_upload", lessonKey: null, submissionSection,
+    primaryAction: submissionSection === "onboarding" ? "selfie" : "photo"
+  }]));
+  return Object.fromEntries(
+    (window.KETSO_ACADEMY_COURSES?.[courseKey]?.lessons || []).map(([lessonKey, label]) => [
+      lessonKey,
+      {
+        label,
+        category: lessonKey === "onboarding" ? "academy_onboarding" : "academy_upload",
+        studentCategory: lessonKey === "onboarding" ? "student_onboarding" : "academy_upload",
+        uploadContext: lessonKey === "onboarding" ? "academy_onboarding" : "academy_lesson_upload",
+        lessonKey,
+        primaryAction: lessonKey === "onboarding" ? "selfie" : "photo"
+      }
+    ])
+  );
+}
+
 const el = {
   studentBanner: document.getElementById("studentBanner"),
   programmeSelector: document.getElementById("programmeSelector"),
@@ -274,7 +296,9 @@ function getUrlToken() {
 
 function getStudentPurpose() {
   const value = el.studentPurpose?.value || "onboarding";
-  const purposes = activeCourseKey === "arboriculture_1" ? ARBORICULTURE_PURPOSES : STUDENT_PURPOSES;
+  const purposes = activeCourseKey === "online_tree_planting"
+    ? STUDENT_PURPOSES
+    : activeCourseKey === "arboriculture_1" ? ARBORICULTURE_PURPOSES : coursePurposes(activeCourseKey);
   return purposes[value] || purposes.onboarding || STUDENT_PURPOSES.onboarding;
 }
 
@@ -316,7 +340,7 @@ function updateQuestionContext() {
 
 function setProgrammeSelection(programmeKey, options = {}) {
   const isStaff = programmeKey === "staff";
-  const isCourse = programmeKey === "online_tree_planting" || programmeKey === "arboriculture_1";
+  const isCourse = Boolean(window.KETSO_ACADEMY_COURSES?.[programmeKey]);
   if (!isStaff && !isCourse) return;
 
   el.programmeButtons.forEach((button) => {
@@ -343,10 +367,12 @@ function setProgrammeSelection(programmeKey, options = {}) {
   updateUploadActionsForContext();
   renderRecentStudentUploads();
 
-  const programmeName = PROGRAMME_LABELS[programmeKey];
-  el.uploadTitle.textContent = programmeKey === "arboriculture_1"
+  const programmeName = PROGRAMME_LABELS[programmeKey] || window.KETSO_ACADEMY_COURSES[programmeKey].name;
+  el.uploadTitle.textContent = programmeKey === "online_tree_planting"
+    ? "Choose your lesson"
+    : programmeKey === "arboriculture_1"
     ? "Choose your module assignment"
-    : "Choose your lesson";
+    : "Choose your part";
 
   if (academyStudent) {
     const name = academyStudent.full_name ||
@@ -360,7 +386,7 @@ function setProgrammeSelection(programmeKey, options = {}) {
   }
 
   if (!options.preserveStatus) {
-    setStatus(`Choose your ${programmeKey === "arboriculture_1" ? "module" : "lesson"}, then confirm your student profile.`);
+    setStatus(`Choose your ${programmeKey === "online_tree_planting" ? "lesson" : programmeKey === "arboriculture_1" ? "module" : "part"}, then confirm your student profile.`);
   }
 
   el.primaryPanel.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -987,6 +1013,7 @@ function buildReviewPayload(fileUrl, size, fileType, extra = {}) {
     academy_track: academyTrack,
     academy_whatsapp: activeStudent?.whatsapp || null,
     lesson_key: activeStudent || !staffUnlocked ? purpose.lessonKey : null,
+    submission_section: purpose.submissionSection || null,
     upload_reason: activeStudent || !staffUnlocked ? el.studentPurpose.value : null,
     upload_reason_label: activeStudent || !staffUnlocked ? purpose.label : null,
     interest_area: academyTrack,
