@@ -75,4 +75,9 @@ test("extra-course enrolment link is token-gated and opens safely", () => {
   assert.match(app, /new URL\(EXTRA_COURSE_ENROLMENT_FORM_URL\)/);
   assert.match(app, /new URLSearchParams\(\{ token: academyToken \}\)/);
   assert.match(app, /extraCourseEnrolmentLink\.hidden = false/);
+  const onboarding = fs.readFileSync(path.join(root, "academy-onboarding", "index.html"), "utf8");
+  assert.match(onboarding, /id="extraCourseEnrolmentLink"[\s\S]*target="_blank"[\s\S]*rel="noopener"[\s\S]*hidden/);
+  assert.match(onboarding, /new URL\(EXTRA_COURSE_ENROLMENT_FORM_URL\)/);
+  assert.match(onboarding, /new URLSearchParams\(\{ token \}\)/);
+  assert.match(onboarding, /extraCourseEnrolmentLink\.hidden = false/);
 });
