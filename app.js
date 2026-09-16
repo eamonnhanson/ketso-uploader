@@ -9,6 +9,7 @@ const ACADEMY_STUDENT_SEARCH_API_URL = "/api/academy-student-search";
 const R2_PUBLIC_BASE = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/";
 const ONBOARDING_FORM_URL = "https://forms.zohopublic.eu/greenmakombeh/form/KETSOacademy/formperma/Qt8SERehFwXmL4fYledPgJO-1QOC9wurOwpZydf68LA";
 const ONBOARDING_HELP_VIDEO_URL = "https://www.tiktok.com/@plantatreenow/video/7638751146852633878?is_from_webapp=1&sender_device=pc&web_id=7548932980812826144";
+const EXTRA_COURSE_ENROLMENT_FORM_URL = "https://forms.zohopublic.eu/greenmakombeh/form/KETSOAcademyEnrolinanothercourse/formperma/FWXOc5zBBvDexB4K15XxcJypcvSrt6CYM5mOSMe2Ipg";
 
 const MAX_CROPPED_BYTES = 500 * 1024;
 const HARD_MAX_IMAGE_INPUT_BYTES = 25 * 1024 * 1024;
@@ -159,6 +160,7 @@ function coursePurposes(courseKey) {
 
 const el = {
   studentBanner: document.getElementById("studentBanner"),
+  extraCourseEnrolmentLink: document.getElementById("extraCourseEnrolmentLink"),
   programmeSelector: document.getElementById("programmeSelector"),
   programmeButtons: [...document.querySelectorAll("[data-programme]")],
   staffCard: document.getElementById("staffCard"),
@@ -1502,6 +1504,10 @@ async function initAcademyToken() {
     el.studentBanner.hidden = false;
     const courseName = PROGRAMME_LABELS[activeCourseKey] || "Online Agroforestry Training";
     el.studentBanner.textContent = `${courseName} uploads for ${name}`;
+    const enrolmentUrl = new URL(EXTRA_COURSE_ENROLMENT_FORM_URL);
+    enrolmentUrl.search = new URLSearchParams({ token: academyToken }).toString();
+    el.extraCourseEnrolmentLink.href = enrolmentUrl.toString();
+    el.extraCourseEnrolmentLink.hidden = false;
     updateUploadActionsForContext();
     updateStudentIdentityPanel();
     renderRecentStudentUploads();
