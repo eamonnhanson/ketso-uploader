@@ -153,6 +153,12 @@
   </a>
 </div>
 
+<p>
+  <a id="extraCourseEnrolmentLink" class="secondary-link" href="#" target="_blank" rel="noopener" hidden>
+    Enrol in another course
+  </a>
+</p>
+
 <input type="hidden" id="category" value="academy_upload">
 
 <label for="fullName">Full name</label>
@@ -263,6 +269,7 @@ const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
 const MAX_TEXT_BYTES = 1 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
 const HARD_MAX_INPUT_BYTES = 100 * 1024 * 1024;
+const EXTRA_COURSE_ENROLMENT_FORM_URL = "https://forms.zohopublic.eu/greenmakombeh/form/KETSOAcademyEnrolinanothercourse/formperma/FWXOc5zBBvDexB4K15XxcJypcvSrt6CYM5mOSMe2Ipg";
 
 const fileInput = document.getElementById("fileInput");
 const image = document.getElementById("image");
@@ -280,6 +287,7 @@ const interestArea = document.getElementById("interestArea");
 const lessonKey = document.getElementById("lessonKey");
 const uploadType = document.getElementById("uploadType");
 const consent = document.getElementById("consent");
+const extraCourseEnrolmentLink = document.getElementById("extraCourseEnrolmentLink");
 
 const textUploadSection = document.getElementById("textUploadSection");
 const textInput = document.getElementById("textInput");
@@ -309,6 +317,11 @@ async function loadStudentFromToken() {
       status.textContent = "Could not find your academy record. Please check your link.";
       return;
     }
+
+    const enrolmentUrl = new URL(EXTRA_COURSE_ENROLMENT_FORM_URL);
+    enrolmentUrl.search = new URLSearchParams({ token }).toString();
+    extraCourseEnrolmentLink.href = enrolmentUrl.toString();
+    extraCourseEnrolmentLink.hidden = false;
 
     const s = data.student;
     window.loadedStudent = s;
