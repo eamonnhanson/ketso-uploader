@@ -58,6 +58,8 @@ assert.match(
   assert.match(app, /course_key: activeCourseKey/);
   assert.match(app, /submission_section: purpose\.submissionSection \|\| null/);
   assert.match(app, /lesson_key: activeStudent \|\| !staffUnlocked \? purpose\.lessonKey/);
+  assert.match(app, /programmeSelectedByStudent/);
+  assert.match(app, /if \(!programmeSelectedByStudent\)/);
   assert.match(gallery, /option value="donor_investor_funding"/);
   assert.match(gallery, /student-profile\/\?student_id=.*course_key=/s);
   assert.match(profile, /KETSO_ACADEMY_COURSES\?\.\[requestedCourseKey\]/);

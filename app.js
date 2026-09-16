@@ -30,6 +30,7 @@ let selectedLink = null;
 let searchTimeout = null;
 let studentSearchTimeout = null;
 let activeCourseKey = window.KETSO_DEFAULT_COURSE || "online_tree_planting";
+let programmeSelectedByStudent = false;
 
 const PROGRAMME_LABELS = Object.freeze({
   online_tree_planting: "Online Agroforestry Training",
@@ -360,6 +361,7 @@ function setProgrammeSelection(programmeKey, options = {}) {
     return;
   }
 
+  if (!options.fromEnrollment) programmeSelectedByStudent = true;
   activeCourseKey = programmeKey;
   el.staffDetails.open = false;
   renderCoursePurposes();
@@ -1488,8 +1490,10 @@ async function initAcademyToken() {
     }
 
     academyStudent = data.student;
-    activeCourseKey = data.enrollment?.course_key || window.KETSO_DEFAULT_COURSE || "online_tree_planting";
-    setProgrammeSelection(activeCourseKey, { preserveStatus: true });
+    if (!programmeSelectedByStudent) {
+      activeCourseKey = data.enrollment?.course_key || window.KETSO_DEFAULT_COURSE || "online_tree_planting";
+      setProgrammeSelection(activeCourseKey, { preserveStatus: true, fromEnrollment: true });
+    }
     selectedStudent = academyStudent;
     const name = academyStudent.full_name ||
       [academyStudent.first_name, academyStudent.last_name].filter(Boolean).join(" ") ||
