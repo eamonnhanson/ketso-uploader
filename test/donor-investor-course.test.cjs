@@ -12,10 +12,11 @@ vm.runInNewContext(courseSource, { window });
 const courseKey = "donor_investor_funding";
 const expectedLessons = [
   ["onboarding", "Onboarding"],
-  ["donor_module_1_report_writing", "Module 1: Report writing"],
-  ["donor_module_2_proposal_writing", "Module 2: Proposal writing"],
-  ["donor_module_3_business_plan", "Module 3: Writing a business plan"],
-  ["donor_module_4_income_generation_fundraising", "Module 4: Income generating and fundraising"]
+  ["donor_module_1_report_writing", "Part 1: Cover page"],
+  ["donor_module_2_proposal_writing", "Part 2: Results"],
+  ["donor_module_3_business_plan", "Part 3: Impact"],
+  ["donor_module_4_income_generation_fundraising", "Part 4: Conclusions"],
+  ["donor_module_5_finances", "Part 5: Finances"]
 ];
 
 test("shared config exposes the donor course under its canonical identifier", () => {
@@ -26,6 +27,8 @@ test("shared config exposes the donor course under its canonical identifier", ()
 });
 
 test("uploader, gallery and profile pass the donor course through the existing flow", () => {
+  const startPage = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const app = fs.readFileSync(path.join(root, "app.js"), "utf8");
   const uploader = fs.readFileSync(path.join(root, "academy-onboarding", "index.html"), "utf8");
   const gallery = fs.readFileSync(path.join(root, "student-gallery", "index.html"), "utf8");
   const profile = fs.readFileSync(path.join(root, "student-profile", "index.html"), "utf8");
@@ -45,6 +48,11 @@ assert.match(
 );
   assert.match(uploader, /course_key: activeCourseKey/);
   assert.match(uploader, /lesson_key: lessonKey\.value/);
+  assert.match(startPage, /data-programme="donor_investor_funding"/);
+  assert.match(startPage, /Communicate effectively with donors and investors/);
+  assert.match(app, /coursePurposes\(activeCourseKey\)/);
+  assert.match(app, /course_key: activeCourseKey/);
+  assert.match(app, /lesson_key: activeStudent \|\| !staffUnlocked \? purpose\.lessonKey/);
   assert.match(gallery, /option value="donor_investor_funding"/);
   assert.match(gallery, /student-profile\/\?student_id=.*course_key=/s);
   assert.match(profile, /KETSO_ACADEMY_COURSES\?\.\[requestedCourseKey\]/);
