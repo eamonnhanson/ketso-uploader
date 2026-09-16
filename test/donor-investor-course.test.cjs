@@ -62,4 +62,5 @@ assert.match(
   assert.match(gallery, /student-profile\/\?student_id=.*course_key=/s);
   assert.match(profile, /KETSO_ACADEMY_COURSES\?\.\[requestedCourseKey\]/);
   assert.match(profile, /find\(\(\[key\]\) => key === value\)/);
+  assert.match(profile, /labelSubmissionSection\(upload\.submission_section\)/);
 });
