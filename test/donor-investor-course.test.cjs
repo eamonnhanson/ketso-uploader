@@ -66,3 +66,13 @@ assert.match(
   assert.match(profile, /find\(\(\[key\]\) => key === value\)/);
   assert.match(profile, /labelSubmissionSection\(upload\.submission_section\)/);
 });
+
+test("extra-course enrolment link is token-gated and opens safely", () => {
+  const startPage = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const app = fs.readFileSync(path.join(root, "app.js"), "utf8");
+
+  assert.match(startPage, /id="extraCourseEnrolmentLink"[\s\S]*target="_blank"[\s\S]*rel="noopener"[\s\S]*hidden/);
+  assert.match(app, /new URL\(EXTRA_COURSE_ENROLMENT_FORM_URL\)/);
+  assert.match(app, /new URLSearchParams\(\{ token: academyToken \}\)/);
+  assert.match(app, /extraCourseEnrolmentLink\.hidden = false/);
+});
