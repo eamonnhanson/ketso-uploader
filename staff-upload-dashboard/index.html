@@ -305,6 +305,56 @@
       font-weight: 700;
     }
 
+    .edit-upload-dialog {
+      width: min(560px, calc(100vw - 24px));
+      max-width: calc(100vw - 24px);
+      max-height: calc(100vh - 24px);
+      margin: auto;
+      border: 0;
+      border-radius: 10px;
+      padding: 0;
+      color: var(--ink);
+      background: var(--panel);
+      box-shadow: 0 18px 55px rgba(0, 0, 0, 0.28);
+    }
+
+    .edit-upload-dialog::backdrop {
+      background: rgba(0, 0, 0, 0.45);
+    }
+
+    .edit-upload-form {
+      max-height: calc(100vh - 24px);
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    .edit-upload-form h2 {
+      margin-bottom: 16px;
+    }
+
+    .edit-upload-form label {
+      margin-top: 0;
+    }
+
+    .edit-upload-form .edit-field + .edit-field {
+      margin-top: 16px;
+    }
+
+    .edit-upload-form textarea {
+      min-height: 120px;
+    }
+
+    .edit-upload-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .edit-upload-actions button {
+      flex: 1 1 150px;
+    }
+
     @media (max-width: 820px) {
       .shell {
         padding: 14px;
@@ -316,6 +366,14 @@
 
       .crop-toolbar {
         grid-template-columns: 1fr;
+      }
+
+      .edit-upload-form {
+        padding: 16px;
+      }
+
+      .edit-upload-actions {
+        flex-direction: column;
       }
     }
   </style>
@@ -396,6 +454,29 @@
     </div>
   </main>
 
+  <dialog id="editUploadDialog" class="edit-upload-dialog" aria-labelledby="editUploadTitle">
+    <form id="editUploadForm" class="edit-upload-form">
+      <h2 id="editUploadTitle">Edit upload details</h2>
+      <div class="edit-field">
+        <label for="editStaffName">Name</label>
+        <input id="editStaffName" name="staff_name" maxlength="80" required>
+      </div>
+      <div class="edit-field">
+        <label for="editCategory">Category</label>
+        <select id="editCategory" name="category"></select>
+      </div>
+      <div class="edit-field">
+        <label for="editCaption">What does this upload show?</label>
+        <textarea id="editCaption" name="caption" maxlength="500"></textarea>
+      </div>
+      <p id="editUploadStatus" class="small" role="status" aria-live="polite"></p>
+      <div class="edit-upload-actions">
+        <button id="saveUploadEdit" type="submit">Save changes</button>
+        <button id="cancelUploadEdit" type="button" class="button-soft">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
   <script src="/shared/staff-categories.js"></script>
   <script src="/shared/staff-photo-submission.js?v=1"></script>
@@ -427,6 +508,7 @@
     let selectedVideoFile = null;
     let videoDurationSeconds = null;
     let visibleUploads = [];
+    let editingUploadId = null;
 
     const el = {
       staffName: document.getElementById("staffName"),
@@ -452,7 +534,15 @@
       receiptHelp: document.getElementById("receiptHelp"),
       refreshBtn: document.getElementById("refreshBtn"),
       uploadsStatus: document.getElementById("uploadsStatus"),
-      uploadsList: document.getElementById("uploadsList")
+      uploadsList: document.getElementById("uploadsList"),
+      editUploadDialog: document.getElementById("editUploadDialog"),
+      editUploadForm: document.getElementById("editUploadForm"),
+      editStaffName: document.getElementById("editStaffName"),
+      editCategory: document.getElementById("editCategory"),
+      editCaption: document.getElementById("editCaption"),
+      editUploadStatus: document.getElementById("editUploadStatus"),
+      saveUploadEdit: document.getElementById("saveUploadEdit"),
+      cancelUploadEdit: document.getElementById("cancelUploadEdit")
     };
 
     init();
@@ -506,6 +596,9 @@
         el.staffName.value = normalizeStaffName(el.staffName.value) || DEFAULT_STAFF_NAME;
         loadUploads();
       });
+      el.editUploadForm.addEventListener("submit", saveStaffUploadEdit);
+      el.cancelUploadEdit.addEventListener("click", closeStaffUploadEdit);
+      el.editUploadDialog.addEventListener("close", () => { editingUploadId = null; });
       updateForestHeroSearch();
     }
 
@@ -1128,33 +1221,41 @@
 
     window.beginStaffUploadEdit = function (reviewId) {
       const upload = visibleUploads.find(item => Number(item.id) === Number(reviewId));
-      const card = [...el.uploadsList.querySelectorAll(".upload-card")].find(item => item.querySelector(`[onclick="beginStaffUploadEdit(${Number(reviewId)})"]`));
-      if (!upload || !card) return;
-      card.innerHTML += `<form class="edit-details" onsubmit="saveStaffUploadEdit(event, ${Number(reviewId)})">
-        <label>Name <input name="staff_name" maxlength="80" required value="${escapeAttr(upload.staff_name || upload.uploader_name || el.staffName.value)}"></label>
-        <label>Category <select name="category">${getStaffCategories().map(item => `<option value="${escapeAttr(item.value)}" ${item.value === (upload.staff_category || upload.selected_category) ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}</select></label>
-        <label>What does this upload show? <textarea name="caption" maxlength="500">${escapeHtml(upload.caption || "")}</textarea></label>
-        <button type="submit">Save changes</button> <button type="button" class="button-soft" onclick="loadUploads()">Cancel</button>
-        <p class="small" data-edit-status></p></form>`;
-      card.querySelector("[onclick]").disabled = true;
+      if (!upload) return;
+      editingUploadId = Number(reviewId);
+      el.editStaffName.value = upload.staff_name || upload.uploader_name || el.staffName.value;
+      el.editCategory.innerHTML = getStaffCategories().map(item =>
+        `<option value="${escapeAttr(item.value)}">${escapeHtml(item.label)}</option>`
+      ).join("");
+      el.editCategory.value = upload.staff_category || upload.selected_category || upload.category || "";
+      el.editCaption.value = upload.caption || "";
+      el.editUploadStatus.textContent = "";
+      el.saveUploadEdit.disabled = false;
+      el.editUploadDialog.showModal();
+      el.editStaffName.focus();
     };
 
-    window.saveStaffUploadEdit = async function (event, reviewId) {
+    function closeStaffUploadEdit() {
+      if (el.editUploadDialog.open) el.editUploadDialog.close();
+    }
+
+    async function saveStaffUploadEdit(event) {
       event.preventDefault();
-      const form = event.currentTarget;
-      const save = form.querySelector('[type="submit"]');
-      const status = form.querySelector("[data-edit-status]");
-      save.disabled = true;
+      if (!Number.isFinite(editingUploadId)) return;
+      const reviewId = editingUploadId;
+      el.saveUploadEdit.disabled = true;
+      el.editUploadStatus.textContent = "";
       try {
-        const res = await fetch(`/api/staff-uploads/${encodeURIComponent(reviewId)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ staff_id: getStaffId(), staff_name: form.staff_name.value.trim(), category: form.category.value, caption: form.caption.value.trim() }) });
+        const res = await fetch(`/api/staff-uploads/${encodeURIComponent(reviewId)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ staff_id: getStaffId(), staff_name: el.editStaffName.value.trim(), category: el.editCategory.value, caption: el.editCaption.value.trim() }) });
         const data = await readJsonResponse(res);
         if (!res.ok || !data.ok) throw new Error(data.error || "Could not update details");
-        const index = visibleUploads.findIndex(item => Number(item.id) === Number(reviewId));
+        const index = visibleUploads.findIndex(item => Number(item.id) === reviewId);
         if (index >= 0) visibleUploads[index] = { ...visibleUploads[index], ...data.upload };
         el.uploadsList.innerHTML = visibleUploads.map(renderUploadCard).join("");
+        closeStaffUploadEdit();
         setStatus("Details updated");
-      } catch (err) { status.textContent = "Could not save changes. " + err.message; save.disabled = false; }
-    };
+      } catch (err) { el.editUploadStatus.textContent = "Could not save changes. " + err.message; el.saveUploadEdit.disabled = false; }
+    }
 
     function cacheUpload(staffId, upload) {
       if (!upload) return;
