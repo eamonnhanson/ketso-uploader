@@ -128,6 +128,7 @@
     function renderUpload(upload) {
       const fileUrl = upload.cropped_file_url || upload.original_file_url || "";
       const type = upload.file_type || upload.upload_type || "";
+      const caption = String(upload.caption || "").trim();
 
       return `
         <article class="card">
@@ -136,6 +137,7 @@
             <strong>${escapeHtml(upload.staff_category || upload.selected_category || upload.category || "Staff upload")}</strong><br>
             ${escapeHtml(upload.linked_entity_name || upload.uploader_name || "")}<br>
             ${escapeHtml((upload.ai_description || "").slice(0, 120))}
+            ${caption ? `<div>Description: ${escapeHtml(caption)}</div>` : ""}
           </div>
         </article>
       `;
