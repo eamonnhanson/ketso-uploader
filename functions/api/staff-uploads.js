@@ -5,6 +5,8 @@ const DEFAULT_STAFF_ID = "amara_abdulai_sesay";
 const REVIEW_API_URL = "https://ptb-tree-map.onrender.com/api/save-photo-review";
 const GALLERY_API_URL = "https://ptb-tree-map.onrender.com/api/photo-review-gallery";
 const R2_PUBLIC_BASE = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/";
+const STAFF_VIDEO_MIME_TYPES = new Set(["video/mp4", "video/quicktime", "video/webm"]);
+const MAX_STAFF_VIDEO_BYTES = 75 * 1024 * 1024;
 
 export async function onRequestGet({ request }) {
   const url = new URL(request.url);
@@ -90,6 +92,14 @@ export async function onRequestPost({ request }) {
     const caption = cleanCaption(body.caption);
     const forestHero = cleanForestHero(body.forest_hero);
     const now = new Date().toISOString();
+    const isVideo = body.file_type === "video";
+
+    if (isVideo) {
+      const mimeType = String(body.mime_type || "").trim().toLowerCase();
+      const fileSize = numberOrNull(body.original_file_size_bytes);
+      if (!STAFF_VIDEO_MIME_TYPES.has(mimeType)) return jsonResponse({ ok: false, error: "UNSUPPORTED_VIDEO_TYPE" }, 400);
+      if (fileSize === null || fileSize > MAX_STAFF_VIDEO_BYTES) return jsonResponse({ ok: false, error: "VIDEO_TOO_LARGE" }, 400);
+    }
 
     const payload = {
       category: "staff_upload",
@@ -108,13 +118,16 @@ export async function onRequestPost({ request }) {
       forest_hero_label: forestHero ? forestHero.display_label : null,
       uploader_name: staffName,
       uploader_email: null,
-      file_type: "image",
-      upload_type: "staff_photo",
+      mime_type: isVideo ? String(body.mime_type || "").trim().toLowerCase() : null,
+      original_filename: isVideo ? String(body.original_filename || "").trim().slice(0, 255) : null,
+      duration_seconds: isVideo ? numberOrNull(body.duration_seconds) : null,
+      file_type: isVideo ? "video" : "image",
+      upload_type: isVideo ? "video" : "staff_photo",
       uploader_role: "staff",
       upload_context: "staff_upload",
-      verification_status: "not_required",
-      review_status: "not_required",
-      public_gallery_status: "public",
+      verification_status: isVideo ? "pending" : "not_required",
+      review_status: isVideo ? "pending" : "not_required",
+      public_gallery_status: isVideo ? "private" : "public",
       uploaded_by: staffId,
       staff_id: staffId,
       staff_name: staffName,

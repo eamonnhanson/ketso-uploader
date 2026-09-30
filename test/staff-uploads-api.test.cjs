@@ -20,6 +20,26 @@ test('staff save keeps metadata and confirms valid receipt', async () => {
     return json({ ok: true, review_id: 51 });
   }, async api => { const r = await api.onRequestPost({ request: post() }); const d = await r.json(); assert.equal(r.status, 200); assert.equal(d.review_id, 51); });
 });
+test('staff video forwards media metadata and starts private pending', async () => {
+  const video = { ...payload, file_url: base + 'staff_uploads/test_staff/attempt/field.mp4', original_file_url: base + 'staff_uploads/test_staff/attempt/field.mp4', file_type: 'video', mime_type: 'video/mp4', original_filename: 'field.mp4', original_file_size_bytes: 1024, duration_seconds: 12 };
+  await withFetch(async (_url, opts) => {
+    const b = JSON.parse(opts.body);
+    assert.equal(b.file_type, 'video'); assert.equal(b.upload_type, 'video');
+    assert.equal(b.mime_type, 'video/mp4'); assert.equal(b.original_filename, 'field.mp4');
+    assert.equal(b.duration_seconds, 12); assert.equal(b.public_gallery_status, 'private');
+    return json({ ok: true, review_id: 52 });
+  }, async api => {
+    const r = await api.onRequestPost({ request: new Request('http://localhost/api/staff-uploads', { method: 'POST', body: JSON.stringify(video) }) });
+    assert.equal(r.status, 200);
+  });
+});
+test('staff video is rejected by the frontend API before the backend call', async () => {
+  const invalid = { ...payload, file_type: 'video', mime_type: 'video/avi', original_file_size_bytes: 1 };
+  await withFetch(async () => { throw new Error('must not call backend'); }, async api => {
+    const r = await api.onRequestPost({ request: new Request('http://localhost/api/staff-uploads', { method: 'POST', body: JSON.stringify(invalid) }) });
+    assert.equal(r.status, 400); assert.equal((await r.json()).error, 'UNSUPPORTED_VIDEO_TYPE');
+  });
+});
 test('receipt lookup requires matching staff, exact photo URL and durable ID', async () => {
   await withFetch(async () => json({ ok: true, photos: [
     { id: 50, upload_context: 'staff_upload', uploader_name: 'Another Person', cropped_file_url: url },

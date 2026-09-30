@@ -143,7 +143,7 @@
 
     function renderPreview(fileUrl, type) {
       if (!fileUrl) return "<p>No file URL.</p>";
-      if (type === "video") return `<video controls src="${escapeAttr(fileUrl)}"></video>`;
+      if (type === "video") return `<video controls preload="metadata" src="${escapeAttr(fileUrl)}"></video>`;
       if (type && type !== "image" && type !== "image_photo") {
         return `<a class="file-link" href="${escapeAttr(fileUrl)}" target="_blank">Open file</a>`;
       }
