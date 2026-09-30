@@ -260,6 +260,17 @@
       background: #eee;
     }
 
+    .video-placeholder {
+      display: grid;
+      width: 92px;
+      height: 92px;
+      place-items: center;
+      border-radius: 8px;
+      background: var(--soft);
+      color: var(--green-dark);
+      font-weight: 700;
+    }
+
     .upload-meta {
       min-width: 0;
       color: #333;
@@ -321,6 +332,12 @@
       <section class="panel" aria-labelledby="upload-title">
         <h2 id="upload-title">Upload staff photo</h2>
 
+        <fieldset>
+          <legend>Upload type</legend>
+          <label><input id="photoMode" type="radio" name="uploadMode" checked> Upload photo</label>
+          <label><input id="videoMode" type="radio" name="uploadMode"> Upload short video</label>
+        </fieldset>
+
 
         <label for="staffName">Staff name</label>
         <input id="staffName" type="text" autocomplete="name" placeholder="First name Last name">
@@ -336,11 +353,11 @@
           <div id="selectedHero" class="selected-item" hidden></div>
         </section>
 
-        <label for="caption">What does this photo show?</label>
+        <label for="caption">What does this upload show?</label>
         <textarea id="caption" maxlength="500" placeholder="Add a short note about the work"></textarea>
 
-        <label for="fileInput">Choose photo</label>
-        <p id="photoHint" class="small">JPG, PNG or WebP, up to 25 MB before resizing. Photos above 8 MB are resized. The full photo and a smaller preview are sent. Videos are not supported here yet.</p>
+        <label id="fileLabel" for="fileInput">Choose photo</label>
+        <p id="photoHint" class="small">JPG, PNG or WebP, up to 25 MB before resizing. Photos above 8 MB are resized. The full photo and a smaller preview are sent.</p>
         <input id="fileInput" aria-describedby="photoHint" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
 
         <section id="cropSection" class="crop-section" hidden>
@@ -361,7 +378,7 @@
           <button id="clearBtn" type="button" class="button-soft">Remove photo</button>
         </div>
 
-        <p class="small">Staff photos can appear in the public gallery. Keep this page open until you see “Photo received”. Your selection is not saved if you close or refresh this page.</p>
+        <p id="uploadHelp" class="small">Staff photos can appear in the public gallery. Keep this page open until you see “Photo received”. Your selection is not saved if you close or refresh this page.</p>
         <p id="status" class="status" role="status" aria-live="polite" tabindex="-1"></p>
         <p id="receiptHelp" class="small" hidden></p>
       </section>
@@ -382,12 +399,16 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
   <script src="/shared/staff-categories.js"></script>
   <script src="/shared/staff-photo-submission.js?v=1"></script>
+  <script src="/shared/staff-video-submission.js?v=1"></script>
   <script>
     const R2_PUBLIC_BASE = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/";
     const SEARCH_API_BASE = "https://ptb-tree-map.onrender.com";
     const MAX_CROPPED_BYTES = 500 * 1024;
     const MAX_ORIGINAL_BYTES = 8 * 1024 * 1024;
     const HARD_MAX_IMAGE_INPUT_BYTES = 25 * 1024 * 1024;
+    const MAX_VIDEO_BYTES = 75 * 1024 * 1024;
+    const MAX_VIDEO_DURATION_SECONDS = 60;
+    const VIDEO_MIME_TYPES = new Set(["video/mp4", "video/quicktime", "video/webm"]);
     const DEFAULT_STAFF_NAME = "Amara Abdulai Sesay";
     const DEFAULT_STAFF_ID = "amara_abdulai_sesay";
 
@@ -402,6 +423,9 @@
     let busy = false;
     let preparing = false;
     let selectionVersion = 0;
+    let uploadMode = "photo";
+    let selectedVideoFile = null;
+    let videoDurationSeconds = null;
 
     const el = {
       staffName: document.getElementById("staffName"),
@@ -411,7 +435,11 @@
       searchResults: document.getElementById("searchResults"),
       selectedHero: document.getElementById("selectedHero"),
       caption: document.getElementById("caption"),
+      photoMode: document.getElementById("photoMode"),
+      videoMode: document.getElementById("videoMode"),
       fileInput: document.getElementById("fileInput"),
+      fileLabel: document.getElementById("fileLabel"),
+      uploadHelp: document.getElementById("uploadHelp"),
       cropSection: document.getElementById("cropSection"),
       image: document.getElementById("image"),
       zoomOut: document.getElementById("zoomOut"),
@@ -451,6 +479,8 @@
 
     function bindEvents() {
       el.fileInput.addEventListener("change", handleFileSelected);
+      el.photoMode.addEventListener("change", () => el.photoMode.checked && setUploadMode("photo"));
+      el.videoMode.addEventListener("change", () => el.videoMode.checked && setUploadMode("video"));
       el.zoomIn.addEventListener("click", () => cropper && cropper.zoom(0.18));
       el.zoomOut.addEventListener("click", () => cropper && cropper.zoom(-0.18));
       el.adaptCropBtn.addEventListener("click", async () => {
@@ -463,7 +493,7 @@
         } catch (_) { setStatus("Could not update preview. Try a different photo."); }
         finally { preparing = false; el.uploadBtn.disabled = !croppedBlob; }
       });
-      el.uploadBtn.addEventListener("click", uploadStaffPhoto);
+      el.uploadBtn.addEventListener("click", () => uploadMode === "video" ? uploadStaffVideo() : uploadStaffPhoto());
       el.clearBtn.addEventListener("click", resetForm);
       window.addEventListener("beforeunload", (event) => {
         if (busy || (submission && !submission.received)) { event.preventDefault(); event.returnValue = ""; }
@@ -480,6 +510,30 @@
 
     function setStatus(message) {
       el.status.textContent = message;
+    }
+
+    function setUploadMode(mode) {
+      if (busy || submission) return;
+      uploadMode = mode;
+      resetImageState();
+      resetVideoState();
+      el.fileInput.value = "";
+      const isVideo = mode === "video";
+      el.photoMode.checked = !isVideo;
+      el.videoMode.checked = isVideo;
+      el.fileLabel.textContent = isVideo ? "Choose short video" : "Choose photo";
+      el.fileInput.accept = isVideo
+        ? "video/mp4,video/quicktime,video/webm"
+        : ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp";
+      el.uploadBtn.textContent = isVideo ? "Send video" : "Send photo";
+      el.clearBtn.textContent = isVideo ? "Remove video" : "Remove photo";
+      el.uploadHelp.textContent = isVideo
+        ? "Short field video. Maximum 60 seconds. Maximum 75 MB. Longer or larger videos cannot be uploaded. Keep this page open until you see “Video received”."
+        : "Staff photos can appear in the public gallery. Keep this page open until you see “Photo received”. Your selection is not saved if you close or refresh this page.";
+      el.photoHint.textContent = isVideo
+        ? "MP4, QuickTime or WebM only. Maximum 60 seconds and 75 MB."
+        : "JPG, PNG or WebP, up to 25 MB before resizing. Photos above 8 MB are resized. The full photo and a smaller preview are sent.";
+      setStatus("");
     }
 
     function normalizeStaffId(value) {
@@ -610,9 +664,18 @@
       return Boolean(extensions[file.type]?.test(file.name)) && file.size > 0;
     }
 
+    function isSupportedVideo(file) {
+      return Boolean(file && VIDEO_MIME_TYPES.has(file.type) && file.size > 0);
+    }
+
     async function handleFileSelected(event) {
       const file = event.target.files && event.target.files[0];
       if (!file || submission || busy) return;
+
+      if (uploadMode === "video") {
+        await handleVideoSelected(file);
+        return;
+      }
 
       if (!isSupportedImage(file)) {
         el.fileInput.value = "";
@@ -691,6 +754,56 @@
         preparing = false;
         setStatus("We could not prepare this photo. Try a smaller JPG, PNG or WebP photo.");
       }
+    }
+
+    async function handleVideoSelected(file) {
+      if (!isSupportedVideo(file)) {
+        el.fileInput.value = "";
+        setStatus("Use MP4, QuickTime or WebM for staff videos.");
+        return;
+      }
+      if (file.size > MAX_VIDEO_BYTES) {
+        el.fileInput.value = "";
+        setStatus("Video is too large. Maximum size is 75 MB.");
+        return;
+      }
+      resetImageState();
+      resetVideoState();
+      selectedVideoFile = file;
+      el.uploadBtn.disabled = true;
+      setStatus("Checking video length…");
+      try {
+        const duration = await readVideoDuration(file);
+        if (duration > MAX_VIDEO_DURATION_SECONDS) {
+          selectedVideoFile = null;
+          el.fileInput.value = "";
+          setStatus("Video is too long. Maximum length is 60 seconds.");
+          return;
+        }
+        videoDurationSeconds = duration;
+        el.uploadBtn.disabled = false;
+        setStatus("Video selected. Check the details, then send your video.");
+      } catch (_) {
+        selectedVideoFile = null;
+        el.fileInput.value = "";
+        setStatus("We could not read this video. Choose a different MP4, QuickTime or WebM video.");
+      }
+    }
+
+    function readVideoDuration(file) {
+      return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const video = document.createElement("video");
+        const cleanup = () => URL.revokeObjectURL(url);
+        video.preload = "metadata";
+        video.onloadedmetadata = () => {
+          const duration = Number(video.duration);
+          cleanup();
+          Number.isFinite(duration) && duration >= 0 ? resolve(duration) : reject(new Error("invalid_duration"));
+        };
+        video.onerror = () => { cleanup(); reject(new Error("metadata_failed")); };
+        video.src = url;
+      });
     }
 
     async function resizeOriginalIfNeeded(file) {
@@ -775,7 +888,7 @@
     }
 
     function lockSelection(locked) {
-      [el.staffName, el.category, el.caption, el.fileInput, el.forestHeroSearch,
+      [el.staffName, el.category, el.caption, el.photoMode, el.videoMode, el.fileInput, el.forestHeroSearch,
         el.zoomIn, el.zoomOut, el.adaptCropBtn].forEach(control => { control.disabled = locked; });
       el.clearBtn.disabled = locked;
       if (cropper) locked ? cropper.disable() : cropper.enable();
@@ -838,13 +951,88 @@
       }
     }
 
+    async function uploadStaffVideo() {
+      if (busy || submission?.received) return;
+      const staffName = normalizeStaffName(el.staffName.value);
+      const staffId = getStaffId();
+      if (!staffName || !/^[a-z0-9][a-z0-9_-]{1,47}$/.test(staffId)) {
+        setStatus("Enter your first and last name."); el.staffName.focus(); return;
+      }
+      if (!selectedVideoFile || !Number.isFinite(videoDurationSeconds)) {
+        setStatus("Choose a short video first."); return;
+      }
+      if (el.category.value === "forest_hero" && !selectedForestHero) {
+        setStatus("Choose a Forest Hero / tree before sending this video."); el.forestHeroSearch.focus(); return;
+      }
+      if (!submission) {
+        uploadFolder = "staff_uploads/" + staffId + "/" + crypto.randomUUID();
+        submission = KetsoStaffVideoSubmission.createSubmission({
+          file: selectedVideoFile, folder: uploadFolder,
+          metadata: {
+            staff_id: staffId, staff_name: staffName, category: el.category.value,
+            caption: el.caption.value.trim(), forest_hero: selectedForestHero,
+            file_type: "video", mime_type: selectedVideoFile.type,
+            original_filename: selectedVideoFile.name,
+            original_file_size_bytes: selectedVideoFile.size,
+            duration_seconds: videoDurationSeconds
+          },
+          upload: uploadFileToR2, save: saveStaffUpload, recover: recoverStaffUpload, onStatus: setStatus
+        });
+      }
+      busy = true;
+      lockSelection(true);
+      el.uploadBtn.disabled = true;
+      el.receiptHelp.hidden = true;
+      try {
+        const saved = await submission.run();
+        setStatus("Video received (submission " + saved.review_id + "). You do not need to send it again.");
+        el.uploadBtn.textContent = "Video received";
+        el.clearBtn.textContent = "Send another video";
+        try { cacheUpload(staffId, saved.upload); } catch (_) {
+          el.receiptHelp.hidden = false;
+          el.receiptHelp.textContent = "Your video was received, but this browser could not remember it in recent uploads.";
+        }
+        loadUploads();
+        el.status.focus();
+      } catch (err) {
+        const message = videoUploadErrorMessage(err);
+        if (submission.saveAttempted) {
+          setStatus(message || "We could not confirm receipt. Your video and details are still on this page. Check the receipt before sending again.");
+          el.uploadBtn.textContent = "Check receipt";
+          el.receiptHelp.textContent = "Keep this page open. If the receipt cannot be confirmed, ask KETSO to check this video before making another submission. File reference: " + uploadFolder;
+          el.receiptHelp.hidden = false;
+        } else {
+          setStatus(message || "Your video upload stopped. Your video and details are still on this page. Check your connection, then try again.");
+          el.uploadBtn.textContent = "Try again";
+        }
+        el.status.focus();
+      } finally {
+        busy = false;
+        el.uploadBtn.disabled = submission.received;
+        el.clearBtn.disabled = submission.saveAttempted && !submission.received;
+      }
+    }
+
+    function videoUploadErrorMessage(err) {
+      const code = String(err?.message || "");
+      const messages = {
+        VIDEO_TOO_LARGE: "Video is too large. Maximum size is 75 MB.",
+        VIDEO_TOO_LONG: "Video is too long. Maximum length is 60 seconds.",
+        UNSUPPORTED_VIDEO_TYPE: "Use MP4, QuickTime or WebM for staff videos.",
+        STAFF_IDENTITY_REQUIRED: "Enter your staff name before sending the video.",
+        STORAGE_FAILED: "The video could not be stored. Check your connection and try again.",
+        RECEIPT_PERSISTENCE_FAILED: "The video was not confirmed. Please check your connection and try again."
+      };
+      return messages[code] || "";
+    }
+
     async function requestJson(url, options = {}, timeout = 60000) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeout);
       try {
         const response = await fetch(url, { ...options, signal: controller.signal });
         const data = await readJsonResponse(response);
-        if (!response.ok || data?.ok !== true) throw new Error("Request not confirmed");
+        if (!response.ok || data?.ok !== true) throw new Error(data?.error || "Request not confirmed");
         return data;
       } finally { clearTimeout(timer); }
     }
@@ -857,12 +1045,19 @@
     }
 
     async function saveStaffUpload(metadata, keys) {
+      const fileUrl = metadata.file_type === "video"
+        ? R2_PUBLIC_BASE + keys.objectKey
+        : R2_PUBLIC_BASE + keys.croppedKey;
+      const originalUrl = metadata.file_type === "video"
+        ? fileUrl
+        : R2_PUBLIC_BASE + keys.originalKey;
       return requestJson("/api/staff-uploads", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...metadata, file_url: R2_PUBLIC_BASE + keys.croppedKey, original_file_url: R2_PUBLIC_BASE + keys.originalKey }) });
+        body: JSON.stringify({ ...metadata, file_url: fileUrl, original_file_url: originalUrl }) });
     }
 
     async function recoverStaffUpload(metadata, keys) {
-      return requestJson("/api/staff-uploads?staff_id=" + encodeURIComponent(metadata.staff_id) + "&file_url=" + encodeURIComponent(R2_PUBLIC_BASE + keys.croppedKey));
+      const key = metadata.file_type === "video" ? keys.objectKey : keys.croppedKey;
+      return requestJson("/api/staff-uploads?staff_id=" + encodeURIComponent(metadata.staff_id) + "&file_url=" + encodeURIComponent(R2_PUBLIC_BASE + key));
     }
 
     async function loadUploads() {
@@ -904,6 +1099,7 @@
     function renderUploadCard(upload) {
       const imageUrl = upload.cropped_file_url || upload.file_url || "";
       const originalUrl = upload.original_file_url || imageUrl;
+      const isVideo = upload.file_type === "video" || upload.upload_type === "video";
       const category = labelCategory(upload.staff_category || upload.selected_category || upload.category);
       const caption = upload.caption ? `<div>${escapeHtml(upload.caption)}</div>` : "";
       const date = formatDate(upload.created_at_utc || upload.created_at || upload.staff_created_at);
@@ -911,16 +1107,16 @@
 
       return `
         <article class="upload-card">
-          <img src="${escapeAttr(imageUrl)}" alt="Staff upload">
+          ${isVideo ? '<div class="video-placeholder" aria-label="Video">Video</div>' : `<img src="${escapeAttr(imageUrl)}" alt="Staff upload">`}
           <div class="upload-meta">
-            <strong>${escapeHtml(category)}</strong><br>
+            <strong>${isVideo ? "Video · " : ""}${escapeHtml(category)}</strong><br>
             ${caption}
             <span class="badge">${escapeHtml(publicStatus === "public" ? "Public" : "Private")}</span>
             <span class="badge">${escapeHtml(upload.verification_status || "not_required")}</span>
             <div>${escapeHtml(date)}</div>
             <div class="upload-links">
-              <a href="${escapeAttr(imageUrl)}" target="_blank" rel="noopener">Open image</a>
-              <a href="${escapeAttr(originalUrl)}" target="_blank" rel="noopener">Open original</a>
+              <a href="${escapeAttr(imageUrl)}" target="_blank" rel="noopener">${isVideo ? "Open video" : "Open image"}</a>
+              ${isVideo ? "" : `<a href="${escapeAttr(originalUrl)}" target="_blank" rel="noopener">Open original</a>`}
             </div>
           </div>
         </article>
@@ -972,8 +1168,8 @@
       const wasReceived = submission?.received;
       submission = null;
       lockSelection(false);
-      el.uploadBtn.textContent = "Send photo";
-      el.clearBtn.textContent = "Remove photo";
+      el.uploadBtn.textContent = uploadMode === "video" ? "Send video" : "Send photo";
+      el.clearBtn.textContent = uploadMode === "video" ? "Remove video" : "Remove photo";
       el.receiptHelp.hidden = true;
       el.fileInput.value = "";
       if (wasReceived) {
@@ -981,6 +1177,7 @@
         updateForestHeroSearch();
       }
       resetImageState();
+      resetVideoState();
       setStatus("");
     }
 
@@ -1002,6 +1199,11 @@
         cropper.destroy();
         cropper = null;
       }
+    }
+
+    function resetVideoState() {
+      selectedVideoFile = null;
+      videoDurationSeconds = null;
     }
 
     async function readJsonResponse(res, label) {
