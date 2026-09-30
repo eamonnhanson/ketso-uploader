@@ -426,6 +426,7 @@
     let uploadMode = "photo";
     let selectedVideoFile = null;
     let videoDurationSeconds = null;
+    let visibleUploads = [];
 
     const el = {
       staffName: document.getElementById("staffName"),
@@ -1082,6 +1083,7 @@
         }
 
         el.uploadsStatus.textContent = "";
+        visibleUploads = uploads;
         el.uploadsList.innerHTML = uploads.map(renderUploadCard).join("");
       } catch (err) {
         const cachedUploads = getCachedUploads(staffId);
@@ -1117,11 +1119,42 @@
             <div class="upload-links">
               <a href="${escapeAttr(imageUrl)}" target="_blank" rel="noopener">${isVideo ? "Open video" : "Open image"}</a>
               ${isVideo ? "" : `<a href="${escapeAttr(originalUrl)}" target="_blank" rel="noopener">Open original</a>`}
+              <button type="button" class="button-soft" onclick="beginStaffUploadEdit(${Number(upload.id)})">Edit details</button>
             </div>
           </div>
         </article>
       `;
     }
+
+    window.beginStaffUploadEdit = function (reviewId) {
+      const upload = visibleUploads.find(item => Number(item.id) === Number(reviewId));
+      const card = [...el.uploadsList.querySelectorAll(".upload-card")].find(item => item.querySelector(`[onclick="beginStaffUploadEdit(${Number(reviewId)})"]`));
+      if (!upload || !card) return;
+      card.innerHTML += `<form class="edit-details" onsubmit="saveStaffUploadEdit(event, ${Number(reviewId)})">
+        <label>Name <input name="staff_name" maxlength="80" required value="${escapeAttr(upload.staff_name || upload.uploader_name || el.staffName.value)}"></label>
+        <label>Category <select name="category">${getStaffCategories().map(item => `<option value="${escapeAttr(item.value)}" ${item.value === (upload.staff_category || upload.selected_category) ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}</select></label>
+        <label>What does this upload show? <textarea name="caption" maxlength="500">${escapeHtml(upload.caption || "")}</textarea></label>
+        <button type="submit">Save changes</button> <button type="button" class="button-soft" onclick="loadUploads()">Cancel</button>
+        <p class="small" data-edit-status></p></form>`;
+      card.querySelector("[onclick]").disabled = true;
+    };
+
+    window.saveStaffUploadEdit = async function (event, reviewId) {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const save = form.querySelector('[type="submit"]');
+      const status = form.querySelector("[data-edit-status]");
+      save.disabled = true;
+      try {
+        const res = await fetch(`/api/staff-uploads/${encodeURIComponent(reviewId)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ staff_id: getStaffId(), staff_name: form.staff_name.value.trim(), category: form.category.value, caption: form.caption.value.trim() }) });
+        const data = await readJsonResponse(res);
+        if (!res.ok || !data.ok) throw new Error(data.error || "Could not update details");
+        const index = visibleUploads.findIndex(item => Number(item.id) === Number(reviewId));
+        if (index >= 0) visibleUploads[index] = { ...visibleUploads[index], ...data.upload };
+        el.uploadsList.innerHTML = visibleUploads.map(renderUploadCard).join("");
+        setStatus("Details updated");
+      } catch (err) { status.textContent = "Could not save changes. " + err.message; save.disabled = false; }
+    };
 
     function cacheUpload(staffId, upload) {
       if (!upload) return;
