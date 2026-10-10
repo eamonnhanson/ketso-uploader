@@ -2,11 +2,27 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>KETSO Academy uploads</title>
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
 
   <style>
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { overflow-wrap: anywhere; }
+    fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+    input, select, textarea { max-width: 100%; }
+    button { min-height: 44px; font-size: 16px; }
+    button.primary { background: #1f7a3a; color: white; border: 0; border-radius: 6px; }
+    #cropViewport { width: 100%; height: 45vh; height: 45dvh; max-height: 420px; overflow: hidden; }
+    #cropViewport .cropper-container { max-width: 100%; }
+    #image { width: 100%; height: 100%; object-fit: contain; }
+    #reviewPhoto { max-width: 100%; max-height: 35vh; object-fit: contain; }
+    #imageControls { display: flex; gap: 12px; }
+    #imageControls.hidden { display: none; }
+    #imageControls button { width: 48px; }
+
     body {
       font-family: Arial, sans-serif;
       padding: 20px;
@@ -48,7 +64,7 @@
       max-width: 100%;
       max-height: 600px;
       display: none;
-      margin-top: 20px;
+      margin-top: 0;
     }
 
     .controls {
@@ -127,6 +143,7 @@
     .hidden {
       display: none;
     }
+    @media (max-width: 480px) { body { padding: 12px; } }
   </style>
 </head>
 
@@ -161,6 +178,9 @@
 
 <input type="hidden" id="category" value="academy_upload">
 
+<p id="stepProgress" role="status" aria-live="polite"></p>
+<fieldset id="detailsStep" hidden>
+<legend>Assignment details</legend>
 <label for="fullName">Full name</label>
 <input type="text" id="fullName" placeholder="Your full name" required>
 
@@ -190,6 +210,14 @@
   <option value="evaluation">Evaluation</option>
 </select>
 
+<label class="consent-label">
+  <input type="checkbox" id="consent">
+  I allow KETSO to store this upload for academy registration, review and learning feedback.
+  I understand that it will not be shown publicly without review or permission.
+</label>
+
+</fieldset>
+<fieldset id="chooseStep"><legend>Choose your work</legend>
 <label for="uploadType">Upload type</label>
 <select id="uploadType" required>
   <option value="">Select upload type</option>
@@ -205,49 +233,45 @@
 </div>
 
 <div id="fileUploadSection">
-  <label for="fileInput">Upload file</label>
+  <div id="photoChoices" hidden>
+<button id="takePhoto" type="button">Take photo</button>
+<button id="chooseGallery" type="button">Choose from gallery</button>
+<input id="cameraInput" type="file" accept="image/jpeg,image/png,image/webp" capture hidden>
+</div>
+<label id="fileLabel" for="fileInput">Choose file</label>
   <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.txt,.mp4,.mov,.webm">
 </div>
 
-<label class="consent-label">
-  <input type="checkbox" id="consent">
-  I allow KETSO to store this upload for academy registration, review and learning feedback.
-  I understand that it will not be shown publicly without review or permission.
-</label>
-
+</fieldset>
 <p>
   <a href="https://youtube.com/shorts/Prr-WLKFDwY?feature=share" target="_blank" class="button-link">
     ▶ Watch instruction video
   </a>
 </p>
 
-<div id="imageInstructions" class="note hidden">
-  Image/photo upload:<br>
-  1. Use the zoom buttons to zoom in<br>
-  2. Drag the image to position it<br>
-  3. Adjust the crop box<br>
-  4. Click "Crop to 600 px"<br>
-  5. Click "Upload work"<br>
-  6. Use JPG, PNG or WebP. HEIC is not reliable in browser preview/crop.
-</div>
-
+<fieldset id="adjustStep" hidden><legend>Adjust photo</legend>
+<div id="imageInstructions" class="note hidden">Move the photo, adjust the frame and use − or + to zoom.</div>
 <div id="generalInstructions" class="note">
   Document, text and video uploads will be stored for review. Large videos should be kept short.
 </div>
 
-<img id="image" alt="Preview">
+<div id="cropViewport"><img id="image" alt="Selected photo"></div>
 
 <div id="imageControls" class="controls hidden">
-  <button id="zoomIn" disabled>Zoom in</button>
-  <button id="zoomOut" disabled>Zoom out</button>
+  <button id="zoomOut" aria-label="Zoom out" disabled>−</button>
+  <button id="zoomIn" aria-label="Zoom in" disabled>+</button>
 </div>
 
-<div class="controls">
-  <button id="cropBtn" disabled class="hidden">Crop to 600 px</button>
-  <button id="uploadBtn" disabled>Upload work</button>
-</div>
+<button id="cropBtn" disabled class="primary hidden">Confirm photo</button>
+</fieldset>
+<fieldset id="reviewStep" hidden><legend>Review and submit</legend>
+<img id="reviewPhoto" alt="Confirmed photo" hidden>
+<p id="reviewDetails"></p><p id="reviewAnswer"></p>
+<button id="uploadBtn" class="primary" disabled>Submit assignment</button>
+</fieldset>
+<div class="controls"><button id="backBtn" hidden>Back</button><button id="continueBtn" class="primary">Continue</button></div>
 
-<p id="status"></p>
+<p id="status" role="status" aria-live="polite"></p>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
 <script src="/shared/academy-courses.js"></script>
@@ -257,6 +281,15 @@ let cropper = null;
 let croppedBlob = null;
 let processedOriginalFile = null;
 let selectedFile = null;
+let step = 1;
+let busy = false;
+let saveAttempted = false;
+let received = false;
+let uploadCache = new Map();
+let reviewUrl = null;
+let selectionVersion = 0;
+let selecting = false;
+let confirming = false;
 
 const REVIEW_API_URL = "https://ptb-tree-map.onrender.com/api/save-photo-review";
 const R2_PUBLIC_BASE = "https://pub-146513161ecf43ebbf81dda0cf702fde.r2.dev/";
@@ -353,12 +386,58 @@ async function loadStudentFromToken() {
     status.textContent = `Your details have been loaded for ${courseName(activeCourseKey)}. Please choose a topic and upload your work.`;
 
   } catch (err) {
-    console.error("loadStudentFromToken error:", err);
     status.textContent = "Could not load your academy details.";
   }
 }
 
 loadStudentFromToken();
+
+const stepPanels = ['chooseStep', 'adjustStep', 'detailsStep', 'reviewStep'];
+const backBtn = document.getElementById('backBtn');
+const continueBtn = document.getElementById('continueBtn');
+function showStep(next) {
+  step = next;
+  stepPanels.forEach((id, index) => { document.getElementById(id).hidden = index + 1 !== step; });
+  const photo = isImageUpload();
+  const visibleStep = !photo && step > 2 ? step - 1 : step;
+  document.getElementById('stepProgress').textContent = 'Step ' + visibleStep + ' of ' + (photo ? 4 : 3) + ': ' + ['Choose your work', 'Adjust photo', 'Assignment details', 'Review and submit'][step - 1];
+  backBtn.hidden = step === 1;
+  continueBtn.hidden = step === 2 || step === 4;
+  if (step === 4) renderReview();
+}
+function renderReview() {
+  const preview = document.getElementById('reviewPhoto');
+  if (reviewUrl) URL.revokeObjectURL(reviewUrl);
+  reviewUrl = croppedBlob && isImageUpload() ? URL.createObjectURL(croppedBlob) : null;
+  preview.hidden = !reviewUrl;
+  if (reviewUrl) preview.src = reviewUrl;
+  document.getElementById('reviewDetails').textContent = [courseName(activeCourseKey), lessonKey.options[lessonKey.selectedIndex]?.text, fullName.value, selectedFile?.name].filter(Boolean).join(' — ');
+  document.getElementById('reviewAnswer').textContent = isTextUpload() ? textInput.value : '';
+}
+backBtn.addEventListener('click', () => {
+  if (busy || confirming || saveAttempted) return;
+  showStep(step === 3 && !isImageUpload() ? 1 : step - 1);
+});
+continueBtn.addEventListener('click', () => {
+  if (busy || selecting || saveAttempted) return;
+  if (step === 1) {
+    if (!uploadType.value || (!isTextUpload() && !cropper && uploadBtn.disabled) || (isTextUpload() && !textInput.value.trim())) {
+      status.textContent = 'Please choose your work before continuing.'; return;
+    }
+    showStep(isImageUpload() ? 2 : 3);
+  } else {
+    const error = validateBeforeUpload();
+    if (error) { status.textContent = error; return; }
+    showStep(4);
+  }
+});
+document.getElementById('takePhoto').addEventListener('click', () => document.getElementById('cameraInput').click());
+document.getElementById('chooseGallery').addEventListener('click', () => fileInput.click());
+document.getElementById('cameraInput').addEventListener('change', selectFile);
+function lockSubmission(locked) {
+  document.querySelectorAll('input, select, textarea, button').forEach(control => { control.disabled = locked; });
+}
+showStep(1);
 
 function courseName(courseKey) {
   return window.KETSO_ACADEMY_COURSES?.[courseKey]?.name || "Online tree planting";
@@ -456,7 +535,7 @@ async function resizeOriginalIfNeeded(file) {
     return file;
   }
 
-  status.textContent = "Original image is larger than 8 MB. Resizing before upload...";
+  status.textContent = "Preparing your photo...";
 
   const img = await loadImageFromFile(file);
 
@@ -492,6 +571,9 @@ async function resizeOriginalIfNeeded(file) {
 }
 
 function resetUploadState() {
+  selectionVersion++;
+  selecting = false;
+  uploadCache = new Map();
   selectedFile = null;
   croppedBlob = null;
   processedOriginalFile = null;
@@ -512,6 +594,11 @@ uploadType.addEventListener("change", () => {
   fileInput.value = "";
   textInput.value = "";
   status.textContent = "";
+  showStep(1);
+  document.getElementById('photoChoices').hidden = !isImageUpload();
+  fileInput.hidden = isImageUpload();
+  document.getElementById('fileLabel').hidden = isImageUpload();
+  document.getElementById('cameraInput').value = '';
 
   if (isTextUpload()) {
     textUploadSection.classList.remove("hidden");
@@ -552,11 +639,12 @@ textInput.addEventListener("input", () => {
   }
 });
 
-fileInput.addEventListener("change", async function (event) {
+async function selectFile(event) {
   const file = event.target.files[0];
   if (!file) return;
 
   resetUploadState();
+  const version = selectionVersion;
   selectedFile = file;
 
   if (file.size > HARD_MAX_INPUT_BYTES) {
@@ -573,13 +661,23 @@ fileInput.addEventListener("change", async function (event) {
       fileInput.value = "";
       return;
     }
+    if (!/\.(jpe?g|png|webp)$/i.test(file.name)) {
+      status.textContent = "Please use a JPG, PNG or WebP photo.";
+      return;
+    }
 
     try {
-      processedOriginalFile = await resizeOriginalIfNeeded(file);
+      selecting = true;
+      status.textContent = 'Preparing your photo...';
+      const original = await resizeOriginalIfNeeded(file);
+      if (version !== selectionVersion) return;
+      processedOriginalFile = original;
+      showStep(2);
 
       const reader = new FileReader();
 
       reader.onload = function () {
+        if (version !== selectionVersion) return;
         image.src = reader.result;
         image.style.display = "block";
 
@@ -587,6 +685,8 @@ fileInput.addEventListener("change", async function (event) {
           if (cropper) cropper.destroy();
 
           cropper = new Cropper(image, {
+            minContainerWidth: 0,
+            minContainerHeight: 0,
             viewMode: 1,
             dragMode: "move",
             autoCropArea: 0.6,
@@ -595,28 +695,32 @@ fileInput.addEventListener("change", async function (event) {
             zoomable: true,
             guides: true,
             center: true,
-            highlight: true
+            highlight: true,
+            ready() {
+              if (version !== selectionVersion) return;
+              selecting = false;
+              cropBtn.disabled = false;
+              zoomIn.disabled = false;
+              zoomOut.disabled = false;
+            }
           });
 
-          cropBtn.disabled = false;
-          zoomIn.disabled = false;
-          zoomOut.disabled = false;
+          // Controls are enabled by Cropper only after the photo is ready.
 
-          status.textContent =
-            "Image loaded.\n" +
-            "Original ready for upload: " +
-            Math.round(processedOriginalFile.size / 1024) +
-            " KB.";
+          status.textContent = "Adjust your photo, then choose Confirm photo.";
 
         } catch (err) {
-          status.textContent = "Cropper failed to load: " + err.message;
+          selecting = false;
+          status.textContent = "Could not open this photo. Go back and choose another JPG, PNG or WebP photo.";
         }
       };
 
+      reader.onerror = () => { selecting = false; status.textContent = "Could not read this photo. Please choose it again."; };
       reader.readAsDataURL(processedOriginalFile);
 
     } catch (err) {
-      status.textContent = "Image processing failed: " + err.message;
+      selecting = false;
+      status.textContent = "Could not prepare this photo. Please choose another JPG, PNG or WebP photo.";
     }
 
     return;
@@ -633,6 +737,10 @@ fileInput.addEventListener("change", async function (event) {
     if (!allowedDocumentTypes.includes(file.type)) {
       status.textContent = "Unsupported document format. Use PDF, DOC, DOCX or TXT.";
       fileInput.value = "";
+      return;
+    }
+    if (!/\.(pdf|docx?|txt)$/i.test(file.name)) {
+      status.textContent = "Use PDF, DOC, DOCX or TXT.";
       return;
     }
 
@@ -655,6 +763,10 @@ fileInput.addEventListener("change", async function (event) {
       fileInput.value = "";
       return;
     }
+    if (!/\.(mp4|mov|webm)$/i.test(file.name)) {
+      status.textContent = "Use MP4, MOV or WebM.";
+      return;
+    }
 
     if (file.size > MAX_VIDEO_BYTES) {
       status.textContent = "Video too large. Maximum size is 100 MB.";
@@ -665,7 +777,8 @@ fileInput.addEventListener("change", async function (event) {
     uploadBtn.disabled = false;
     status.textContent = "Video ready for upload.";
   }
-});
+}
+fileInput.addEventListener("change", selectFile);
 
 zoomIn.addEventListener("click", () => {
   if (cropper) cropper.zoom(0.2);
@@ -676,7 +789,8 @@ zoomOut.addEventListener("click", () => {
 });
 
 cropBtn.addEventListener("click", async function () {
-  if (!cropper) return;
+  if (!cropper || selecting || confirming) return;
+  cropBtn.disabled = true;
 
   const canvas = cropper.getCroppedCanvas({
     width: 600,
@@ -686,42 +800,76 @@ cropBtn.addEventListener("click", async function () {
   });
 
   if (!canvas) {
-    status.textContent = "Cropping failed.";
+    status.textContent = "Could not confirm this photo. Please try again.";
+    cropBtn.disabled = false;
     return;
   }
 
   try {
+    confirming = true;
     const blob = await compressCanvasToMaxBytes(canvas, MAX_CROPPED_BYTES, {
       startQuality: 0.86,
       minQuality: 0.45
     });
 
     if (!blob) {
-      status.textContent = "Could not create cropped image.";
+      status.textContent = "Could not confirm your photo. Please try again.";
       return;
     }
 
     if (blob.size > MAX_CROPPED_BYTES) {
-      status.textContent = "Cropped image is still above 500 KB. Please crop a smaller area or use another image.";
+      status.textContent = "Please select a smaller part of the photo or choose another photo.";
       return;
     }
 
     croppedBlob = blob;
     uploadBtn.disabled = false;
 
-    status.textContent =
-      "Cropped image ready.\n" +
-      "Cropped size: " +
-      Math.round(croppedBlob.size / 1024) +
-      " KB.\n" +
-      "You can now upload your work.";
+    uploadCache = new Map();
+    status.textContent = "Photo confirmed.";
+    showStep(3);
 
   } catch (err) {
-    status.textContent = "Crop compression failed: " + err.message;
+    status.textContent = "Could not confirm this photo. Please try again.";
+  } finally {
+    confirming = false;
+    cropBtn.disabled = false;
   }
 });
 
+function submissionError(httpStatus, code) {
+  // Never include raw response bodies, URLs, file names or exception messages.
+  const error = new Error('Submission request failed');
+  error.httpStatus = httpStatus;
+  error.code = code;
+  return error;
+}
+
+async function readSubmissionResponse(res) {
+  if (!(res.headers.get('content-type') || '').includes('application/json')) {
+    throw submissionError(res.status, 'INVALID_RESPONSE');
+  }
+  let data;
+  try { data = await res.json(); }
+  catch { throw submissionError(res.status, 'INVALID_RESPONSE'); }
+  if (!res.ok || data?.ok !== true) {
+    const code = data?.code === 'UPLOAD_STORAGE_UNAVAILABLE' ? 'UPLOAD_STORAGE_UNAVAILABLE' : 'REQUEST_REJECTED';
+    throw submissionError(res.status, code);
+  }
+  return data;
+}
+
+function failureDetails(stage, error) {
+  const labels = { prepare: 'Preparing assignment', original: 'Original photo upload', preview: 'Photo preview upload', file: 'File upload', text: 'Text upload', review: 'Saving assignment' };
+  const httpStatus = Number.isInteger(error?.httpStatus) && error.httpStatus >= 100 && error.httpStatus <= 599
+    ? 'HTTP ' + error.httpStatus : 'No HTTP response';
+  const hint = error?.code === 'UPLOAD_STORAGE_UNAVAILABLE'
+    ? ' Upload storage is unavailable on this site. Ask KETSO to check its upload configuration.' : '';
+  return 'Failed stage: ' + labels[stage] + ' (' + httpStatus + ').' + hint;
+}
+
 async function uploadFileToR2(file) {
+  if (uploadCache.has(file)) return uploadCache.get(file);
   const fd = new FormData();
   fd.append("file", file);
   fd.append("folder", UPLOAD_FOLDER);
@@ -731,20 +879,9 @@ async function uploadFileToR2(file) {
     body: fd
   });
 
-  const contentType = res.headers.get("content-type") || "";
-  let data;
-
-  if (contentType.includes("application/json")) {
-    data = await res.json();
-  } else {
-    const text = await res.text();
-    throw new Error("Upload returned non-JSON response: " + text.slice(0, 200));
-  }
-
-  if (!res.ok) {
-    throw new Error(data.error || res.status);
-  }
-
+  const data = await readSubmissionResponse(res);
+  if (typeof data.key !== 'string' || !data.key) throw submissionError(res.status, 'INVALID_RESPONSE');
+  uploadCache.set(file, data);
   return data;
 }
 
@@ -788,13 +925,14 @@ function validateBeforeUpload() {
   }
 
   if (isImageUpload() && !croppedBlob) {
-    return "Please crop the image first.";
+    return "Please confirm your photo first.";
   }
 
   return null;
 }
 
 uploadBtn.addEventListener("click", async function () {
+  if (busy || saveAttempted || received) return;
   const validationError = validateBeforeUpload();
 
   if (validationError) {
@@ -802,7 +940,10 @@ uploadBtn.addEventListener("click", async function () {
     return;
   }
 
-  uploadBtn.disabled = true;
+  busy = true;
+  lockSubmission(true);
+  uploadBtn.textContent = "Uploading...";
+  let failedStage = 'prepare';
 
   try {
     let mainFile = null;
@@ -820,6 +961,7 @@ uploadBtn.addEventListener("click", async function () {
       }
 
       status.textContent = "Uploading text answer...";
+      failedStage = 'text';
       mainUploadData = await uploadFileToR2(mainFile);
     }
 
@@ -830,13 +972,15 @@ uploadBtn.addEventListener("click", async function () {
         throw new Error("Original file is still larger than 8 MB. Upload blocked.");
       }
 
-      status.textContent = "Uploading original image...";
+      status.textContent = "Uploading your photo... Keep this page open.";
+      failedStage = 'original';
       originalUploadData = await uploadFileToR2(originalFile);
 
       const croppedName = safeFileBaseName(originalFile.name) + "_600px.jpg";
       mainFile = new File([croppedBlob], croppedName, { type: "image/jpeg" });
 
-      status.textContent = "Uploading cropped 600 px version...";
+      status.textContent = "Uploading photo preview...";
+      failedStage = 'preview';
       mainUploadData = await uploadFileToR2(mainFile);
     }
 
@@ -844,10 +988,11 @@ uploadBtn.addEventListener("click", async function () {
       mainFile = selectedFile;
 
       status.textContent = "Uploading file...";
+      failedStage = 'file';
       mainUploadData = await uploadFileToR2(mainFile);
     }
 
-    status.textContent = "File uploaded. Saving Academy record...";
+    status.textContent = "Saving your assignment...";
 
     const payload = {
       category: category.value,
@@ -887,6 +1032,8 @@ uploadBtn.addEventListener("click", async function () {
       points_awarded: 0
     };
 
+    saveAttempted = true;
+    failedStage = 'review';
     const res = await fetch(REVIEW_API_URL, {
       method: "POST",
       headers: {
@@ -895,22 +1042,11 @@ uploadBtn.addEventListener("click", async function () {
       body: JSON.stringify(payload)
     });
 
-    const contentType = res.headers.get("content-type") || "";
-    let data;
-
-    if (contentType.includes("application/json")) {
-      data = await res.json();
-    } else {
-      const text = await res.text();
-      throw new Error("Review save returned non-JSON response: " + text.slice(0, 200));
-    }
-
-    if (!res.ok) {
-      throw new Error(data.error || res.status);
-    }
-
+    const data = await readSubmissionResponse(res);
+    if (!/^[1-9]\d*$/.test(String(data.review_id || ""))) throw submissionError(res.status, 'INVALID_RESPONSE');
+    received = true;
     status.innerHTML =
-      "Done.<br>" +
+      "Upload successful.<br>" +
       "Your KETSO Academy upload has been received for review.<br>" +
       "Review ID: " + data.review_id + "<br><br>" +
       '<a href="/academy-my-upload/?review_id=' + encodeURIComponent(data.review_id) + '" ' +
@@ -921,9 +1057,18 @@ uploadBtn.addEventListener("click", async function () {
       'View student gallery</a>';
 
   } catch (err) {
-    status.textContent = "Upload failed before the review could be saved: " + err.message;
+    status.textContent = saveAttempted
+      ? 'We could not confirm your receipt. Your assignment may have been received. Keep this page open and ask your tutor to check before submitting again.'
+      : 'Your upload did not finish. Your work is still here. Check your connection and choose Try again.';
+    status.textContent += '\n' + failureDetails(failedStage, err);
   } finally {
-    uploadBtn.disabled = false;
+    busy = false;
+    if (received) uploadBtn.textContent = 'Upload successful';
+    else if (saveAttempted) uploadBtn.textContent = 'Receipt not confirmed';
+    if (!saveAttempted && !received) {
+      lockSubmission(false);
+      uploadBtn.textContent = 'Try again';
+    }
   }
 });
 </script>
