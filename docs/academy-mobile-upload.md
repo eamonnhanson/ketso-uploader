@@ -96,3 +96,75 @@ uploader remains independently deployable. No deployment command, merge,
 production data mutation or environment change is part of this work. Any host
 automation associated with publishing a branch/PR is managed externally; a PR is
 not confirmation of what is deployed.
+
+## Android submission failure investigation (10 October 2026)
+
+The reported Android failure occurred on PR #33's preview. Its original deployment
+was `ab810a4a.ketso-uploader.pages.dev` at commit `a5be85d`. GitHub's Cloudflare check
+reported a successful build, which did not establish that runtime bindings existed.
+No Wrangler/Pages configuration file exists in this repository. The Cloudflare
+deployment dashboard redirected to login, so account settings and the actual bucket
+name could not be read. No credentials, settings or bindings were changed.
+
+Commit `3cb2133` adds a read-only `GET /upload` check. The configured Git integration
+automatically published `f4c83143.ketso-uploader.pages.dev`. Reading
+`https://f4c83143.ketso-uploader.pages.dev/upload` returned **HTTP 503**:
+
+```json
+{"ok":false,"storage_ready":false,"code":"UPLOAD_STORAGE_UNAVAILABLE","error":"Upload storage is not configured for this environment."}
+```
+
+This probe only checks whether `env.KETSO_BUCKET.put` is a function; it does not
+enumerate objects, read files, write files, or call the review API. It confirms a
+missing/unusable R2 binding in the current Preview environment, not a bucket
+permission or capacity test. No Android network trace from the older deployment
+was available. For a valid photo on the inspected preview, the **original photo
+upload** fails first: cropped upload and review save are never reached. Regression
+tests exercise that exact missing-binding path through the real Cloudflare handler.
+
+### Required infrastructure configuration (not performed)
+
+In **Cloudflare Workers & Pages → ketso-uploader → Settings → Bindings**, select
+the **Preview** environment and add an **R2 bucket** binding with variable name
+**`KETSO_BUCKET`**. Select the approved uploader bucket; this must be an R2 binding,
+not a plain environment variable or secret. The actual bucket name remains unknown
+without authenticated dashboard access and must not be invented.
+
+The selected bucket's public URL must agree with the uploader's existing
+`R2_PUBLIC_BASE`. The page also retains its existing production review/token API
+URLs, so a preview hostname alone does not isolate student submissions from
+production. Choosing a separate test bucket requires corresponding approved test
+endpoints/public URL configuration. Do not work around the missing binding by
+redirecting preview uploads to the production uploader.
+
+The binding will take effect on a subsequent authorized deployment, as explained
+in [Cloudflare's binding documentation](https://developers.cloudflare.com/pages/functions/bindings/).
+No production binding/settings change or manual deployment was performed. Repair
+of the environment remains blocked on the project owner's configuration approval.
+
+### Code fixes and latest validation
+
+- Missing bindings now return a fixed `UPLOAD_STORAGE_UNAVAILABLE` response with
+  HTTP 503 before reading an upload. Other caught exceptions return a fixed
+  `UPLOAD_FAILED` code with HTTP 500 rather than raw exception details.
+- Student errors include the failing stage and HTTP status, including non-JSON
+  and malformed JSON responses. Network errors say `No HTTP response`. Diagnostics
+  use static labels/allowlisted codes; no token, filename, URL, response body,
+  student metadata or raw exception is displayed or logged.
+- Existing relative `/upload` routing, valid POST response fields, streaming R2
+  writes, file limits, token flow and conservative review-save retry policy remain.
+  GET checks are uncached and do not run automatically for each student upload.
+- Full `npm test` with Node 24.19.0: **64 passed, 0 failed**. New tests cover missing
+  and invalid binding, no-I/O readiness, original/preview failures through the
+  actual handler, retained originals on retry, safe HTTP diagnostics, and shared
+  image/document/video upload contracts with an injected bucket.
+- Chrome mobile script: **10 scenarios passed, 0 failed**. The previous eight
+  portrait/landscape viewport cases plus original HTTP 503 and cropped HTTP 500
+  cases verify visible diagnostics, retained metadata and successful manual retry
+  after the mocked storage fault clears. Application requests are intercepted;
+  no files were sent to Cloudflare/R2 or the production review API.
+
+After approved Preview binding configuration is applied, check `GET /upload` for
+`{"ok":true,"storage_ready":true}`. Then test an Android photo using approved
+test storage/backend data, checking original upload, preview upload and receipt.
+The code change alone cannot make an unbound preview accept uploads.
