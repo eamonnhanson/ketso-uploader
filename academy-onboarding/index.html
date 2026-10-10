@@ -837,6 +837,37 @@ cropBtn.addEventListener("click", async function () {
   }
 });
 
+function submissionError(httpStatus, code) {
+  // Never include raw response bodies, URLs, file names or exception messages.
+  const error = new Error('Submission request failed');
+  error.httpStatus = httpStatus;
+  error.code = code;
+  return error;
+}
+
+async function readSubmissionResponse(res) {
+  if (!(res.headers.get('content-type') || '').includes('application/json')) {
+    throw submissionError(res.status, 'INVALID_RESPONSE');
+  }
+  let data;
+  try { data = await res.json(); }
+  catch { throw submissionError(res.status, 'INVALID_RESPONSE'); }
+  if (!res.ok || data?.ok !== true) {
+    const code = data?.code === 'UPLOAD_STORAGE_UNAVAILABLE' ? 'UPLOAD_STORAGE_UNAVAILABLE' : 'REQUEST_REJECTED';
+    throw submissionError(res.status, code);
+  }
+  return data;
+}
+
+function failureDetails(stage, error) {
+  const labels = { prepare: 'Preparing assignment', original: 'Original photo upload', preview: 'Photo preview upload', file: 'File upload', text: 'Text upload', review: 'Saving assignment' };
+  const httpStatus = Number.isInteger(error?.httpStatus) && error.httpStatus >= 100 && error.httpStatus <= 599
+    ? 'HTTP ' + error.httpStatus : 'No HTTP response';
+  const hint = error?.code === 'UPLOAD_STORAGE_UNAVAILABLE'
+    ? ' Upload storage is unavailable on this site. Ask KETSO to check its upload configuration.' : '';
+  return 'Failed stage: ' + labels[stage] + ' (' + httpStatus + ').' + hint;
+}
+
 async function uploadFileToR2(file) {
   if (uploadCache.has(file)) return uploadCache.get(file);
   const fd = new FormData();
@@ -848,21 +879,8 @@ async function uploadFileToR2(file) {
     body: fd
   });
 
-  const contentType = res.headers.get("content-type") || "";
-  let data;
-
-  if (contentType.includes("application/json")) {
-    data = await res.json();
-  } else {
-    const text = await res.text();
-    throw new Error("Upload returned non-JSON response: " + text.slice(0, 200));
-  }
-
-  if (!res.ok) {
-    throw new Error(data.error || res.status);
-  }
-
-  if (!data.ok || !data.key) throw new Error("Upload not confirmed");
+  const data = await readSubmissionResponse(res);
+  if (typeof data.key !== 'string' || !data.key) throw submissionError(res.status, 'INVALID_RESPONSE');
   uploadCache.set(file, data);
   return data;
 }
@@ -925,6 +943,7 @@ uploadBtn.addEventListener("click", async function () {
   busy = true;
   lockSubmission(true);
   uploadBtn.textContent = "Uploading...";
+  let failedStage = 'prepare';
 
   try {
     let mainFile = null;
@@ -942,6 +961,7 @@ uploadBtn.addEventListener("click", async function () {
       }
 
       status.textContent = "Uploading text answer...";
+      failedStage = 'text';
       mainUploadData = await uploadFileToR2(mainFile);
     }
 
@@ -953,12 +973,14 @@ uploadBtn.addEventListener("click", async function () {
       }
 
       status.textContent = "Uploading your photo... Keep this page open.";
+      failedStage = 'original';
       originalUploadData = await uploadFileToR2(originalFile);
 
       const croppedName = safeFileBaseName(originalFile.name) + "_600px.jpg";
       mainFile = new File([croppedBlob], croppedName, { type: "image/jpeg" });
 
       status.textContent = "Uploading photo preview...";
+      failedStage = 'preview';
       mainUploadData = await uploadFileToR2(mainFile);
     }
 
@@ -966,6 +988,7 @@ uploadBtn.addEventListener("click", async function () {
       mainFile = selectedFile;
 
       status.textContent = "Uploading file...";
+      failedStage = 'file';
       mainUploadData = await uploadFileToR2(mainFile);
     }
 
@@ -1010,6 +1033,7 @@ uploadBtn.addEventListener("click", async function () {
     };
 
     saveAttempted = true;
+    failedStage = 'review';
     const res = await fetch(REVIEW_API_URL, {
       method: "POST",
       headers: {
@@ -1018,21 +1042,8 @@ uploadBtn.addEventListener("click", async function () {
       body: JSON.stringify(payload)
     });
 
-    const contentType = res.headers.get("content-type") || "";
-    let data;
-
-    if (contentType.includes("application/json")) {
-      data = await res.json();
-    } else {
-      const text = await res.text();
-      throw new Error("Review save returned non-JSON response: " + text.slice(0, 200));
-    }
-
-    if (!res.ok) {
-      throw new Error(data.error || res.status);
-    }
-
-    if (!data.ok || !/^[1-9]\d*$/.test(String(data.review_id || ""))) throw new Error("Receipt missing");
+    const data = await readSubmissionResponse(res);
+    if (!/^[1-9]\d*$/.test(String(data.review_id || ""))) throw submissionError(res.status, 'INVALID_RESPONSE');
     received = true;
     status.innerHTML =
       "Upload successful.<br>" +
@@ -1049,6 +1060,7 @@ uploadBtn.addEventListener("click", async function () {
     status.textContent = saveAttempted
       ? 'We could not confirm your receipt. Your assignment may have been received. Keep this page open and ask your tutor to check before submitting again.'
       : 'Your upload did not finish. Your work is still here. Check your connection and choose Try again.';
+    status.textContent += '\n' + failureDetails(failedStage, err);
   } finally {
     busy = false;
     if (received) uploadBtn.textContent = 'Upload successful';

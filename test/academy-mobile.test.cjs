@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const { File } = require('node:buffer');
 const html = fs.readFileSync(require('node:path').join(__dirname, '../academy-onboarding/index.html'), 'utf8');
 const script = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
-function setup({ type = 'image_photo', failUpload = false, loseSave = false, badReceipt = false, enrollment = 'online_tree_planting', legacy = false } = {}) {
+function setup({ type = 'image_photo', failUpload = false, uploadResponse = null, loseSave = false, badReceipt = false, enrollment = 'online_tree_planting', legacy = false } = {}) {
   const elements = new Map(), calls = [], handlers = new Map();
   function element(id) {
     if (!elements.has(id)) elements.set(id, { value: '', textContent: '', innerHTML: '', checked: false,
@@ -22,7 +22,12 @@ function setup({ type = 'image_photo', failUpload = false, loseSave = false, bad
     URL, URLSearchParams, Blob, File, FormData, console: { warn() {}, error() {} },
     fetch: async (url, opts = {}) => {
       if (String(url).includes('academy-student?')) return json({ ok: true, student: { id: 7, full_name: 'Test Student', email: 'student@example.invalid', whatsapp: '123', track: 'tree planting' }, enrollment: { course_key: enrollment, legacy } });
-      if (url === '/upload') { calls.push('file'); if (failUpload && ++uploadCount === 2) throw Error('offline'); return json({ ok: true, key: 'synthetic/' + calls.length }); }
+      if (url === '/upload') {
+        calls.push('file'); uploadCount++;
+        if (uploadResponse) return uploadResponse(opts.body, uploadCount);
+        if (failUpload && uploadCount === 2) throw Error('offline');
+        return json({ ok: true, key: 'synthetic/' + calls.length });
+      }
       calls.push(JSON.parse(opts.body));
       if (loseSave) throw Error('response lost');
       return json(badReceipt ? { ok: false } : { ok: true, review_id: 42 });
@@ -65,7 +70,36 @@ test('double submit sends one record and locks inputs during upload and after re
 test('failed preview upload preserves original, metadata and manual retry', async () => {
   const p = setup({ failUpload: true }); await p.ready(); await p.event('uploadBtn');
   assert.equal(p.elements.get('uploadBtn').textContent, 'Try again'); assert.equal(p.elements.get('fullName').value, 'Test Student');
+  assert.match(p.elements.get('status').textContent, /Photo preview upload \(No HTTP response\)/);
   await p.event('uploadBtn'); assert.equal(p.calls.filter(c => c === 'file').length, 3); assert.equal(p.calls.filter(c => c !== 'file').length, 1);
+});
+test('missing Cloudflare R2 binding fails at original upload with safe HTTP 503 diagnostics', async () => {
+  const { onRequestPost } = await import('../functions/upload.js');
+  const p = setup({ uploadResponse: body => onRequestPost({ request: new Request('http://test.invalid/upload', { method:'POST', body }), env:{} }) });
+  await p.ready(); await p.event('uploadBtn');
+  assert.deepEqual(p.calls,['file']); assert.equal(p.run('saveAttempted'),false);
+  const message = p.elements.get('status').textContent;
+  assert.match(message,/Original photo upload \(HTTP 503\)/); assert.match(message,/Upload storage is unavailable/);
+  assert.doesNotMatch(message,/synthetic-test-token|student@example|Test Student|test.jpg/);
+  assert.equal(p.run('selectedFile.size'),8); assert.equal(p.elements.get('uploadBtn').textContent,'Try again');
+});
+test('Cloudflare preview upload failure reports its stage and retries only the failed preview', async () => {
+  const { onRequestPost } = await import('../functions/upload.js'); let puts=0;
+  const p = setup({ uploadResponse: body => onRequestPost({ request:new Request('http://test.invalid/upload',{ method:'POST',body }),
+    env:{ KETSO_BUCKET:{ async put() { if (++puts === 2) throw Error('private/student@example.invalid/token=secret'); } } } }) });
+  await p.ready(); await p.event('uploadBtn');
+  assert.match(p.elements.get('status').textContent,/Photo preview upload \(HTTP 500\)/);
+  assert.doesNotMatch(p.elements.get('status').textContent,/private|secret|example.invalid/);
+  await p.event('uploadBtn'); assert.equal(puts,3); assert.equal(p.calls.filter(c=>c!=='file').length,1);
+});
+for (const [label,response] of [
+  ['HTML error',()=>new Response('student@example.invalid token=secret',{ status:502,headers:{'Content-Type':'text/html'} })],
+  ['malformed JSON',()=>new Response('token=secret',{ status:500,headers:{'Content-Type':'application/json'} })],
+  ['validation error',()=>new Response(JSON.stringify({ ok:false,error:'student@example.invalid token=secret' }),{ status:400,headers:{'Content-Type':'application/json'} })]
+]) test(label+' preserves HTTP status without exposing response content',async()=>{
+  const p=setup({ uploadResponse:response }); await p.ready(); await p.event('uploadBtn');
+  assert.match(p.elements.get('status').textContent,new RegExp('Original photo upload \\(HTTP '+response().status+'\\)'));
+  assert.doesNotMatch(p.elements.get('status').textContent,/secret|example.invalid/); assert.deepEqual(p.calls,['file']);
 });
 for (const option of ['loseSave', 'badReceipt']) test(option + ' blocks unsafe resubmission without discarding work', async () => {
   const p = setup({ [option]: true }); await p.ready(); await p.event('uploadBtn'); await p.event('uploadBtn');

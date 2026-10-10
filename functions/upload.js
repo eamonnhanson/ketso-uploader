@@ -1,4 +1,12 @@
+// Read-only readiness probe: no bucket reads, writes, keys or student data.
+export function onRequestGet({ env }) {
+  return storageReady(env)
+    ? jsonResponse({ ok: true, storage_ready: true })
+    : storageUnavailable();
+}
+
 export async function onRequestPost({ request, env }) {
+  if (!storageReady(env)) return storageUnavailable();
   try {
     const formData = await request.formData();
     const file = formData.get("file");
@@ -148,12 +156,26 @@ export async function onRequestPost({ request, env }) {
       content_type: file.type || "application/octet-stream"
     }, 200);
 
-  } catch (err) {
+  } catch {
     return jsonResponse({
       ok: false,
-      error: err && err.message ? err.message : String(err)
+      code: "UPLOAD_FAILED",
+      error: "Could not store the file."
     }, 500);
   }
+}
+
+function storageReady(env) {
+  return typeof env?.KETSO_BUCKET?.put === "function";
+}
+
+function storageUnavailable() {
+  return jsonResponse({
+    ok: false,
+    storage_ready: false,
+    code: "UPLOAD_STORAGE_UNAVAILABLE",
+    error: "Upload storage is not configured for this environment."
+  }, 503);
 }
 
 function sanitizeFolder(value) {
@@ -177,7 +199,8 @@ function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store"
     }
   });
 }
