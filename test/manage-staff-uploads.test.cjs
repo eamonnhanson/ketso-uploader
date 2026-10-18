@@ -77,10 +77,10 @@ test('existing staff login stores only the issued session and opens the two staf
 test('a filter change during loading wins over the earlier response', async () => {
   const controls = new Map(), calls = [];
   function element() { return { value: '', textContent: '', children: [], addEventListener() {}, querySelectorAll() { return []; }, replaceChildren() { this.children = []; }, append(child) { this.children.push(child); }, add() {} }; }
-  for (const id of ['collection','status','search','from','to','message','grid','filters','cancel','logout','edit-form']) controls.set(id, element());
+  for (const id of ['collection','status','search','from','to','message','grid','filters','cancel','close-editor','logout','edit-form']) controls.set(id, element());
   controls.get('collection').value = 'current'; controls.get('status').value = 'active';
   const context = { AbortController, URLSearchParams, Option: function() { this.dataset = {}; },
-    sessionStorage: { getItem() { return 'session'; } }, location: {},
+    sessionStorage: { getItem(key) { return key === 'ketso_staff_session' ? 'session' : null; }, setItem() {}, removeItem() {} }, location: {},
     document: { getElementById(id) { return controls.get(id); }, createElement() { return element(); } },
     fetch(url, options) { return new Promise(resolve => calls.push({ url, options, resolve })); }
   };
