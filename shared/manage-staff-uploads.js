@@ -3,6 +3,17 @@
   if (!token) { location.replace('/?programme=staff'); return; }
   const $ = id => document.getElementById(id);
   let uploads = [], collections = [], selected, loadController;
+  const collectionPreferenceKey = 'ketso_staff_collection';
+  let collectionRestored = false;
+  function storedCollection() {
+    try { return sessionStorage.getItem(collectionPreferenceKey); } catch { return null; }
+  }
+  function rememberCollection(value) {
+    try {
+      if (value === null) sessionStorage.removeItem(collectionPreferenceKey);
+      else sessionStorage.setItem(collectionPreferenceKey, value);
+    } catch { /* Storage may be unavailable; filtering must still work. */ }
+  }
   async function api(path, options = {}) {
     const response = await fetch('/api/staff-managed-uploads' + path, { ...options,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } });
@@ -21,10 +32,18 @@
       const data = await api('?' + query, { signal: controller.signal });
       if (loadController !== controller) return;
       uploads = data.uploads; collections = data.collections;
-      const current = $('collection').value;
+      const requestedCollection = $('collection').value;
+      const preferredCollection = collectionRestored ? requestedCollection : storedCollection() ?? 'current';
+      collectionRestored = true;
+      const validCollections = new Set(['current', 'unassigned', 'all', ...collections.map(collection => collection.id)]);
+      const current = validCollections.has(preferredCollection) ? preferredCollection : 'current';
+      if (!validCollections.has(preferredCollection)) rememberCollection(null);
       $('collection').querySelectorAll('[data-project]').forEach(option => option.remove());
       for (const collection of collections) { const option = new Option(collection.name, collection.id); option.dataset.project = '1'; $('collection').add(option); }
       $('collection').value = current;
+      // The first response supplies the collection catalog. Load the restored
+      // view before rendering so thumbnails always match the selected filter.
+      if (current !== requestedCollection) return load();
       $('grid').replaceChildren();
       for (const upload of uploads) {
         const button = document.createElement('button');
@@ -55,18 +74,23 @@
     $('edit-message').textContent = ''; $('editor').showModal();
   }
   $('filters').onsubmit = event => { event.preventDefault(); load(); };
-  for (const id of ['collection', 'status', 'from', 'to']) $(id).onchange = load;
-  $('cancel').onclick = () => $('editor').close();
+  $('collection').onchange = () => {
+    collectionRestored = true;
+    rememberCollection($('collection').value);
+    return load();
+  };
+  for (const id of ['status', 'from', 'to']) $(id).onchange = load;
+  $('cancel').onclick = $('close-editor').onclick = () => $('editor').close();
   $('logout').onclick = () => { sessionStorage.removeItem('ketso_staff_session'); location.replace('/'); };
   $('edit-form').onsubmit = async event => {
-    event.preventDefault(); $('save').disabled = true; $('cancel').disabled = true;
+    event.preventDefault(); $('save').disabled = true; $('cancel').disabled = true; $('close-editor').disabled = true;
     try {
       await api('/' + selected.id, { method: 'PATCH', body: JSON.stringify({ caption: $('caption').value, location: $('location').value, date_taken: $('taken').value || null,
         tags: $('tags').value.split('\n').map(tag => tag.trim()).filter(Boolean), status: $('edit-status').value,
         collections: [...$('memberships').querySelectorAll('input:checked')].map(input => input.value) }) });
       $('editor').close(); await load(); $('message').textContent = 'Changes saved. ' + $('message').textContent;
     } catch (error) { $('edit-message').textContent = error.message; }
-    finally { $('save').disabled = false; $('cancel').disabled = false; }
+    finally { $('save').disabled = false; $('cancel').disabled = false; $('close-editor').disabled = false; }
   };
   load();
 })();

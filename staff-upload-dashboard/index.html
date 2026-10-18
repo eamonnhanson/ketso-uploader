@@ -223,6 +223,23 @@
       justify-content: space-between;
       margin-bottom: 12px;
     }
+.manage-uploads-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  margin: 10px 12px 18px 0;
+  padding: 12px 20px;
+  border: 2px solid var(--green);
+  border-radius: 8px;
+  background: var(--green);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
+.manage-uploads-button:hover { background: var(--green-dark); }
+.manage-uploads-button:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+@media (max-width: 600px) { .manage-uploads-button { display: flex; width: 100%; } }
 .gallery-link {
   display: inline-block;
   margin: 10px 0 18px;
@@ -381,8 +398,9 @@
 <body>
   <main class="shell">
     <header>
-      <nav><a href="/staff-home/">Staff home</a> · <a href="/manage-uploads/">Manage existing uploads</a></nav><h1>KETSO staff upload dashboard</h1>
+      <nav><a href="/staff-home/">Staff home</a></nav><h1>KETSO staff upload dashboard</h1>
       <p class="intro">Send a field photo to KETSO and Plant N Boom, then check that it was received.</p>
+      <a class="manage-uploads-button" href="/manage-uploads/">Manage existing uploads</a>
       <a class="gallery-link" href="/gallery" target="_blank" rel="noopener">Open gallery</a>
     </header>
 
