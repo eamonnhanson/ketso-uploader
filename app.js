@@ -1226,8 +1226,9 @@ async function unlockStaff() {
       el.staffMessage.textContent = data.error || "Wrong password.";
       return;
     }
-    el.staffMessage.textContent = "Opening staff upload dashboard...";
-    window.location.href = "/staff-upload-dashboard/";
+    sessionStorage.setItem("ketso_staff_session", data.token);
+    el.staffMessage.textContent = "Opening staff choices...";
+    window.location.href = "/staff-home/";
   } catch (_error) {
     el.staffMessage.textContent = "Staff access could not be checked. Please try again.";
   } finally {
