@@ -335,6 +335,12 @@
       box-shadow: 0 18px 55px rgba(0, 0, 0, 0.28);
     }
 
+    .edit-upload-close { position: absolute; top: 8px; right: 8px; min-width: 44px; min-height: 44px; font-size: 28px; padding: 0; }
+    .edit-upload-form h2 { padding-right: 48px; }
+    @supports (height: 100dvh) {
+      .edit-upload-dialog, .edit-upload-form { max-height: calc(100dvh - 24px); }
+    }
+
     .edit-upload-dialog::backdrop {
       background: rgba(0, 0, 0, 0.45);
     }
@@ -474,6 +480,7 @@
 
   <dialog id="editUploadDialog" class="edit-upload-dialog" aria-labelledby="editUploadTitle">
     <form id="editUploadForm" class="edit-upload-form">
+      <button id="closeUploadEdit" type="button" class="button-soft edit-upload-close" aria-label="Close without saving">&times;</button>
       <h2 id="editUploadTitle">Edit upload details</h2>
       <div class="edit-field">
         <label for="editStaffName">Name</label>
@@ -485,7 +492,7 @@
       </div>
       <div class="edit-field">
         <label for="editCaption">What does this upload show?</label>
-        <textarea id="editCaption" name="caption" maxlength="500"></textarea>
+        <textarea id="editCaption" name="caption" maxlength="2000"></textarea>
       </div>
       <p id="editUploadStatus" class="small" role="status" aria-live="polite"></p>
       <div class="edit-upload-actions">
@@ -496,7 +503,7 @@
   </dialog>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-  <script src="/shared/staff-session.js"></script><script src="/shared/staff-categories.js"></script>
+  <script src="/shared/staff-session.js"></script><script type="module" src="/shared/staff-categories.js"></script>
   <script src="/shared/staff-photo-submission.js?v=1"></script>
   <script src="/shared/staff-video-submission.js?v=1"></script>
   <script>
@@ -527,6 +534,7 @@
     let videoDurationSeconds = null;
     let visibleUploads = [];
     let editingUploadId = null;
+    let editingUploadToken = null;
 
     const el = {
       staffName: document.getElementById("staffName"),
@@ -560,7 +568,8 @@
       editCaption: document.getElementById("editCaption"),
       editUploadStatus: document.getElementById("editUploadStatus"),
       saveUploadEdit: document.getElementById("saveUploadEdit"),
-      cancelUploadEdit: document.getElementById("cancelUploadEdit")
+      cancelUploadEdit: document.getElementById("cancelUploadEdit"),
+      closeUploadEdit: document.getElementById("closeUploadEdit")
     };
 
     init();
@@ -616,6 +625,7 @@
       });
       el.editUploadForm.addEventListener("submit", saveStaffUploadEdit);
       el.cancelUploadEdit.addEventListener("click", closeStaffUploadEdit);
+      el.closeUploadEdit.addEventListener("click", closeStaffUploadEdit);
       el.editUploadDialog.addEventListener("close", () => { editingUploadId = null; });
       updateForestHeroSearch();
     }
@@ -1178,7 +1188,7 @@
       el.uploadsList.innerHTML = "";
 
       try {
-        const res = await fetch(`/api/staff-uploads?staff_id=${encodeURIComponent(staffId)}&limit=50`);
+        const res = await fetch(`/api/staff-uploads?staff_id=${encodeURIComponent(staffId)}&limit=50`, { cache: "no-store" });
         const data = await readJsonResponse(res, "Staff uploads");
 
         if (!res.ok || !data.ok) {
@@ -1200,6 +1210,7 @@
         const cachedUploads = getCachedUploads(staffId);
 
         if (cachedUploads.length) {
+          visibleUploads = cachedUploads;
           el.uploadsStatus.textContent = "Showing recent uploads saved in this browser. We could not refresh the list. Check your connection and press Refresh.";
           el.uploadsList.innerHTML = cachedUploads.map(renderUploadCard).join("");
           return;
@@ -1241,6 +1252,8 @@
       const upload = visibleUploads.find(item => Number(item.id) === Number(reviewId));
       if (!upload) return;
       editingUploadId = Number(reviewId);
+      editingUploadToken = { baseline: { staff_name: upload.staff_name ?? null, category: upload.staff_category ?? null, caption: upload.caption ?? null },
+        initial: { staff_name: upload.staff_name || upload.uploader_name || el.staffName.value, category: upload.staff_category || upload.selected_category || upload.category || "", caption: upload.caption || "" } };
       el.editStaffName.value = upload.staff_name || upload.uploader_name || el.staffName.value;
       el.editCategory.innerHTML = getStaffCategories().map(item =>
         `<option value="${escapeAttr(item.value)}">${escapeHtml(item.label)}</option>`
@@ -1254,25 +1267,47 @@
     };
 
     function closeStaffUploadEdit() {
+      editingUploadToken = null;
       if (el.editUploadDialog.open) el.editUploadDialog.close();
     }
 
     async function saveStaffUploadEdit(event) {
       event.preventDefault();
-      if (!Number.isFinite(editingUploadId)) return;
+      if (!Number.isFinite(editingUploadId) || el.saveUploadEdit.disabled) return;
       const reviewId = editingUploadId;
+      const editToken = editingUploadToken;
       el.saveUploadEdit.disabled = true;
       el.editUploadStatus.textContent = "";
+      const upload = visibleUploads.find(item => Number(item.id) === reviewId);
+      const staffId = upload?.staff_id || upload?.uploaded_by || getStaffId();
+      const values = { staff_name: el.editStaffName.value, category: el.editCategory.value, caption: el.editCaption.value };
+      const metadata = { staff_id: staffId, expected: {} };
+      for (const key of Object.keys(values)) {
+        if (values[key] !== editToken.initial[key]) {
+          metadata[key] = key === "caption" ? values[key].trim() : values[key]; metadata.expected[key] = editToken.baseline[key];
+        }
+      }
+      if (!Object.keys(metadata.expected).length) { closeStaffUploadEdit(); return; }
       try {
-        const res = await fetch(`/api/staff-uploads/${encodeURIComponent(reviewId)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ staff_id: getStaffId(), staff_name: el.editStaffName.value.trim(), category: el.editCategory.value, caption: el.editCaption.value.trim() }) });
+        const res = await fetch(`/api/staff-uploads/${encodeURIComponent(reviewId)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(metadata) });
         const data = await readJsonResponse(res);
-        if (!res.ok || !data.ok) throw new Error(data.error || "Could not update details");
+        if (res.status === 409) throw new Error("This upload changed in another editor. Your entries are retained. Close and reopen after refreshing to review the latest values.");
+        if (!res.ok || data?.ok !== true) throw new Error(`Save was not confirmed (HTTP ${res.status}; ${data?.diagnostic || "STAFF_METADATA_UPDATE_FAILED"}). Please retry or sign in again if your session expired.`);
+        if (Number(data.upload?.id) !== reviewId || data.upload.staff_id !== staffId ||
+            Object.keys(metadata.expected).some(key =>
+              (key === "category" ? data.upload.staff_category : key === "caption" ? data.upload.caption || "" : data.upload[key]) !== metadata[key])) throw new Error("The server did not confirm all saved details. Please refresh to check before retrying.");
         const index = visibleUploads.findIndex(item => Number(item.id) === reviewId);
         if (index >= 0) visibleUploads[index] = { ...visibleUploads[index], ...data.upload };
+        // Cache failure must not turn a confirmed database write into a failed save.
+        try { cacheUpload(staffId, visibleUploads[index]); } catch {}
         el.uploadsList.innerHTML = visibleUploads.map(renderUploadCard).join("");
-        closeStaffUploadEdit();
+        if (editingUploadToken === editToken) closeStaffUploadEdit();
         setStatus("Details updated");
-      } catch (err) { el.editUploadStatus.textContent = "Could not save changes. " + err.message; el.saveUploadEdit.disabled = false; }
+      } catch (err) {
+        if (editingUploadToken !== editToken) return;
+        el.editUploadStatus.textContent = "Could not save changes. " + err.message;
+        el.saveUploadEdit.disabled = false;
+      }
     }
 
     function cacheUpload(staffId, upload) {
