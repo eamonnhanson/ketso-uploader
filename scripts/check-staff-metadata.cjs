@@ -25,8 +25,13 @@ const root = path.resolve(__dirname, '..');
           assert.equal(req.headers().authorization, 'Bearer fixture-session');
           if (fail) return json({ ok: false, diagnostic: 'DATABASE_PERMISSION_DENIED' }, 500);
           const body = req.postDataJSON();
+          assert.deepEqual(Object.keys(body.expected).sort(), Object.keys(body).filter(key => !['staff_id','expected'].includes(key)).sort());
           assert.equal(body.staff_id, 'fixture_staff');
-          row = { ...row, staff_name: body.staff_name, staff_category: body.category, caption: body.caption };
+          for (const key of Object.keys(body.expected)) {
+            const column = key === 'category' ? 'staff_category' : key;
+            if (row[column] !== body.expected[key]) return json({ ok: false, diagnostic: 'METADATA_CONFLICT' }, 409);
+          }
+          for (const key of Object.keys(body.expected)) row[key === 'category' ? 'staff_category' : key] = body[key];
           return json({ ok: true, upload: row });
         }
         if (url.pathname === '/api/staff-uploads') return json({ ok: true, uploads: [row] });
@@ -57,6 +62,31 @@ const root = path.resolve(__dirname, '..');
       assert.equal(await page.inputValue('#editStaffName'), 'Renamed Staff');
       assert.equal(await page.inputValue('#editCategory'), 'training');
       assert.equal(await page.inputValue('#editCaption'), 'Saved seedlings');
+      // Name-only edits must not send an unchanged caption/category.
+      for (const name of ['Mary  Jane', 'José']) {
+        await page.fill('#editStaffName', name);
+        await page.click('#saveUploadEdit');
+        await page.waitForFunction(() => !document.getElementById('editUploadDialog').open);
+        await page.reload(); await open();
+        assert.equal(await page.inputValue('#editStaffName'), name);
+        assert.equal(await page.inputValue('#editCaption'), 'Saved seedlings');
+      }
+      // A concurrent name update survives a description-only save.
+      row.staff_name = 'Concurrent colleague';
+      await page.fill('#editCaption', 'Description only'); await page.click('#saveUploadEdit');
+      await page.waitForFunction(() => !document.getElementById('editUploadDialog').open);
+      assert.equal(row.staff_name, 'Concurrent colleague');
+      await open();
+      // Same-field concurrent edit must retain the user's input and newer row.
+      row.caption = 'Newer server description';
+      await page.fill('#editCaption', 'Stale attempted description'); await page.click('#saveUploadEdit');
+      await page.waitForFunction(() => document.getElementById('editUploadStatus').textContent.includes('changed in another editor'));
+      assert.equal(row.caption, 'Newer server description');
+      assert.equal(await page.inputValue('#editCaption'), 'Stale attempted description');
+      await page.click('#closeUploadEdit'); await page.reload(); await open();
+      await page.fill('#editCaption', ''); await page.click('#saveUploadEdit');
+      await page.waitForFunction(() => !document.getElementById('editUploadDialog').open);
+      await page.reload(); await open(); assert.equal(await page.inputValue('#editCaption'), '');
       fail = true; await page.fill('#editCaption', 'Keep after failure'); await page.click('#saveUploadEdit');
       await page.waitForFunction(() => document.getElementById('editUploadStatus').textContent.includes('Could not save'));
       assert.equal(await page.inputValue('#editCaption'), 'Keep after failure');

@@ -107,7 +107,7 @@ test('existing metadata PATCH proxy forwards the session and returns JSON withou
   try {
     const response = await onRequestPatch({ params: { id: '71' }, request: new Request('https://example.test/api/staff-uploads/71', {
       method: 'PATCH', headers: { Authorization: 'Bearer session' },
-      body: JSON.stringify({ staff_id: 'test_staff', staff_name: 'Test Staff', category: 'nursery', caption: 'Existing editor' })
+      body: JSON.stringify({ staff_id: 'test_staff', staff_name: 'Test Staff', category: 'nursery', caption: 'Existing editor', expected: {staff_name: 'Test Staff', category: 'nursery', caption: 'Existing editor'} })
     }) });
     assert.equal(response.status, 200); assert.deepEqual(await response.json(), { ok: true, review_id: 71, upload });
     assert.equal(calls[0].headers.Authorization, 'Bearer session'); assert.equal(response.headers.get('Authorization'), null);

@@ -1,5 +1,9 @@
 # Staff metadata persistence investigation — 22 October 2026
 
+Follow-up: see [confirmed review blockers](staff-metadata-review-blockers.md) for
+the current contract, backend PR #65 proposal, verification and remaining blockers.
+The backend delivery status and original all-field PATCH description below are historical.
+
 Status: uploader fix implemented; companion backend change supplied as a patch.
 Production acceptance and the exact deployed database failure remain unverified.
 No production records, configuration, migrations, merges or deployments were changed.
