@@ -30,7 +30,7 @@ test('dialog cancel closes without PATCH and save keeps the metadata PATCH contr
   assert.match(page, /cancelUploadEdit\.addEventListener\("click", closeStaffUploadEdit\)/);
   assert.match(page, /editUploadDialog\.close\(\)/);
   assert.match(page, /saveUploadEdit\.disabled = true/);
-  assert.match(page, /staff_id: getStaffId\(\), staff_name:/);
+  assert.match(page, /staff_id: staffId, staff_name:/);
   assert.match(api, /const allowed = new Set\(\["staff_id", "staff_name", "category", "caption"\]\)/);
   assert.match(api, /method: "PATCH"/);
   assert.doesNotMatch(api, /file_type: body\.file_type/);

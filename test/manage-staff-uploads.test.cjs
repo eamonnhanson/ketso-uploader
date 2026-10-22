@@ -102,13 +102,14 @@ test('existing metadata PATCH proxy forwards the session and returns JSON withou
   const source = fs.readFileSync(path.join(root, 'functions/api/staff-uploads/[id].js'), 'utf8').replace('../../_shared/staff-categories.js', categoryUrl);
   const { onRequestPatch } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
   const original = global.fetch, calls = [];
-  global.fetch = async (url, options) => { calls.push(options); return Response.json({ ok: true, review_id: 71 }); };
+  const upload = { id: 71, staff_id: 'test_staff', staff_name: 'Test Staff', staff_category: 'nursery', caption: 'Existing editor' };
+  global.fetch = async (url, options) => { calls.push(options); return Response.json({ ok: true, review_id: 71, upload }); };
   try {
     const response = await onRequestPatch({ params: { id: '71' }, request: new Request('https://example.test/api/staff-uploads/71', {
       method: 'PATCH', headers: { Authorization: 'Bearer session' },
       body: JSON.stringify({ staff_id: 'test_staff', staff_name: 'Test Staff', category: 'nursery', caption: 'Existing editor' })
     }) });
-    assert.equal(response.status, 200); assert.deepEqual(await response.json(), { ok: true, review_id: 71 });
+    assert.equal(response.status, 200); assert.deepEqual(await response.json(), { ok: true, review_id: 71, upload });
     assert.equal(calls[0].headers.Authorization, 'Bearer session'); assert.equal(response.headers.get('Authorization'), null);
   } finally { global.fetch = original; }
 });
