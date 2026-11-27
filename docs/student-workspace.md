@@ -184,3 +184,10 @@ publication/revocation, all supported MIME types, Unicode filename encoding and
 long-name extensions. Chromium checks the tutor filename and downloaded bytes.
 Validation: 107 automated tests and both browser checks. No real student data or
 live emails are used. Only student-staging is authorized for this deployment.
+
+## Production release candidate
+
+See [student-production-release.md](student-production-release.md) for the current
+owner-confirmed production configuration, mandatory AI launch decision, candidate
+comparison, remaining acceptance gates and rollback. Earlier optional-AI guidance
+is superseded for this release. No production deployment or activation is authorized.

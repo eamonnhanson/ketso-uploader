@@ -501,3 +501,10 @@ this investigation. The commit adds tests and documentation only; the runtime fi
 already exists in its ancestor. Deployment results are reported in the task.
 Pending records are not automatically replayed by deployment. Existing retry and
 expiry safeguards still apply; any live email test remains a separate action.
+
+## Production release candidate
+
+See [student-production-release.md](student-production-release.md) for the current
+owner-confirmed production configuration, mandatory AI launch decision, candidate
+comparison, remaining acceptance gates and rollback. Earlier optional-AI guidance
+is superseded for this release. No production deployment or activation is authorized.

@@ -1,0 +1,169 @@
+diff --git a/api/updateStaffUploadMetadata.js b/api/updateStaffUploadMetadata.js
+--- a/api/updateStaffUploadMetadata.js
++++ b/api/updateStaffUploadMetadata.js
+@@ -19,27 +19,34 @@
+     if (!staffId) return res.status(400).json({ ok: false, error: "STAFF_IDENTITY_REQUIRED" });
+     const staffName = text(body.staff_name, 80);
+     const category = text(body.category, 100);
+-    const caption = optionalText(body.caption, 500);
+-    if (!staffName) return res.status(400).json({ ok: false, error: "INVALID_STAFF_NAME" });
+-    if (!STAFF_CATEGORIES.has(category)) return res.status(400).json({ ok: false, error: "INVALID_STAFF_CATEGORY" });
++    if (body.caption != null && (typeof body.caption !== "string" || body.caption.length > 2000)) {
++      return res.status(400).json({ ok: false, error: "INVALID_STAFF_CAPTION" });
++    }
++    const caption = optionalText(body.caption, 2000);
++    if (Object.hasOwn(body, "staff_name") && !staffName) return res.status(400).json({ ok: false, error: "INVALID_STAFF_NAME" });
++    if (Object.hasOwn(body, "category") && !STAFF_CATEGORIES.has(category)) return res.status(400).json({ ok: false, error: "INVALID_STAFF_CATEGORY" });
+     try {
+       if (!dbPool) ({ pool: dbPool } = await import("./db.js"));
+       const result = await dbPool.query(`
+         UPDATE photo_uploads_review
+-        SET staff_name = $1, uploader_name = $1,
+-            linked_entity_name = CASE WHEN linked_entity_type = 'staff' THEN $1 ELSE linked_entity_name END,
+-            staff_category = $2, selected_category = $2, caption = $3, updated_at_utc = now()
++        SET staff_name = COALESCE($1, staff_name), uploader_name = COALESCE($1, uploader_name),
++            linked_entity_name = CASE WHEN linked_entity_type = 'staff' AND $1 IS NOT NULL THEN $1 ELSE linked_entity_name END,
++            staff_category = COALESCE($2, staff_category), selected_category = COALESCE($2, selected_category),
++            caption = CASE WHEN $6 THEN $3 ELSE caption END, updated_at_utc = now()
+         WHERE id = $4 AND staff_id = $5 AND upload_context = 'staff_upload'
+           AND ${STAFF_SCOPE.replaceAll('p.', '')}
+         RETURNING id, staff_id, staff_name, uploader_name, staff_category, selected_category, caption,
+-          cropped_file_url, original_file_url, file_type, mime_type, duration_seconds,
++          cropped_file_url, original_file_url, file_type,
+           created_at_utc, verification_status, review_status, public_gallery_status, upload_context;
+-      `, [staffName, category, caption, reviewId, staffId]);
++      `, [Object.hasOwn(body, "staff_name") ? staffName : null,
++        Object.hasOwn(body, "category") ? category : null, caption, reviewId, staffId, Object.hasOwn(body, "caption")]);
+       if (!result.rows.length) return res.status(404).json({ ok: false, error: "STAFF_UPLOAD_NOT_FOUND" });
+       return res.status(200).json({ ok: true, review_id: result.rows[0].id, upload: result.rows[0] });
+     } catch (err) {
+-      console.error("updateStaffUploadMetadata error:", err);
+-      return res.status(500).json({ ok: false, error: "STAFF_METADATA_UPDATE_FAILED" });
++      const diagnostic = ({ "42703": "SCHEMA_MISMATCH", "42P01": "SCHEMA_MISMATCH", "42501": "DATABASE_PERMISSION_DENIED", "23505": "METADATA_CONFLICT", "57014": "DATABASE_TIMEOUT" })[err?.code] || "DATABASE_ERROR";
++      // Never log SQL, parameters, connection strings or raw driver errors.
++      console.error("updateStaffUploadMetadata", { diagnostic });
++      return res.status(500).json({ ok: false, error: "STAFF_METADATA_UPDATE_FAILED", diagnostic });
+     }
+   };
+ }
+diff --git a/test/staffUploadMetadataRegression.test.js b/test/staffUploadMetadataRegression.test.js
+new file mode 100644
+--- /dev/null
++++ b/test/staffUploadMetadataRegression.test.js
+@@ -0,0 +1,56 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { createUpdateStaffUploadMetadataHandler } from '../api/updateStaffUploadMetadata.js';
++
++const response = () => ({ statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } });
++const request = body => ({ method: 'PATCH', params: { review_id: '71' }, body: { staff_id: 'staff_1', ...body } });
++
++test('partial PATCH binds omitted values separately from explicit caption clearing', async () => {
++  for (const [body, expected] of [
++    [{ caption: 'Description' }, [null, null, 'Description', 71, 'staff_1', true]],
++    [{ staff_name: 'New Name' }, ['New Name', null, null, 71, 'staff_1', false]],
++    [{ category: 'training' }, [null, 'training', null, 71, 'staff_1', false]],
++    [{ staff_name: 'New Name', caption: 'Description' }, ['New Name', null, 'Description', 71, 'staff_1', true]],
++    [{ caption: '' }, [null, null, '', 71, 'staff_1', true]]
++  ]) {
++    const handler = createUpdateStaffUploadMetadataHandler({ dbPool: { async query(sql, values) {
++      assert.deepEqual(values, expected);
++      assert.match(sql, /caption = CASE WHEN \$6 THEN \$3 ELSE caption END/);
++      assert.match(sql, /staff_name = COALESCE\(\$1, staff_name\)/);
++      assert.match(sql, /staff_category = COALESCE\(\$2, staff_category\)/);
++      assert.match(sql, /staff_id = \$5/); assert.match(sql, /academy_student_id IS NULL/);
++      assert.doesNotMatch(sql.split('WHERE')[0], /(?:cropped_file_url|public_gallery_status|staff_id)\s*=/);
++      return { rows: [{ id: 71 }] };
++    } } });
++    const res = response(); await handler(request(body), res); assert.equal(res.statusCode, 200);
++  }
++});
++
++test('database failures stay failures and return only bounded diagnostic codes', async () => {
++  const logs = [], log = console.error;
++  console.error = (...args) => logs.push(args);
++  try {
++    for (const [code, diagnostic] of [['42703','SCHEMA_MISMATCH'], ['42501','DATABASE_PERMISSION_DENIED'],
++      ['23505','METADATA_CONFLICT'], ['57014','DATABASE_TIMEOUT'], ['unknown','DATABASE_ERROR']]) {
++      const handler = createUpdateStaffUploadMetadataHandler({ dbPool: { async query() {
++        throw Object.assign(new Error('postgres://secret'), { code, detail: 'sensitive metadata' });
++      } } });
++      const res = response(); await handler(request({ caption: 'Description' }), res);
++      assert.equal(res.statusCode, 500); assert.deepEqual(res.body, { ok: false, error: 'STAFF_METADATA_UPDATE_FAILED', diagnostic });
++    }
++    assert.doesNotMatch(JSON.stringify(logs), /secret|sensitive/);
++  } finally { console.error = log; }
++});
++
++test('long descriptions are preserved and excessive or non-string captions fail before SQL', async () => {
++  let calls = 0;
++  const handler = createUpdateStaffUploadMetadataHandler({ dbPool: { async query(sql, values) {
++    calls++; assert.equal(values[2].length, 1500); return { rows: [{ id: 71 }] };
++  } } });
++  const res = response(); await handler(request({ staff_name: 'Changed Name', caption: 'x'.repeat(1500) }), res);
++  assert.equal(res.statusCode, 200);
++  for (const caption of ['x'.repeat(2001), {}]) {
++    const invalid = response(); await handler(request({ caption }), invalid); assert.equal(invalid.statusCode, 400);
++  }
++  assert.equal(calls, 1);
++});
+diff --git a/test/staffMetadataPostgresIntegration.test.js b/test/staffMetadataPostgresIntegration.test.js
+new file mode 100644
+--- /dev/null
++++ b/test/staffMetadataPostgresIntegration.test.js
+@@ -0,0 +1,55 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { createUpdateStaffUploadMetadataHandler } from '../api/updateStaffUploadMetadata.js';
++
++// Reuses the repository's guarded, disposable loopback database fixture.
++const connectionString = process.env.PTB_STAFF_MANAGEMENT_POSTGRES_TEST_URL;
++test('staff metadata survives independent PostgreSQL reads and preserves unrelated columns', {
++  skip: !connectionString && 'dedicated loopback PostgreSQL unavailable'
++}, async t => {
++  const { localManagementPool, resetManagementDatabase } = await import('./helpers/staffManagementDatabase.js');
++  const pool = localManagementPool(connectionString);
++  try {
++    const { ids } = await resetManagementDatabase(pool);
++    const handler = createUpdateStaffUploadMetadataHandler({ dbPool: pool });
++    async function edit(body, id = ids.legacy) {
++      const res = { code: 200, status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; } };
++      await handler({ method: 'PATCH', params: { review_id: id }, body: { staff_id: 'fixture_staff', ...body } }, res);
++      return res;
++    }
++    for (const [name, patch, fields] of [
++      ['description only', { caption: 'New description' }, ['caption']],
++      ['name only', { staff_name: 'Renamed Staff' }, ['staff_name', 'uploader_name']],
++      ['category only', { category: 'training' }, ['staff_category', 'selected_category']],
++      ['simultaneous name and description', { staff_name: 'Another Name', caption: 'x'.repeat(1500) }, ['staff_name', 'uploader_name', 'caption']]
++    ]) {
++      await t.test(name, async () => {
++        const before = (await pool.query('SELECT * FROM photo_uploads_review WHERE id=$1', [ids.legacy])).rows[0];
++        const res = await edit(patch); assert.equal(res.code, 200);
++        // A separate connection/read models the next page load after a save.
++        const reader = localManagementPool(connectionString);
++        let after;
++        try { after = (await reader.query('SELECT * FROM photo_uploads_review WHERE id=$1', [ids.legacy])).rows[0]; }
++        finally { await reader.end(); }
++        for (const [key, value] of Object.entries(before)) {
++          if (!fields.includes(key) && key !== 'updated_at_utc') assert.deepEqual(after[key], value, key);
++        }
++        if ('caption' in patch) assert.equal(after.caption, patch.caption);
++        if ('staff_name' in patch) assert.equal(after.staff_name, patch.staff_name);
++        if ('category' in patch) assert.equal(after.staff_category, patch.category);
++        assert.equal(res.body.upload.caption, after.caption);
++      });
++    }
++    await t.test('wrong owner and student/private/pending records remain unchanged', async () => {
++      for (const id of [ids.private, ids.student, ids.pending]) assert.equal((await edit({ caption: 'Forbidden' }, id)).code, 404);
++      assert.equal((await edit({ staff_id: 'another_staff', caption: 'Forbidden' })).code, 404);
++    });
++    await t.test('database failure returns failure', async () => {
++      const failing = createUpdateStaffUploadMetadataHandler({ dbPool: { async query() { throw Object.assign(new Error('test failure'), { code: '42501' }); } } });
++      const res = { status(code) { this.code = code; return this; }, json(body) { this.body = body; } };
++      await failing({ method: 'PATCH', params: { review_id: ids.legacy }, body: { staff_id: 'fixture_staff', caption: 'Unwritten' } }, res);
++      assert.equal(res.code, 500); assert.equal(res.body.ok, false);
++      assert.equal((await pool.query('SELECT caption FROM photo_uploads_review WHERE id=$1', [ids.legacy])).rows[0].caption, 'x'.repeat(1500));
++    });
++  } finally { await pool.end(); }
++});

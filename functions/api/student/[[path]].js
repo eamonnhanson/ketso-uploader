@@ -23,7 +23,7 @@ async function staff(request,env){
  }
 
  const key=request.headers.get('X-Admin-Key');check(key,'Enter the existing tutor admin key.',401);
- const r=await fetch(`${LEGACY}/api/academy-tutor-questions?status=new`,{headers:{'X-Admin-Key':key},signal:AbortSignal.timeout(10000)});
+ const r=await fetch(`${LEGACY}/api/academy-tutor-questions?status=new`,{headers:{'X-Admin-Key':key},redirect:'manual',signal:AbortSignal.timeout(10000)});
  check(r.ok,'Staff authentication failed or is unavailable.',r.status===401||r.status===403?403:503);
  const data=await r.json();check(data.ok===true,'Staff authentication failed.',403);
 }
@@ -131,7 +131,7 @@ export async function onRequest(context){
    check(!staging,'Production course linking is disabled in staging.',403);
    const body=await readJSON(request,2000);check(typeof body.token==='string'&&body.token.length<1000,'Enter your personal course token.');
    const target=new URL('/api/academy-student',LEGACY);target.searchParams.set('token',body.token);
-   const r=await fetch(target,{signal:AbortSignal.timeout(10000)}),data=await r.json();
+   const r=await fetch(target,{redirect:'manual',signal:AbortSignal.timeout(10000)}),data=await r.json();
    check(r.ok&&data.ok&&data.student&&String(data.student.email||'').trim().toLowerCase()===a.email,'The course record must match your verified email. Ask staff to correct missing or outdated addresses.',403);
    const id=String(data.student.id||data.student.ketso_student_id||'');check(id,'The course record has no student ID.');
    check(!a.legacy_student_id||a.legacy_student_id===id,'This account is already linked to a different student.',409);
