@@ -158,3 +158,14 @@ Preview deployment and non-destructive smoke checks. This supersedes earlier
 no-push authorization notes; main merges and production changes remain prohibited.
 Email enablement and sending remain prohibited. Deployment results will be reported
 against the pushed commit; authorization alone does not establish deployment success.
+
+## Live manual verification and credential isolation update
+
+The owner reports that workspace/profile/tutor pages load, legacy staff-upload
+and student-gallery pages are blocked, email-disabled registration fails as
+expected, and accounts/tokens/outbox/attempts/sessions each have zero rows.
+Preview branch restriction, removed production storage, and Fail closed were
+reconfirmed on 27 November 2026. See [student-email-zapier.md](student-email-zapier.md)
+for the historical/manual deployment risk assessment, conditional shared-Preview
+acceptance criteria, recommended dedicated project and local PowerShell commands.
+No credentials were generated, emails enabled or deployments performed in this update.

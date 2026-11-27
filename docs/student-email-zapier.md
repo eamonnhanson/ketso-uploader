@@ -288,3 +288,174 @@ Preview deployment and non-destructive smoke checks. This supersedes earlier
 no-push authorization notes; main merges and production changes remain prohibited.
 Email enablement and sending remain prohibited. Deployment results will be reported
 against the pushed commit; authorization alone does not establish deployment success.
+
+
+## Manual smoke verification and credential decision — 27 November 2026
+
+Owner-reported live results for commit dfd02c516d2abb9f39a7779ed6d6b39dbe9419d6:
+student workspace and staging profile load; staff upload dashboard and student
+gallery are blocked; staging tutor page loads; registration with email disabled
+returns the expected error. The owner checked D1 and found zero accounts, tokens,
+outbox records, attempts and sessions. Preview is restricted to student-staging,
+production storage bindings are removed, and Fail closed is configured.
+These are manual owner observations, not an agent-run live test. The Cloudflare
+GitHub check previously confirmed successful deployment. No email delivery has
+been tested or authorized. The zero-row observation is for those five tables,
+not a claim that every table was queried.
+
+### Credential isolation decision
+
+The deployed application safeguards passed the reported smoke checks. They do
+not establish isolation against other code with access to the same Preview
+environment. Existing Preview is conditionally suitable for controlled email
+testing with staging-only secrets and synthetic recipients, but only after a
+trusted operator checks all of the following:
+
+- Pages → project → Deployments: inventory historical previews and hashed URLs,
+  not just the current student-staging alias. Delete obsolete/untrusted preview
+  deployments through a separately authorized action. Do not assume updating
+  current settings or removing a binding revokes bindings from already-deployed
+  versions. Conversely, do not assume adding a new secret automatically injects
+  it into all old deployments; deployment/version behavior must be verified.
+- Branch control restricts Git-triggered previews; it is not a restriction on
+  manual/API/Wrangler uploads or on trusted code changed by a compromised user.
+  Review Cloudflare members/roles, API tokens, CI credentials and manual deploy
+  capabilities. Only trusted operators may deploy to the credential-bearing
+  application. A manually uploaded artifact can omit the middleware entirely.
+- Review GitHub collaborators, staging branch protection/rules, workflow changes
+  and fork/PR deployment permissions. Access-protected URLs and host allowlists
+  do not prevent deployed server code from reading its own bindings/secrets.
+- Review Zap editors, connections and task-history access. Zap history necessarily
+  contains recipient addresses and usable verification/reset links. The Catch
+  Hook URL is itself a credential. The callback credential authorizes delivery
+  state updates; it must not be included in the initial hook payload.
+
+We cannot verify the deployment/permission inventory remotely. Therefore this
+record does not certify the shared Preview environment as credential-isolated.
+A dedicated project is not technically mandatory if the above audit succeeds,
+but it is the recommended simplest dependable boundary before adding secrets.
+
+### Recommended manual approach (not executed)
+
+Create a separate student-staging Pages project connected only to the trusted
+student-staging branch, using the existing staging-only D1/R2 resources, no
+production bindings, and fresh staging-only credentials. Disable other branch
+previews there and restrict deploy permissions/API tokens. Enable Fail closed.
+If student-staging is that project's Production branch, use that project's
+Production environment for these settings: it remains a staging application,
+not the existing ketso-uploader production app. Set STUDENT_STAGING=true and
+both origin variables to its actual canonical HTTPS hostname (no trailing slash).
+Do not guess or assume the new project hostname. Keep email false and the Zap
+disabled; repeat the read-only smoke checks after a separately authorized deploy.
+A dedicated project still requires trusted deployers; shared broad account tokens
+can defeat project separation. Nothing has been created or deployed by this task.
+
+For retaining the current project after the audit, the exact origin remains
+https://student-staging.ketso-uploader.pages.dev and the callback remains
+https://student-staging.ketso-uploader.pages.dev/api/student/email/callback.
+
+### Windows PowerShell: generate locally, never in chat
+
+Run the following on your own Windows machine in a private PowerShell session
+(Windows PowerShell 5.1 or PowerShell 7). These commands are instructions only;
+they have not been executed by the agent. They use independent cryptographically
+random 32-byte draws. No secret is printed or written to a file.
+
+```powershell
+function New-LocalRandomBase64 {
+    $bytes = New-Object byte[] 32
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $rng.GetBytes($bytes)
+        return [Convert]::ToBase64String($bytes)
+    }
+    finally {
+        $rng.Dispose()
+        [Array]::Clear($bytes, 0, $bytes.Length)
+    }
+}
+
+$callbackSecret = (New-LocalRandomBase64).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+$aesKey = New-LocalRandomBase64
+
+if ($callbackSecret.Length -ne 43) { throw 'Unexpected callback secret length' }
+if ([Convert]::FromBase64String($aesKey).Length -ne 32) { throw 'Unexpected AES key length' }
+```
+
+After choosing the isolated deployment environment, run this separately:
+
+```powershell
+Set-Clipboard -Value $callbackSecret
+```
+
+Paste into Cloudflare secret STUDENT_EMAIL_CALLBACK_SECRET and the protected Zap
+callback Authorization header as `Bearer ` followed by that same value. Do not
+paste it into the Catch Hook payload. Then run separately:
+
+```powershell
+Set-Clipboard -Value $aesKey
+```
+
+Paste into Cloudflare secret STUDENT_EMAIL_ENCRYPTION_KEY. Keep standard Base64
+including its trailing `=`; do not convert this key to Base64URL. Do not share
+this AES key with Zapier or Zoho. Store recovery copies in an approved password
+manager. Do not regenerate it casually: pending payloads require the original key.
+When finished:
+
+```powershell
+Set-Clipboard -Value ''
+Remove-Variable callbackSecret, aesKey
+Remove-Item Function:\New-LocalRandomBase64
+```
+
+If Windows clipboard history or sync is enabled, clear its saved entries too;
+clearing the current clipboard alone does not erase history. Do not echo the
+variables, screenshot their values, paste them into chat, or commit them.
+
+### Exact email environment settings
+
+| Name | Cloudflare kind | Required value/purpose |
+| --- | --- | --- |
+| STUDENT_STAGING | Variable | true in the selected staging deployment environment |
+| STUDENT_STAGING_ORIGIN | Variable | Actual canonical HTTPS staging origin; no trailing slash |
+| STUDENT_EMAIL_ORIGIN | Variable | Exactly the same staging origin |
+| STUDENT_EMAIL_ENABLED | Variable | false; do not enable until separately authorized |
+| STUDENT_ZAPIER_HOOK_URL | Secret | Exact staging Catch Hook HTTPS URL from Zapier |
+| STUDENT_EMAIL_CALLBACK_SECRET | Secret | Generated 43-character Base64URL callback secret |
+| STUDENT_EMAIL_ENCRYPTION_KEY | Secret | Generated 32-byte AES key in standard Base64 |
+| STUDENT_DB | D1 binding | ketso-student-staging |
+| STUDENT_PRIVATE_FILES | R2 binding | ketso-student-private-staging; public access disabled |
+
+STUDENT_STAGING_ADMIN_KEY is optional for the staging staff console, separate
+from email and never a production credential. STUDENT_MAILER is obsolete.
+No Zoho password or OAuth token belongs in Cloudflare; configure the authorized
+Zoho connection in Zapier. The sender is fixed in code as info@planteenboom.nu;
+there is no additional sender variable. A Zap send test can send real mail even
+while STUDENT_EMAIL_ENABLED=false, so do not test/publish the Zap send step yet.
+
+### Staging dispatch compatibility fix — 2026-11-27
+
+The owner subsequently reported a live reset request with a pending attempt and
+dispatch_unconfirmed, while a synthetic PowerShell request reached Zapier.
+Earlier email-disabled smoke results are historical; this change does not change
+the live enable flag or authorize test emails.
+
+Cloudflare Workers rejects redirect: error before network I/O. Dispatch now uses
+redirect: manual. All non-2xx responses, including redirects, are rejected with
+hook_rejected; Location is never followed. A 2xx still requires the authenticated
+callback. Encryption, token expiry, single-use links and retry limits are unchanged.
+
+Structured warnings use event student_email_dispatch, internal request_id and
+attempt_id, a fixed category (transport_failure, http_rejection, database_failure),
+and HTTP status only for rejection. Transport failures retain dispatch_unconfirmed
+and pending delivery. Database errors may leave the last durable state unchanged;
+inspect logs and use the existing rate-limited retry when eligible. Never log raw
+exceptions, bodies, Location headers, webhook URLs, recipients or credentials.
+waitUntil manages background dispatch but does not automatically resume interrupted
+work. No architecture or Zap changes are required.
+
+Regression tests check supported fetch options, rejection of 301/302/303/307/308,
+diagnostic field allowlisting and database/transport error separation. All 103
+automated tests pass. Both browser checks pass using synthetic intercepted requests
+only. The workspace check now waits for asynchronous area navigation before
+entering question text, and asserts that the submitted question retains that text.

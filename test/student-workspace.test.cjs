@@ -21,7 +21,7 @@ function fixture(){
   const {onRequest}=await import(moduleURL);const h={'CF-Connecting-IP':'test-'+(++address),...headers};if(origin)h.Origin=origin;if(cookie)h.Cookie=cookie;
   if(body!==undefined)h['Content-Type']='application/json';
   const priorFetch=global.fetch,work=[];
-  global.fetch=async (url,options)=>{if(String(url)===env.STUDENT_ZAPIER_HOOK_URL){mail.push(JSON.parse(options.body));if(transport.error)throw Error(transport.error);return Response.json({hook_received:true},{status:transport.status});}return priorFetch(url,options);};
+  global.fetch=async (url,options)=>{if(String(url)===env.STUDENT_ZAPIER_HOOK_URL){assert.equal(options.redirect,'manual');assert.equal(options.method,'POST');assert.equal(options.headers['Content-Type'],'application/json');assert.ok(options.signal instanceof AbortSignal);mail.push(JSON.parse(options.body));if(transport.error)throw Error(transport.error);return Response.json({hook_received:true},{status:transport.status});}return priorFetch(url,options);};
   try{const result=await onRequest({env,request:new Request('https://ketso.test/api/student/'+route,{method,headers:h,body:body===undefined?undefined:JSON.stringify(body)}),waitUntil(p){pending.push(p);work.push(p);}});await Promise.all(work);return result;}finally{global.fetch=priorFetch;}
  }
  async function register(email='student@example.test'){
@@ -223,4 +223,34 @@ test('isolated staging uses its student database and private bucket without lega
  await f.draft(cookie,'question');await f.call('submit',{cookie,body:{id:crypto.randomUUID(),area:'question',revision:1,publish:false}});
  assert.equal(f.sqlite.prepare("SELECT ai_status FROM student_submissions WHERE area='question'").get().ai_status,'unavailable');
  assert.ok(me.account.id);
+});
+
+
+test('all HTTP redirects are rejected without following or confirming delivery',async()=>{
+ for(const status of [301,302,303,307,308]){
+  const f=fixture();f.transport.status=status;
+  const item=await requested(f);
+  assert.equal(f.mail.length,1);
+  assert.equal(f.sqlite.prepare('SELECT status FROM student_email_outbox').get().status,'failed');
+  assert.equal(f.sqlite.prepare('SELECT error_code FROM student_email_attempts').get().error_code,'hook_rejected');
+  assert.equal((await (await f.call('email/status',{body:{receipt:item.receipt}})).json()).status,'failed');
+ }
+});
+test('dispatch diagnostics distinguish HTTP, transport and database errors without sensitive values',async()=>{
+ const logs=[],previous=console.warn;console.warn=value=>logs.push(JSON.parse(value));
+ try{
+  const f=fixture();f.transport.status=503;await requested(f);
+  f.transport.error='SECRET recipient@example.test token webhook';await requested(f,'other@example.test');
+  const {dispatchEmail}=await import('../functions/_shared/student-email.js');
+  const row=f.sqlite.prepare('SELECT id FROM student_email_outbox LIMIT 1').get();
+  f.sqlite.exec('UPDATE student_email_outbox SET retry_after=0');
+  const prepare=f.db.prepare;
+  f.db.prepare=function(sql){if(sql.includes("error_code='hook_rejected'"))throw Error('SECRET database credential');return prepare.call(this,sql);};
+  const priorFetch=global.fetch;global.fetch=async()=>new Response(null,{status:302,headers:{Location:'https://untrusted.invalid/SECRET'}});
+  try{await dispatchEmail(f.env,row.id);}finally{global.fetch=priorFetch;}
+  assert.deepEqual(logs.map(x=>x.category),['http_rejection','transport_failure','http_rejection','database_failure']);
+  for(const log of logs)assert.deepEqual(Object.keys(log).sort(),['event','request_id','attempt_id','category',...(log.http_status===undefined?[]:['http_status'])].sort());
+  assert.doesNotMatch(JSON.stringify(logs),/SECRET|recipient@|https:|token|credential/);
+  assert.equal(f.sqlite.prepare('SELECT error_code FROM student_email_attempts ORDER BY rowid DESC LIMIT 1').get().error_code,null);
+ }finally{console.warn=previous;}
 });

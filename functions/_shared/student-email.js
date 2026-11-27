@@ -43,6 +43,9 @@ export async function queueEmail(env,a,purpose) {
 export async function dispatchEmail(env,id) {
  emailReady(env); // Recheck the explicit enable gate before any outbox claim or network request.
  const db=env.STUDENT_DB,attempt=crypto.randomUUID();
+ // Only fixed categories and internal IDs enter logs; never serialize exceptions.
+ const diagnostic=(category,httpStatus)=>console.warn(JSON.stringify({event:'student_email_dispatch',request_id:id,attempt_id:attempt,category,...(httpStatus===undefined?{}:{http_status:httpStatus})}));
+ try {
  // An atomic claim prevents parallel retries. No dispatch can rotate a link or change its owner.
  const row=await db.prepare(`UPDATE student_email_outbox SET status='pending',attempts=attempts+1,current_attempt=?,retry_after=?
  WHERE id=? AND status IN ('pending','failed') AND attempts<? AND retry_after<=? AND expires>?
@@ -61,16 +64,25 @@ export async function dispatchEmail(env,id) {
    db.prepare("UPDATE student_email_outbox SET status='failed' WHERE id=? AND current_attempt=? AND status NOT IN ('sent','skipped')").bind(id,attempt)]);
   return;
  }
+ let result;
  try {
-  const result=await fetch(env.STUDENT_ZAPIER_HOOK_URL,{method:'POST',redirect:'error',signal:AbortSignal.timeout(10000),headers:{'Content-Type':'application/json'},body:JSON.stringify({version:1,request_id:id,attempt_id:attempt,eligible:!!row.account_id,from:FROM,...message,purpose:row.purpose,expires_at:row.expires,callback_url:env.STUDENT_EMAIL_ORIGIN+'/api/student/email/callback'})});
-  if(!result.ok){
-   await db.prepare("UPDATE student_email_attempts SET error_code='hook_rejected' WHERE id=?").bind(attempt).run();
-   await db.prepare("UPDATE student_email_outbox SET status='failed' WHERE id=? AND current_attempt=? AND status NOT IN ('sent','skipped')").bind(id,attempt).run();
-  }
-  // A 2xx only acknowledges the hook. The durable state remains pending until callback.
+  // Workers supports manual, not error. Never forward a sensitive payload on redirects.
+  result=await fetch(env.STUDENT_ZAPIER_HOOK_URL,{method:'POST',redirect:'manual',signal:AbortSignal.timeout(10000),headers:{'Content-Type':'application/json'},body:JSON.stringify({version:1,request_id:id,attempt_id:attempt,eligible:!!row.account_id,from:FROM,...message,purpose:row.purpose,expires_at:row.expires,callback_url:env.STUDENT_EMAIL_ORIGIN+'/api/student/email/callback'})});
  } catch {
-  // Ambiguous timeout/transport failure: Zapier may still be running. Never claim delivery.
+  diagnostic('transport_failure');
+  // Delivery is ambiguous; a later authenticated callback can still confirm it.
   await db.prepare("UPDATE student_email_attempts SET error_code='dispatch_unconfirmed' WHERE id=?").bind(attempt).run();
+  return;
+ }
+ if(!result.ok){
+  diagnostic('http_rejection',result.status);
+  await db.prepare("UPDATE student_email_attempts SET error_code='hook_rejected' WHERE id=?").bind(attempt).run();
+  await db.prepare("UPDATE student_email_outbox SET status='failed' WHERE id=? AND current_attempt=? AND status NOT IN ('sent','skipped')").bind(id,attempt).run();
+ }
+ // A 2xx only acknowledges the hook. The durable state remains pending until callback.
+ } catch {
+  // Database failures must not be mislabeled as transport errors or leak raw D1 errors.
+  diagnostic('database_failure');
  }
 }
 export async function emailReceipt(env,receipt) {
