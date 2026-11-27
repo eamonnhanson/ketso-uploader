@@ -160,6 +160,8 @@ const app = document.getElementById("app");
 
 if (!studentId) {
   app.innerHTML = "Missing student_id.";
+} else if (/^[a-f0-9-]{36}$/.test(studentId)) {
+  app.textContent = "";
 } else {
   loadProfile(studentId);
 }
@@ -408,5 +410,9 @@ function escapeAttr(value) {
 }
 </script>
 
+<section id="studentSubmittedWork" aria-label="Submitted student work"></section>
+<p><a href="/student-account/">Sign in to manage your own work</a></p>
+<script src="/shared/student-writing.js"></script>
+<script src="/shared/student-public-work.js"></script>
 </body>
 </html>
