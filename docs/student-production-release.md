@@ -306,3 +306,49 @@ Remaining mandatory launch gates:
 4. Final explicit merge/deploy/email activation approval and recorded rollback SHA.
 No new infrastructure, Render/PostgreSQL/Zap changes, production writes or emails
 are included in this preparation.
+
+## Controlled deployment authorization and manual preflight evidence
+
+Owner reviewed dashboard screenshots and confirmed the following on 27 November
+2026. These are manual attestations, not independent agent inspection of secrets
+or Cloudflare settings:
+- Current production rollback deployment: 1550d974-36f8-43fe-85ae-c2e0c5b0d6f1;
+  source: 2526be404b35871791f6b5f57cce1b1b0055a6e6.
+- Repository: zero external collaborators and zero deploy keys. Installed apps:
+  ChatGPT Codex Connector, Cloudflare Workers and Pages, GitGuardian, Netlify, Render.
+- Cloudflare: one member (owner/Super Admin); no personal API tokens. Account token
+  ketso-uploader grants only Workers R2 Storage Bucket Item Write on ketso-tree-photos.
+- Production STUDENT_DB/private R2 bindings target the confirmed production
+  resources; KETSO_BUCKET preserved; AI binding present.
+- STUDENT_EMAIL_ENABLED=false; STUDENT_STAGING=false; email origin correct.
+  Approved knowledge and three encrypted email secrets present; production and
+  staging secrets were generated independently.
+- Migrations 001/002 compared with repository SQL; nine tables and three indexes
+  confirmed. No migration execution is required for this deployment.
+
+Owner authorizes PR #37 readiness/merge and controlled production deployment with
+email disabled. This supersedes earlier no-merge/no-deploy preparation notes only.
+Email enablement, production Zap activation, sending emails, Render/PostgreSQL
+changes and public announcement remain prohibited.
+
+Main is unprotected. Individual app permissions, global API key usage, historical
+deployment access, 2FA and Zapier history permissions remain incompletely audited.
+Secret values cannot be independently inspected. These residual uncertainties are
+recorded under the owner's controlled-deployment authorization, not marked resolved.
+No evidence establishes a compromised credential or unauthorized deployer.
+Unsigned inbound hook risk remains an email-activation/public-launch gate; disabling
+application email does not itself disable an independently activated Zap. Do not
+activate the production Zap. Review its activation state before any email approval.
+
+Controlled-deployment gates: unchanged reviewed base/head (or reviewed differences),
+no failing GitHub check, matching manual schema/binding evidence, confirmed email
+false, recorded rollback and scoped owner authorization. These are sufficient for
+the approved controlled deployment. Live application AI, production tutor auth,
+profile linking and legacy smoke tests follow deployment; they do not justify an
+unapproved public launch. Complete outstanding access/history/2FA audit or explicitly
+resolve those risks, and resolve inbound webhook risk before email/public launch.
+AI remains mandatory; Playground acceptance is not application acceptance.
+
+Workflow state for this release is controlled production deployment authorized,
+pending actual Cloudflare result and production acceptance. The task report records
+the actual merge SHA/deployment result; this pre-merge text does not assert success.
