@@ -14,6 +14,18 @@
       <p class="intro">Quickly send a selfie, photo, video or text update.</p>
     </header>
 
+    <section class="staff-card" aria-labelledby="student-login-title">
+      <h2 id="student-login-title">Student login</h2>
+      <form id="studentLoginForm">
+        <label>Email <input name="email" type="email" autocomplete="email" required></label>
+        <label>Password <input name="password" type="password" autocomplete="current-password" minlength="15" maxlength="128" required></label>
+        <button class="button button-dark" type="submit">Sign in to my workspace</button>
+      </form>
+      <p id="studentLoginStatus" role="status" aria-live="polite"></p>
+      <p><a href="/student-account/">Create an account, verify email or reset password</a> · <a href="/student-account/">Open my workspace</a></p>
+    </section>
+    <script src="/shared/student-login.js" defer></script>
+
     <section id="studentBanner" class="student-banner" hidden aria-live="polite"></section>
     <a id="extraCourseEnrolmentLink" class="button button-soft" href="#" target="_blank" rel="noopener" hidden>
       Enrol in another course

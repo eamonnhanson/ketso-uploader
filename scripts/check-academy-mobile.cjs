@@ -5,7 +5,7 @@ const path = require('node:path');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
 (async () => {
-  const browser = await chromium.launch({ channel: process.env.BROWSER_CHANNEL || 'chrome', headless: true });
+  const browser = await chromium.launch({ ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : { channel: process.env.BROWSER_CHANNEL || 'chrome' }), headless: true });
   let passed = 0;
   try {
     const cases = [320,360,390,430].flatMap(width => ['portrait','landscape'].map(orientation => ({ width, orientation })));
@@ -17,7 +17,12 @@ const root = path.resolve(__dirname, '..');
       page.on('pageerror', error => errors.push(error.message));
       await page.route('**/*', async route => {
         const request = route.request(), url = new URL(request.url());
-        if (url.hostname === 'cdnjs.cloudflare.com') return route.continue();
+        if (url.hostname === 'cdnjs.cloudflare.com') {
+          // Optional exact-version offline assets for environments without CDN access.
+          if (process.env.CROPPER_FIXTURE_DIR && /^\/ajax\/libs\/cropperjs\/1\.6\.2\/cropper\.min\.(js|css)$/.test(url.pathname))
+            return route.fulfill({contentType:url.pathname.endsWith('.js')?'text/javascript':'text/css',body:fs.readFileSync(path.join(process.env.CROPPER_FIXTURE_DIR,path.basename(url.pathname)))});
+          return route.continue();
+        }
         if (url.hostname !== 'academy.test') return route.abort();
         const json = body => route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
         if (url.pathname === '/upload') {
