@@ -459,3 +459,45 @@ diagnostic field allowlisting and database/transport error separation. All 103
 automated tests pass. Both browser checks pass using synthetic intercepted requests
 only. The workspace check now waits for asynchronous area navigation before
 entering question text, and asserts that the submitted question retains that text.
+
+### Verified-account reset investigation — 27 November 2026
+
+Owner reports successful registration email, Zoho provider ID, authenticated
+callback, verification/login and skipped nonexistent-account resets, followed by
+two eligible resets pending with dispatch_unconfirmed and no Zap run. Build logs
+provided by the owner establish that the later redeployment at 17:19 UTC checked
+out dfd02c516d2abb9f39a7779ed6d6b39dbe9419d6, not the fixed c361673 commit.
+That old source still contains redirect: error and lacks categorized diagnostics.
+This reintroduced the known Workers fetch defect. The earlier successful tests
+are not evidence that this later deployment used the same code. Individual attempt
+timestamps/runtime logs were not supplied, so their exact deployment correlation
+has not been independently verified.
+
+Registration and eligible reset share queueEmail, AES-GCM encryption, dispatchEmail
+and waitUntil. Reset changes purpose, subject, link text and expiry (30 minutes
+versus 24 hours). Ineligible reset encrypts an empty payload and sends eligible=false
+without recipient or token. Token creation/encryption precede the accepted response;
+decryption failures use payload_unreadable, missing/expired tokens use expired.
+Neither path produces dispatch_unconfirmed from these operations. That code comes
+from the fetch/options/serialization catch; the newer diagnostic describes its
+category without replacing the durable code. JSON contains plain strings, numbers
+and booleans. The staging admin key is read only by staff authentication.
+waitUntil is shared by all three flows and does not explain this old-source build.
+
+Minimal remedy: deploy the current student-staging tip containing c361673. Do not
+change timeout, encryption, tokens, Zapier or the dispatch architecture speculatively.
+After editing environment settings, do not retry an obsolete deployment: verify
+its source commit first. Prefer a fresh push from the tested student-staging tip.
+In Workers & Pages > ketso-uploader > Deployments, check the Preview branch and
+source commit; the build log HEAD must match the intended commit. Verify the stable
+branch alias points to that deployment. A successful build alone is insufficient.
+
+Two additional offline regressions exercise two successive eligible resets for a
+verified staging account with the staging admin key present, encrypted payload and
+30-minute expiry, authenticated confirmation, transport failure, retry cooldown,
+unchanged ownership/token on retry, single-use consumption and session revocation.
+All 105 automated tests and both browser checks pass. No emails were sent during
+this investigation. The commit adds tests and documentation only; the runtime fix
+already exists in its ancestor. Deployment results are reported in the task.
+Pending records are not automatically replayed by deployment. Existing retry and
+expiry safeguards still apply; any live email test remains a separate action.

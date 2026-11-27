@@ -254,3 +254,49 @@ test('dispatch diagnostics distinguish HTTP, transport and database errors witho
   assert.equal(f.sqlite.prepare('SELECT error_code FROM student_email_attempts ORDER BY rowid DESC LIMIT 1').get().error_code,null);
  }finally{console.warn=previous;}
 });
+
+test('verified staging account resets dispatch encrypted eligible mail and require authenticated confirmation',async()=>{
+ const f=fixture();f.env.STUDENT_STAGING='true';f.env.STUDENT_STAGING_ORIGIN=f.env.STUDENT_EMAIL_ORIGIN;
+ f.env.STUDENT_STAGING_ADMIN_KEY='synthetic-staging-admin-key-for-tests-only';
+ await f.user();
+ const before=f.sqlite.prepare('SELECT * FROM student_accounts').get();
+ const requests=[];
+ for(let i=0;i<2;i++){
+  const item=await requested(f,'student@example.test','forgot');requests.push(item);
+  const p=item.payload,row=f.sqlite.prepare('SELECT * FROM student_email_outbox WHERE id=?').get(p.request_id);
+  assert.equal(p.eligible,true);assert.equal(p.purpose,'reset');assert.equal(p.to,'student@example.test');
+  assert.equal(p.subject,'Reset your KETSO password');assert.match(p.text,/#reset=[a-f0-9]{64}/);
+  assert.equal(p.callback_url,'https://ketso.test/api/student/email/callback');
+  assert.equal(row.expires-row.created_at,1800);assert.equal(row.attempts,1);assert.equal(row.status,'pending');
+  assert.doesNotMatch(row.payload,/student@example|reset=|choose a new password/);
+  assert.equal(f.sqlite.prepare('SELECT error_code FROM student_email_attempts WHERE id=?').get(p.attempt_id).error_code,null);
+  const token=p.text.match(/reset=([a-f0-9]+)/)[1];
+  const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token));
+  assert.equal(row.token_hash,Buffer.from(hash).toString('hex'));
+  assert.equal(f.sqlite.prepare('SELECT account_id FROM student_tokens WHERE hash=?').get(row.token_hash).account_id,before.id);
+  assert.doesNotMatch(await item.response.text(),/reset=|student@example|token|provider_message/);
+  assert.equal((await callback(f,p,'sent',{})).status,200);
+  assert.equal(f.sqlite.prepare('SELECT status FROM student_email_outbox WHERE id=?').get(p.request_id).status,'sent');
+ }
+ assert.notEqual(requests[0].payload.text,requests[1].payload.text);
+ assert.deepEqual(f.sqlite.prepare('SELECT * FROM student_accounts').get(),before);
+});
+test('verified reset transport failures remain pending and retry keeps the same owner and single-use token',async()=>{
+ const f=fixture();const cookie=await f.user();
+ f.transport.error='synthetic transport exception';
+ const item=await requested(f,'student@example.test','forgot'),p=item.payload;
+ const row=f.sqlite.prepare('SELECT * FROM student_email_outbox WHERE id=?').get(p.request_id);
+ assert.equal(row.status,'pending');assert.equal(row.attempts,1);
+ assert.equal(f.sqlite.prepare('SELECT error_code FROM student_email_attempts WHERE id=?').get(p.attempt_id).error_code,'dispatch_unconfirmed');
+ assert.equal((await f.call('email/retry',{body:{receipt:item.receipt}})).status,429);
+ f.sqlite.prepare('UPDATE student_email_outbox SET retry_after=0 WHERE id=?').run(row.id);f.transport.error=null;
+ assert.equal((await f.call('email/retry',{body:{receipt:item.receipt}})).status,200);
+ const retry=f.mail.at(-1);assert.equal(retry.text,p.text);assert.equal(retry.request_id,p.request_id);assert.notEqual(retry.attempt_id,p.attempt_id);
+ const retried=f.sqlite.prepare('SELECT * FROM student_email_outbox WHERE id=?').get(row.id);
+ assert.equal(retried.account_id,row.account_id);assert.equal(retried.token_hash,row.token_hash);assert.equal(retried.expires,row.expires);
+ assert.equal((await callback(f,retry)).status,200);
+ const token=retry.text.match(/reset=([a-f0-9]+)/)[1],newPassword='New synthetic reset password 456!';
+ assert.equal((await f.call('auth/reset',{body:{token,password:newPassword}})).status,200);
+ assert.equal((await f.call('auth/reset',{body:{token,password:newPassword}})).status,400);
+ assert.equal((await f.call('me',{cookie})).status,401);await f.login('student@example.test',newPassword);
+});
