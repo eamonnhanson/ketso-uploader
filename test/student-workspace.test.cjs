@@ -300,3 +300,50 @@ test('verified reset transport failures remain pending and retry keeps the same 
  assert.equal((await f.call('auth/reset',{body:{token,password:newPassword}})).status,400);
  assert.equal((await f.call('me',{cookie})).status,401);await f.login('student@example.test',newPassword);
 });
+
+test('question attachments retain filenames, bytes and submission snapshots with staging access controls',async()=>{
+ const f=fixture();f.env.STUDENT_STAGING='true';f.env.STUDENT_STAGING_ORIGIN=f.env.STUDENT_EMAIL_ORIGIN;f.env.STUDENT_STAGING_ADMIN_KEY='synthetic-staff-key-for-attachment-tests';
+ const a=await f.user(),b=await f.user('other@example.test'),owner=f.sqlite.prepare('SELECT id FROM student_accounts WHERE email=?').get('student@example.test').id;
+ const first=crypto.randomUUID(),second=crypto.randomUUID(),privateFile=crypto.randomUUID();
+ for(const [id,name,bytes] of [[first,"L'année (1).pdf",'old attachment'],[second,'new.txt','new attachment'],[privateFile,'draft.docx','draft only']]){
+  f.sqlite.prepare('INSERT INTO student_files VALUES(?,?,?,?,?)').run(id,owner,name,bytes.length,0);f.objects.set(id,new TextEncoder().encode(bytes));
+ }
+ const staffHeaders={'X-Admin-Key':f.env.STUDENT_STAGING_ADMIN_KEY};
+ assert.equal((await f.call('files/'+first)).status,401);
+ assert.equal((await f.call('files/'+first,{cookie:b})).status,404);
+ assert.equal((await f.call('files/'+privateFile,{headers:staffHeaders})).status,404);
+ await f.draft(a,'question',{text:'First question',answers:[],files:[first]});
+ const q1=crypto.randomUUID();assert.equal((await f.call('submit',{cookie:a,body:{id:q1,area:'question',revision:1,publish:false}})).status,200);
+ await f.draft(a,'question',{text:'New question',answers:[],files:[second]},1);
+ const q2=crypto.randomUUID();assert.equal((await f.call('submit',{cookie:a,body:{id:q2,area:'question',revision:2,publish:false}})).status,200);
+ await f.draft(a,'question',{text:'Later draft',answers:[],files:[]},2);
+ const questions=(await (await f.call('staff',{headers:staffHeaders})).json()).questions;
+ assert.deepEqual(questions.find(q=>q.id===q1).content.files,[first]);assert.deepEqual(questions.find(q=>q.id===q2).content.files,[second]);
+ assert.deepEqual(questions.find(q=>q.id===q1).attachments,[{id:first,name:"L'année (1).pdf"}]);
+ assert.equal((await f.call('files/'+first,{headers:{'X-Admin-Key':'wrong'}})).status,403);
+ const download=await f.call('files/'+first,{headers:staffHeaders});
+ assert.equal(download.headers.get('Content-Type'),'application/pdf');
+ assert.match(download.headers.get('Content-Disposition'),/L%27ann%C3%A9e%20%281%29.pdf/);
+ assert.equal(await download.text(),'old attachment');
+ assert.equal(await (await f.call('files/'+second,{cookie:a})).text(),'new attachment');
+ assert.equal((await f.call('drafts/question',{cookie:b,method:'PUT',body:{revision:0,content:{files:[first]}}})).status,404);
+ await f.call('visibility',{cookie:a,body:{id:q1,publish:true,publicConsent:true}});
+ assert.equal((await f.call('files/'+first)).status,200);
+ assert.equal((await f.call('files/'+second)).status,401);
+ await f.call('visibility',{cookie:a,body:{id:q1,publish:false}});
+ assert.equal((await f.call('files/'+first)).status,401);
+ assert.equal((await f.call('files/'+first,{cookie:b})).status,404);
+ assert.equal((await f.call('files/'+first,{headers:staffHeaders})).status,200);
+});
+
+test('uploads preserve long filename extensions and download MIME types for supported formats',async()=>{
+ const f=fixture(),cookie=await f.user(),{onRequest}=await import(moduleURL);
+ for(const [ext,type] of [['pdf','application/pdf'],['docx','application/vnd.openxmlformats-officedocument.wordprocessingml.document'],['odt','application/vnd.oasis.opendocument.text'],['txt','text/plain'],['jpg','image/jpeg'],['jpeg','image/jpeg'],['png','image/png']]){
+  const form=new FormData();form.append('file',new File(['original bytes'],'x'.repeat(190)+'.'+ext,{type:'application/octet-stream'}));
+  const temp=new Request('https://ketso.test/api/student/files',{method:'POST',body:form}),bytes=await temp.arrayBuffer();
+  const r=await onRequest({env:f.env,request:new Request(temp.url,{method:'POST',body:bytes,headers:{'Content-Type':temp.headers.get('Content-Type'),'Content-Length':String(bytes.byteLength),Origin:'https://ketso.test',Cookie:cookie}}),waitUntil(){}});
+  assert.equal(r.status,200);const file=await r.json();assert.equal(file.name.length,180);assert.ok(file.name.endsWith('.'+ext));
+  const download=await f.call('files/'+file.id,{cookie});assert.equal(download.headers.get('Content-Type'),type);assert.equal(download.headers.get('Content-Disposition'),"attachment; filename*=UTF-8''"+file.name);
+  assert.equal(download.headers.get('Cache-Control'),'no-store');assert.equal(await download.text(),'original bytes');
+ }
+});

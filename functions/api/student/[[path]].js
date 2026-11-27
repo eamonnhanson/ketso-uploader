@@ -4,6 +4,16 @@ import {AREAS,validateContent,ownedFiles,answerQuestion} from '../../_shared/stu
 import {emailReady,queueEmail,dispatchEmail,emailCallback,emailRequest} from '../../_shared/student-email.js';
 const LEGACY='https://ptb-tree-map.onrender.com';
 const response=(data,status=200,headers={})=>Response.json(data,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...headers}});
+const fileType=name=>({pdf:'application/pdf',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',odt:'application/vnd.oasis.opendocument.text',txt:'text/plain',jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png'}[name.split('.').pop().toLowerCase()]||'application/octet-stream');
+const encodedFilename=name=>encodeURIComponent(name).replace(/['()*]/g,c=>'%'+c.charCodeAt(0).toString(16).toUpperCase());
+async function withAttachments(db,row){
+ const content=JSON.parse(row.content),attachments=[];
+ for(const id of content.files){
+  const file=await db.prepare('SELECT id,name FROM student_files WHERE id=? AND account_id=?').bind(id,row.account_id).first();
+  if(file)attachments.push(file);
+ }
+ return {...row,content,attachments};
+}
 async function staff(request,env){
  if(isStudentStaging(request,env)){
   check(typeof env.STUDENT_STAGING_ADMIN_KEY==='string'&&env.STUDENT_STAGING_ADMIN_KEY.length>=32,'Staging staff access is not configured.',503);
@@ -87,14 +97,14 @@ export async function onRequest(context){
   if(path[0]==='public'&&method==='GET'){
    const a=await db.prepare('SELECT id,name,legacy_student_id FROM student_accounts WHERE id=? OR legacy_student_id=?').bind(path[1]||'',path[1]||'').first();
    check(a,'Profile not found.',404);
-   const rows=await db.prepare('SELECT id,area,content,created_at,ai_answer,ai_status,staff_answer FROM student_submissions WHERE account_id=? AND public=1 ORDER BY created_at DESC').bind(a.id).all();
-   return response({account:publicAccount(a),submissions:rows.results.map(x=>({...x,content:JSON.parse(x.content)}))});
+   const rows=await db.prepare('SELECT id,account_id,area,content,created_at,ai_answer,ai_status,staff_answer FROM student_submissions WHERE account_id=? AND public=1 ORDER BY created_at DESC').bind(a.id).all();
+   return response({account:publicAccount(a),submissions:await Promise.all(rows.results.map(async x=>{const {account_id,...item}=await withAttachments(db,x);return item;}))});
   }
   if(path[0]==='staff'){
    await staff(request,env);
    if(method==='GET'){
     const rows=await db.prepare(`SELECT s.*,a.name FROM student_submissions s JOIN student_accounts a ON s.account_id=a.id WHERE area='question' ORDER BY reviewed,created_at DESC LIMIT 100`).all();
-    return response({questions:rows.results.map(x=>({...x,content:JSON.parse(x.content)}))});
+    return response({questions:await Promise.all(rows.results.map(x=>withAttachments(db,x)))});
    }
    check(method==='POST'&&path[1],'Unknown action.',404);const body=await readJSON(request,15000);
    check(typeof body.answer==='string'&&body.answer.trim()&&body.answer.length<=10000,'Write an answer of at most 10,000 characters.');
@@ -107,7 +117,7 @@ export async function onRequest(context){
    if(!published){if(request.headers.has('X-Admin-Key')){await staff(request,env);const attached=await db.prepare("SELECT s.id FROM student_submissions s, json_each(s.content,'$.files') f WHERE s.area='question' AND f.value=? LIMIT 1").bind(file.id).first();check(attached,'File not found.',404);}else{const a=await account(request,db);check(a.id===file.account_id,'File not found.',404);}}
    check(env.STUDENT_PRIVATE_FILES,'Private storage is unavailable.',503);
    const object=await env.STUDENT_PRIVATE_FILES.get(file.id);check(object,'File not found.',404);
-   return new Response(object.body,{headers:{'Content-Type':'application/octet-stream','Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"sandbox"}});
+   return new Response(object.body,{headers:{'Content-Type':fileType(file.name),'Content-Disposition':`attachment; filename*=UTF-8''${encodedFilename(file.name)}`,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"sandbox"}});
   }
   const a=await account(request,db);
   if(method!=='GET')await rate(db,'write:'+a.id,120,60);
@@ -143,8 +153,8 @@ export async function onRequest(context){
    const length=Number(request.headers.get('Content-Length'));check(length>0&&length<=6*1024*1024,'Upload a file of at most 5 MB.',413);
    const form=await request.formData(),file=form.get('file');check(file&&typeof file!=='string'&&file.size>0&&file.size<=5*1024*1024,'Upload a file of at most 5 MB.',413);
    check(/\.(pdf|docx|odt|txt|jpg|jpeg|png)$/i.test(file.name),'Use PDF, DOCX, ODT, TXT, JPG or PNG.');
-   const id=crypto.randomUUID(),name=file.name.replace(/[\x00-\x1f\x7f]/g,'').slice(0,180);
-   await env.STUDENT_PRIVATE_FILES.put(id,file.stream(),{httpMetadata:{contentType:'application/octet-stream'}});
+   const id=crypto.randomUUID(),clean=file.name.replace(/[\x00-\x1f\x7f/\\]/g,''),ext=clean.slice(clean.lastIndexOf('.')),name=clean.slice(0,clean.length-ext.length).slice(0,180-ext.length)+ext;
+   await env.STUDENT_PRIVATE_FILES.put(id,file.stream(),{httpMetadata:{contentType:fileType(name)}});
    try{await db.prepare('INSERT INTO student_files(id,account_id,name,size,created_at) VALUES(?,?,?,?,?)').bind(id,a.id,name,file.size,now()).run();}
    catch(e){await env.STUDENT_PRIVATE_FILES.delete(id);throw e;}
    return response({id,name});

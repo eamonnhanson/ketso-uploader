@@ -148,3 +148,39 @@ See [student-staging-safety.md](student-staging-safety.md) for the current
 server/browser production isolation, restricted staging staff access, disabled
 course linking and AI, normal private D1/R2 use, and the mandatory Cloudflare
 branch/failure-mode checks before pushing. Production behavior is preserved.
+
+## Attachment downloads — 27 November 2026
+
+The tutor browser previously replaced the server filename with question-attachment
+when downloading a blob, removing its extension. Files also used a generic binary
+MIME type. Tutor downloads now use stored filenames; tutor/public lists show actual
+uploaded filenames. Responses use the supported extension's MIME type, RFC 5987
+UTF-8 attachment filenames, no-store, nosniff and sandbox. New uploads retain the
+extension when a long name is shortened; unsafe control/path characters are removed.
+Existing files require no migration. Previously truncated names cannot be recovered
+if the original extension was already lost.
+
+Question attachment IDs are saved in each submission's immutable content snapshot,
+not resolved from the latest draft. Uploads have unique storage IDs and are never
+overwritten. Later draft edits and new submissions preserve earlier bytes and IDs.
+The UI shows the question date and explains that listed uploads retain their original
+contents. Generated ODT downloads contain current writing/answers, not uploaded files.
+Draft attachments remain selected until removed: submitting again intentionally
+includes the currently listed files. No evidence of snapshot corruption was found;
+the particular live older attachment was not inspected.
+
+Private file URLs require the owner session or authenticated staff access to a
+submitted question. Staff cannot download draft-only attachments; other accounts
+cannot attach or retrieve private files. Public access is derived on every download
+from public submission references, not a permanent public R2 URL. Making the last
+public submission referencing a file private revokes anonymous access immediately.
+If the same upload is deliberately reused in another public submission, it remains
+public until that submission is private too. Already downloaded copies cannot be
+revoked. The private bucket and all authentication routes remain unchanged.
+
+Regression coverage verifies old/new question snapshots and exact bytes, owner and
+staff access, wrong/missing credentials, cross-account attachment rejection,
+publication/revocation, all supported MIME types, Unicode filename encoding and
+long-name extensions. Chromium checks the tutor filename and downloaded bytes.
+Validation: 107 automated tests and both browser checks. No real student data or
+live emails are used. Only student-staging is authorized for this deployment.
