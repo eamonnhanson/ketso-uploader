@@ -1,8 +1,65 @@
 # Academy portal coordinated release candidate
 
 Draft PR #38, feature/academy-portal; companion backend feature/academy-portal-backend.
-No merge, deployment, production SQL, email activation or Zapier/Zoho changes authorized.
+Backend PR #69 is deployed under prior authorization. PR #38 merge/deployment and all activation remain unauthorized.
 This candidate extends the existing infrastructure; it does not introduce a second student registry.
+
+## Live backend acceptance — 28 November 2026
+
+Render connector independently confirms deployment `dep-dc5do5m0tbcc73e49nlg` is live at
+`a3ef1e34070778dd5f11989615c92e0763a4ded4` (PR #69). Startup instance
+`srv-d34t8modl3ps7386mjs0-kcgml` logged `[DB] ready at 2026-11-28T13:51:11.467Z`
+and the service became live at 13:51:15 UTC. The service tracks backend main with automatic
+commit deployments. Do not merge documentation PR #70 without separate deployment approval.
+
+Management verified the running dependencies: Express 4.22.2, body-parser 1.20.9,
+proxy-addr 2.0.8 and qs 6.16.2; /health and /api/academy-courses both returned HTTP 200.
+These two routes are static health/catalog responses, not independent database probes.
+The separate database-ready log closes the outstanding post-deploy database connectivity gate.
+Render Shell confirms ACADEMY_PORTAL_ENABLED=false. Management's Cloudflare Production
+confirmation of STUDENT_EMAIL_ENABLED=false remains the email configuration evidence.
+Secret values were not read. No migrations or permissions were changed during acceptance.
+
+The pre-merge application-pool check confirmed web_ro, both read-only settings off and both
+portal SELECT permissions true. Applied grants, sequence/row-lock checks and RLS results are
+already recorded as passed; do not repeat migrations or grants. Counts remain the previously
+verified 778 students and 660 enrolments, not a new production count query.
+
+The startup logs confirm the existing pg concurrent-query deprecation and SSL-mode warning.
+Startup nevertheless reached database readiness. The async connect listener/import-time query
+can overlap; pool.end() in a diagnostic shell can terminate unfinished listener work. That
+explains the reported ordering but does not establish an exact shutdown error without its stack.
+Do not suppress warnings or change TLS in this release. Effective TLS verification needs a
+separate options/CA review; the source rejectUnauthorized flag alone is inconclusive because
+connection-string SSL options override it. No connection URLs or credentials are recorded here.
+
+PR #38 was rechecked against uploader main `87edd041942fe83838ed78ea7b79f3fae0304833`:
+main is an ancestor, GitHub reports no conflicts, and GitGuardian passes on reviewed head
+`a2701f0df190f8013834ee86ff61e4003441731f`. No aggregate commit-status checks are registered
+(the API reports pending with zero statuses); this is not a failed test or a green CI suite.
+Local uploader regression tests pass 154/154. All five browser scripts pass, including
+360/390/1280px portal checks and ten mobile upload scenarios; native Android camera use
+still needs device verification. Render returned no error-level logs in the inspected
+13:51:10–13:57:31 UTC post-startup window (not a guarantee of future error-free operation). No application changes are needed for this
+acceptance update. PR #38 stays draft and unmerged pending explicit approval.
+
+### Remaining deployment and activation gates
+
+- Before approved PR #38 merge, recheck its exact head/main and checks, and retain both flags
+  false. Record the current Pages deployment/rollback ID and source SHA before merge.
+- Confirm Pages deploys the actual merge commit. Check course browsing, authorised legacy
+  links, uploader/gallery/tutor entrypoints, disabled registration and email messaging, existing
+  student login/private workspace and separate staff access. Local fixtures do not replace
+  these live authorised acceptance checks.
+- Portal activation is separate: controlled verified-account linkage, actual selected-course
+  enrolments, photo/consent propagation and withdrawal require explicit activation approval.
+- Email remains blocked pending the separately reviewed inbound-webhook authentication fix
+  and explicit activation approval. Live application AI and staff/profile-linking acceptance
+  remain public-launch gates. Do not send email or announce a launch.
+- Backend rollback source: `21159eac5aed95a7db070049705a2ecc4587c283`, prior deployment
+  `dep-dc5cs16c6qcc738jur30`. Keep additive schema/data and flags false; do not reverse the
+  corrected enrolment function or restore a backup over newer records. Aiven backup restore
+  recoverability remains an accepted, unverified limitation.
 
 ## Production state confirmed by management — 28 November 2026
 
@@ -15,7 +72,7 @@ results, not a fresh remote database inspection by this task.
 Render and Pages Production have ACADEMY_PORTAL_ENABLED=false,
 ACADEMY_PORTAL_ISSUER=https://ketso-uploader.pages.dev and an independently generated shared
 ACADEMY_PORTAL_SECRET. STUDENT_EMAIL_ENABLED remains false. Values were not read or exposed.
-Render redeployed existing main 21159eac successfully and database connectivity was confirmed.
+Before PR #69, Render redeployed 21159eac successfully; the latest live result is recorded above.
 The runtime role is web_ro; its name alone does not establish effective privileges.
 
 Management relies on Aiven backups. Recoverability has not been independently verified.
@@ -124,29 +181,19 @@ email must stay disabled until its authenticated first-step guard is separately 
 
 ## Remaining coordinated deployment sequence — explicit approval required
 
-1. Run the read-only `ptb-tree-map/docs/sql/academy_portal_web_ro_access.sql` in production.
-   It reports access and generates only missing narrow GRANT statements; it executes none.
-   Check the actual web_ro connection reports transaction_read_only=off and
-   default_transaction_read_only=off. If RLS applies, review policies rather than grant BYPASSRLS.
-2. An owner may apply only the generated missing grants after approval, then rerun the checks.
-   Do not grant ALL, DELETE, CREATE, superuser, role membership, blanket sequence rights or
-   write access to points. The enrolment id UPDATE column privilege is needed for FOR UPDATE;
-   the application never updates enrolment IDs. Preserve existing legacy permissions.
-   The SECURITY DEFINER CRM owner's SELECT(academy_student_id) privilege is checked separately.
-3. Review the refreshed PR heads and checks. Main rechecked at backend
-   21159eac5aed95a7db070049705a2ecc4587c283 and uploader
-   87edd041942fe83838ed78ea7b79f3fae0304833; both are ancestors of their candidate branches.
-4. After explicit merge/deploy approval, merge backend PR #69 first, including patched lockfile
-   and qs override. Verify Render deploys the actual merge SHA; confirm installed body-parser
-   1.20.9, proxy-addr 2.0.8 and qs 6.16.2. Keep portal/email false. Smoke-test health, legacy
-   token/course reads, staff/tutor access, gallery and normal request parsing without real writes.
-5. Only after backend acceptance, merge uploader PR #38 with approval and verify Pages deploys
-   its actual merge SHA. Confirm legacy uploader routes and the five portal destinations.
-   Keep both portal flags false and email false. No migrations or secret regeneration are needed.
-6. Portal enablement is a separate explicit approval. Complete controlled acceptance with
-   verified synthetic users before public launch, including profile linkage, true cohorts,
-   consent withdrawal, private attachments, staff corrections and actual application AI.
-   Email remains disabled until its separate webhook-security and activation gates pass.
+1. Completed: PostgreSQL 027/028/029, D1 003, narrow grants, row-lock/sequence checks and
+   actual web_ro runtime read/write settings. Do not repeat migrations or permission changes.
+2. Completed: backend PR #69 deployed as a3ef1e34070778dd5f11989615c92e0763a4ded4;
+   patched installed versions, health/catalog and independent database-ready startup confirmed.
+3. Before separately approved PR #38 merge, recheck head/main/checks and record the current
+   Pages production deployment ID and rollback SHA. Uploader main rechecked at
+   87edd041942fe83838ed78ea7b79f3fae0304833. Keep portal and email false.
+4. Merge PR #38 only after explicit approval; verify Pages deploys its actual merge SHA.
+   Perform authorised live legacy uploader/course/gallery/tutor/staff checks and confirm the
+   five destinations, existing private workspace and disabled registration/email behavior.
+5. Portal and email activation each require separate approval. Controlled canonical linkage,
+   actual multi-course enrolment, consent withdrawal and live application AI are acceptance
+   gates before public launch. Resolve email webhook security before enabling dispatch.
 
 Before any merge record the deployment actually serving each application for rollback. Rollback
 must retain consent/CRM protections after any portal use. With no portal identities, previous
@@ -324,7 +371,7 @@ consent/CRM guards after any portal identity has been created.
 
 ## Production npm security review
 
-The current main lockfile reproduces the three Render findings in production dependencies:
+The pre-release main lockfile reproduced the three Render findings in production dependencies:
 - body-parser 1.20.5, high: GHSA-27r3-jxmh-p828 (compressed-body trailing-byte DoS), plus
   low-severity invalid-limit advisory GHSA-v422-hmwv-36x6. Global Express parsers run before
   route authentication; the compressed-body path is reachable even with the portal disabled.
