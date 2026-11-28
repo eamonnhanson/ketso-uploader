@@ -4,6 +4,25 @@ Draft PR #38, feature/academy-portal; companion backend feature/academy-portal-b
 No merge, deployment, production SQL, email activation or Zapier/Zoho changes authorized.
 This candidate extends the existing infrastructure; it does not introduce a second student registry.
 
+## Production state confirmed by management — 28 November 2026
+
+PostgreSQL 027, 028, 029 and Cloudflare D1 003 were manually executed and verified.
+Do not rerun them as part of this deployment. PostgreSQL is 16.16. Pre/post counts match:
+778 students; 328 online_tree_planting; 322 arboriculture_1; 10 donor_investor_funding;
+660 enrolments total; reported SUM(total_points)=0. These are owner-reported production
+results, not a fresh remote database inspection by this task.
+
+Render and Pages Production have ACADEMY_PORTAL_ENABLED=false,
+ACADEMY_PORTAL_ISSUER=https://ketso-uploader.pages.dev and an independently generated shared
+ACADEMY_PORTAL_SECRET. STUDENT_EMAIL_ENABLED remains false. Values were not read or exposed.
+Render redeployed existing main 21159eac successfully and database connectivity was confirmed.
+The runtime role is web_ro; its name alone does not establish effective privileges.
+
+Management relies on Aiven backups. Recoverability has not been independently verified.
+No additional manual backup is requested; this accepted limitation remains recorded.
+Keep data/schema and corrected enrolment function during rollback; do not restore a whole
+backup over newer activity or reintroduce the donor-excluding function.
+
 ## Ownership and registration
 
 PostgreSQL academy_students.id is the canonical Academy identity; its existing enrolments,
@@ -59,7 +78,7 @@ Zoho “Enrol in another course” link unchanged. AI and staff corrections are 
 
 ## Exact migrations and configuration
 
-Candidate scripts (none executed against production):
+Source-controlled scripts (now executed and verified in production by management; retained for reference):
 - ptb-tree-map/docs/sql/027_academy_portal.sql: linkage, idempotency ledger, transactional registration.
 - ptb-tree-map/docs/sql/028_academy_portal_crm_bridge.sql: compatible CRM function update.
 - ptb-tree-map/docs/sql/029_academy_enrollment_concurrency.sql: function-only three-course correction; concurrent, cohort-aware idempotence.
@@ -69,7 +88,7 @@ Existing course schema from 007/022 must be installed. The owner confirmed the l
 excludes donor_investor_funding even though 10 donor enrolments exist. Do not assume migration
 023 matches production or rerun historical backfills: use corrective migration 029. Existing D1 migrations 001 and 002 remain unchanged.
 
-Before approving SQL, inspect production schema read-only, especially nullable zoho_contact_id,
+The original schema gate covered nullable zoho_contact_id,
 student ID types/defaults and other mandatory academy_students columns. The repository has no
 complete CREATE TABLE snapshot for this legacy table. Synthetic tests use documented columns;
 they cannot prove the live schema accepts portal-created records. Do not fabricate a Zoho ID
@@ -103,28 +122,36 @@ TLS is required. No personal data, raw errors, tokens or signatures are logged. 
 were generated or configured. The separate unsigned Zapier email-hook risk remains unresolved;
 email must stay disabled until its authenticated first-step guard is separately approved.
 
-## Coordinated deployment sequence — future approval required
+## Remaining coordinated deployment sequence — explicit approval required
 
-1. Review both draft PRs, confirm the live legacy schema/course mapping/prerequisites and database
-   role privileges. Confirm managed-account exclusion is acceptable for legacy public profiles.
-2. Back up existing Academy tables/functions. Record current Render and Pages rollback SHAs.
-3. After separate approval, apply PostgreSQL 027, then 028, then 029; keep the portal disabled
-   until all three succeed. Apply D1 003 before deploying its uploader consumer. If 027/028
-   were already applied from an earlier draft, reapply the reviewed 027 function definition
-   (CREATE TABLE IF NOT EXISTS is retained), then 028 and 029. Nothing is applied by this task.
-4. Deploy reviewed backend with portal flag false. Verify legacy token/upload/tutor/Zoho paths.
-5. Configure independent service issuer/secret on Render and Pages; do not expose to Preview.
-6. Deploy reviewed uploader with portal flag false and email false. Check all five destinations.
-7. Only after separate approval, enable portal service and complete controlled verified synthetic
-   account acceptance. Email activation remains a distinct blocked approval step.
-8. Validate actual AI inference, staff corrections, consent withdrawal/direct photo URLs, retries,
-   cross-account rejection, multi-course statuses, concurrent requests and unchanged historical points.
+1. Run the read-only `ptb-tree-map/docs/sql/academy_portal_web_ro_access.sql` in production.
+   It reports access and generates only missing narrow GRANT statements; it executes none.
+   Check the actual web_ro connection reports transaction_read_only=off and
+   default_transaction_read_only=off. If RLS applies, review policies rather than grant BYPASSRLS.
+2. An owner may apply only the generated missing grants after approval, then rerun the checks.
+   Do not grant ALL, DELETE, CREATE, superuser, role membership, blanket sequence rights or
+   write access to points. The enrolment id UPDATE column privilege is needed for FOR UPDATE;
+   the application never updates enrolment IDs. Preserve existing legacy permissions.
+   The SECURITY DEFINER CRM owner's SELECT(academy_student_id) privilege is checked separately.
+3. Review the refreshed PR heads and checks. Main rechecked at backend
+   21159eac5aed95a7db070049705a2ecc4587c283 and uploader
+   87edd041942fe83838ed78ea7b79f3fae0304833; both are ancestors of their candidate branches.
+4. After explicit merge/deploy approval, merge backend PR #69 first, including patched lockfile
+   and qs override. Verify Render deploys the actual merge SHA; confirm installed body-parser
+   1.20.9, proxy-addr 2.0.8 and qs 6.16.2. Keep portal/email false. Smoke-test health, legacy
+   token/course reads, staff/tutor access, gallery and normal request parsing without real writes.
+5. Only after backend acceptance, merge uploader PR #38 with approval and verify Pages deploys
+   its actual merge SHA. Confirm legacy uploader routes and the five portal destinations.
+   Keep both portal flags false and email false. No migrations or secret regeneration are needed.
+6. Portal enablement is a separate explicit approval. Complete controlled acceptance with
+   verified synthetic users before public launch, including profile linkage, true cohorts,
+   consent withdrawal, private attachments, staff corrections and actual application AI.
+   Email remains disabled until its separate webhook-security and activation gates pass.
 
-Rollback: disable ACADEMY_PORTAL_ENABLED on both services; retain private data and schema. Before
-any registrations, previous frontend/backend revisions can be restored. After portal identities
-exist, do not blindly roll back to a backend without consent filters or the CRM bridge: that could
-re-expose private identities or duplicate Zoho records. Keep those guards while disabling new
-operations. Never drop linkage/intent tables or delete student records as rollback.
+Before any merge record the deployment actually serving each application for rollback. Rollback
+must retain consent/CRM protections after any portal use. With no portal identities, previous
+application SHAs can be restored after approval while keeping additive schema and 029. An older
+backend rollback also reintroduces its npm advisories; prefer a corrective deployment when possible.
 
 ## Brand-compliance review
 
@@ -144,7 +171,7 @@ first-load bandwidth, but this candidate preserves the approved original exactly
 
 ## Remaining acceptance limits
 
-Real PostgreSQL 17.12 multi-connection testing now passes in a Docker container with networking
+Real PostgreSQL 16.16 multi-connection and minimal-role testing now passes in a Docker container with networking
 explicitly disabled, no published ports and synthetic data only. Live legacy student-column
 nullability, role/function privileges and operational course prerequisites remain acceptance
 checks; the owner-confirmed enrolment indexes do not need to be re-requested. No production
@@ -242,16 +269,16 @@ adapter changes and replay/forgery testing. Production email stays disabled.
 
 ## Validation record (28 November 2026)
 
-Backend npm test: 305 passed, zero failures, five existing external-integration skips.
+Backend npm test after dependency fixes: 306 passed, zero failures, five existing external-integration skips.
 Uploader npm test: 154 passed, zero failures. Affected portal/workspace browser checks pass.
 The earlier five browser scripts passed; this correction changes no uploader/auth/upload routes.
 Real PostgreSQL concurrency command: `npm run test:academy-concurrency`.
-The harness requires a fresh `ketso-portal-concurrency` Docker container, image postgres:17,
+The harness requires a fresh `ketso-portal-concurrency` Docker container, image postgres:16.16 (postgres:17 also supported),
 network mode none, database ketso_synthetic. It refuses an existing populated test database.
 Run it after:
 ```sh
 docker run -d --name ketso-portal-concurrency --network none \
-  -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=ketso_synthetic postgres:17
+  -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=ketso_synthetic postgres:16.16
 docker exec ketso-portal-concurrency pg_isready -U postgres
 npm run test:academy-concurrency
 ```
@@ -287,10 +314,42 @@ withdrawn/completed record. Any intentional status transition requires a separat
 staff operation. NULL and empty cohorts remain equivalent solely as already defined by the
 index; two nonempty cohort strings remain distinct. Existing cohort history is never rewritten.
 
-Before execution, snapshot the current function definition/grants and historical table counts
-and fingerprints using the owner's approved database procedure. After execution, compare the
-same baseline and verify the function permits all three course keys. Do not hard-code 660 as an
-eternal production count: legitimate operations may add records before the approved window.
+Management has completed migration verification and elected to rely on Aiven backups. Do not
+repeat migrations or request a new manual backup. The unverified recoverability limitation is
+recorded above. Keep the supplied production baseline as a dated observation, not a fixed future
+count; legitimate business activity may add records.
 Rollback preserves all enrolment rows/indexes; do not restore the known donor-excluding function
 as a routine rollback. Disable new portal operations while retaining the corrected function and
 consent/CRM guards after any portal identity has been created.
+
+## Production npm security review
+
+The current main lockfile reproduces the three Render findings in production dependencies:
+- body-parser 1.20.5, high: GHSA-27r3-jxmh-p828 (compressed-body trailing-byte DoS), plus
+  low-severity invalid-limit advisory GHSA-v422-hmwv-36x6. Global Express parsers run before
+  route authentication; the compressed-body path is reachable even with the portal disabled.
+  No invalid limit configuration was found. Update to 1.20.9.
+- proxy-addr 2.0.7, critical: GHSA-jqcg-44mw-7w3h (IPv4-mapped IPv6 trust-subnet spoofing).
+  No trust-proxy setting or req.ip/req.ips authorization was found in server.js/api; Express
+  defaults to not trusting proxies. The vulnerable package is shipped, but the advisory's
+  trust-subnet authorization prerequisite was not demonstrated here. Update to 2.0.8.
+- qs 6.15.2, moderate: GHSA-x5fp-wj9c-mxmx, GHSA-4mjr-xmp4-gh2g and GHSA-6pq8-jhm2-2vcw.
+  Extended URL-encoded parsing is reachable. No comma mode or application qs.stringify use
+  was found, so not every advisory's specific prerequisite is demonstrated. Pin the transitive
+  qs override to 6.16.2; Express's existing ~6.15 range otherwise retains vulnerable versions.
+
+Express stays at 4.22.2; no major framework or application-route redesign. Compatible qs support
+packages object-inspect and side-channel move with the dependency resolution. A clean npm ci
+passes; production-only and full npm audits both report zero advisories at review time. This
+is registry evidence, not a guarantee against unknown vulnerabilities. Both complete backend
+regressions and new HTTP tests pass (normal JSON/form parsing, oversized-body rejection,
+malformed compressed-body rejection, process health afterward and default proxy behaviour).
+
+Pre-existing api/db.js TLS configuration disables certificate verification in production. It
+was not changed: repository instructions require a separate certificate/TLS review, and Aiven
+CA/connection settings were not inspected. This is distinct from the npm advisories.
+
+PostgreSQL 16.16 role test: generated narrow grants permit registration, profile updates and
+row locks. Deletion, account-email rewrites, enrolment-status rewrites, point writes, sequence
+resets and schema creation are denied to the otherwise unprivileged synthetic web_ro. No
+production GRANT was executed. Live effective web_ro privileges remain to be checked.
