@@ -21,9 +21,10 @@ historical email matches fail for staff resolution. No synthetic Zoho IDs are cr
 Existing account-only users can save private registration choices in My Academy profile.
 
 PostgreSQL serializes by normalized email and issuer/subject; an idempotency key and payload
-hash protect retry. The existing enroll_academy_student function is reused. A selected course
-with any existing enrolment retains its original status, including withdrawn/completed;
-new course keys receive one active enrolment. The response reports actual statuses.
+hash protect retry. The existing enroll_academy_student function is reused. The target cohort comes from the canonical academy_students.cohort field. A matching
+(student, course, COALESCE(cohort, '')) enrolment is returned unchanged, including withdrawn/
+completed status and existing token. Other genuine cohorts remain separate enrolments. No
+cohort is trimmed, relabelled or backfilled. Responses and private course links include cohort.
 The CRM bridge keeps the existing process_academy_student_from_crm signature and links a
 later Zoho contact to a portal-created record instead of inserting another identity.
 It preserves a linked student's centrally managed full name. Existing tokens remain valid.
@@ -61,11 +62,12 @@ Zoho “Enrol in another course” link unchanged. AI and staff corrections are 
 Candidate scripts (none executed against production):
 - ptb-tree-map/docs/sql/027_academy_portal.sql: linkage, idempotency ledger, transactional registration.
 - ptb-tree-map/docs/sql/028_academy_portal_crm_bridge.sql: compatible CRM function update.
+- ptb-tree-map/docs/sql/029_academy_enrollment_concurrency.sql: function-only three-course correction; concurrent, cohort-aware idempotence.
 - ketso-uploader/docs/sql/003_student_registration_intents.sql: retryable private D1 intent.
 
-Existing PostgreSQL migrations 007, 022_donor_investor_academy_course and
-023_donor_investor_enrollment_function must already be installed. Do not blindly rerun old
-backfills. Existing D1 migrations 001 and 002 remain unchanged.
+Existing course schema from 007/022 must be installed. The owner confirmed the live function
+excludes donor_investor_funding even though 10 donor enrolments exist. Do not assume migration
+023 matches production or rerun historical backfills: use corrective migration 029. Existing D1 migrations 001 and 002 remain unchanged.
 
 Before approving SQL, inspect production schema read-only, especially nullable zoho_contact_id,
 student ID types/defaults and other mandatory academy_students columns. The repository has no
@@ -106,7 +108,10 @@ email must stay disabled until its authenticated first-step guard is separately 
 1. Review both draft PRs, confirm the live legacy schema/course mapping/prerequisites and database
    role privileges. Confirm managed-account exclusion is acceptable for legacy public profiles.
 2. Back up existing Academy tables/functions. Record current Render and Pages rollback SHAs.
-3. Manually apply PostgreSQL 027 then 028, and D1 003 to the intended resources only.
+3. After separate approval, apply PostgreSQL 027, then 028, then 029; keep the portal disabled
+   until all three succeed. Apply D1 003 before deploying its uploader consumer. If 027/028
+   were already applied from an earlier draft, reapply the reviewed 027 function definition
+   (CREATE TABLE IF NOT EXISTS is retained), then 028 and 029. Nothing is applied by this task.
 4. Deploy reviewed backend with portal flag false. Verify legacy token/upload/tutor/Zoho paths.
 5. Configure independent service issuer/secret on Render and Pages; do not expose to Preview.
 6. Deploy reviewed uploader with portal flag false and email false. Check all five destinations.
@@ -139,14 +144,18 @@ first-load bandwidth, but this candidate preserves the approved original exactly
 
 ## Remaining acceptance limits
 
-Synthetic PGlite tests execute real PostgreSQL functions, but are single-process: a real multi-
-connection race test and live schema/privilege check remain mandatory before activation. No new
-production database credentials were accessed. Unverified abandoned intent/photo cleanup needs
-an operator retention policy; failed or ambiguous photo-update responses may leave private orphan
-objects, never public objects. No automatic deletion is introduced.
-The complete npm backend suite includes an ops-console-only branch isolation assertion that
-rejects authorised changes outside apps/ops-console. It is not weakened or skipped here.
-The draft must not be described as fully green until that repository test ownership is resolved.
+Real PostgreSQL 17.12 multi-connection testing now passes in a Docker container with networking
+explicitly disabled, no published ports and synthetic data only. Live legacy student-column
+nullability, role/function privileges and operational course prerequisites remain acceptance
+checks; the owner-confirmed enrolment indexes do not need to be re-requested. No production
+credentials were accessed. Abandoned private intents/photo objects still need a retention policy.
+
+The ops-console test-scope conflict is resolved: general tests validate the isolation policy in a
+synthetic Git repository. The identical strict branch/working-tree release enforcement is now
+`npm --prefix apps/ops-console run check:isolation`, also mandatory at the start of its `npm run
+check`. It correctly rejects this coordinated backend branch; no ops-only release is attempted.
+Missing comparison history also fails the release guard. Read-only SQL and deployment-root
+safeguards remain in the normal tests.
 
 ## Lockout root cause and corrected policy
 
@@ -233,10 +242,55 @@ adapter changes and replay/forgery testing. Production email stays disabled.
 
 ## Validation record (28 November 2026)
 
-Uploader: 154/154 automated tests pass. All five offline browser scripts pass, including
-360/390/1280 portal navigation, enabled synthetic multi-course registration, optional consent,
-photo crop, workspace, staging safeguards, staff metadata and ten Academy mobile scenarios.
-Backend functional directory: 242 pass, zero failures, five existing environment-dependent skips.
-Full backend npm test: 304 pass, one ops-console branch/working-tree isolation failure, five skips.
-The new signed-API/PGlite tests pass, including public-photo withdrawal, stale revisions and
-cross-account denial. No tests used real students, production SQL, email or external writes.
+Backend npm test: 305 passed, zero failures, five existing external-integration skips.
+Uploader npm test: 154 passed, zero failures. Affected portal/workspace browser checks pass.
+The earlier five browser scripts passed; this correction changes no uploader/auth/upload routes.
+Real PostgreSQL concurrency command: `npm run test:academy-concurrency`.
+The harness requires a fresh `ketso-portal-concurrency` Docker container, image postgres:17,
+network mode none, database ketso_synthetic. It refuses an existing populated test database.
+Run it after:
+```sh
+docker run -d --name ketso-portal-concurrency --network none \
+  -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=ketso_synthetic postgres:17
+docker exec ketso-portal-concurrency pg_isready -U postgres
+npm run test:academy-concurrency
+```
+Local trust authentication is confined to this network-isolated disposable container. It is not
+production configuration. Stop/remove this named test container after reviewing the results.
+
+Passed: 16 distinct PostgreSQL connections return one ID/token for the same identity; concurrent
+requests for different cohorts produce separate rows; NULL and empty cohort resolve to one
+identity; another student's token collision fails without a new enrolment; direct concurrent
+writers commit or roll back safely; 12 separate portal requests produce one canonical linkage
+and three enrolments in the student's genuine cohort. A 660-row synthetic baseline (including
+10 donor enrolments and all four statuses) retains identical full-row fingerprints, points and
+all five index definitions after migrations and attempted enrolment retries. Production's 660
+rows were not queried or modified by these tests.
+
+## Owner-confirmed production indexes and corrective semantics
+
+Confirmed by management: primary key(id); UNIQUE(enrollment_token); unique expression index
+academy_course_enrollments_identity_idx on (academy_student_id, course_key, COALESCE(cohort,
+''::text)); ordinary indexes on academy_student_id and enrollment_token. Preserve all five.
+029 creates/replaces only enroll_academy_student with its existing signature. There is no
+student/course-only uniqueness constraint, table backfill, token regeneration or status update.
+
+The function locks the canonical student, reads the exact cohort identity, and inserts using
+ON CONFLICT with the EXISTING expression index. It re-reads a concurrent winner at READ
+COMMITTED; token uniqueness violations are not swallowed or treated as identity matches.
+At REPEATABLE READ/SERIALIZABLE, retry the entire transaction on SQLSTATE 40001, using the
+same idempotency key. Deadlock 40P01 likewise requires bounded transaction retry. Never
+retry a 23505 token collision by assigning the token to a different student.
+
+An existing enrolment is not a status-edit API: calling with active must not reactivate a
+withdrawn/completed record. Any intentional status transition requires a separately reviewed
+staff operation. NULL and empty cohorts remain equivalent solely as already defined by the
+index; two nonempty cohort strings remain distinct. Existing cohort history is never rewritten.
+
+Before execution, snapshot the current function definition/grants and historical table counts
+and fingerprints using the owner's approved database procedure. After execution, compare the
+same baseline and verify the function permits all three course keys. Do not hard-code 660 as an
+eternal production count: legitimate operations may add records before the approved window.
+Rollback preserves all enrolment rows/indexes; do not restore the known donor-excluding function
+as a routine rollback. Disable new portal operations while retaining the corrected function and
+consent/CRM guards after any portal identity has been created.
