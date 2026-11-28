@@ -1,7 +1,3 @@
-# Required approved logo — missing
+# Approved portal logo
 
-Place the original approved ketso_logo_white_clean.png here.
-The portal references /assets/brand/ketso_logo_white_clean.png at 180px width,
-with a minimum width of 140px on Forest Green. Do not recolour, redraw or generate
-a replacement. Until provided, screenshots show missing-image alternative text;
-this is a release blocker, not an approved brand rendition.
+Use ketso_logo_transparent_clean.png unchanged on a pale background, 180px wide and never below 140px. The supplied white version is retained as an asset but is not the portal mark. Follow docs/brand/KETSO_Short_Brand_Book_and_AI_Prompting_Guide.docx.

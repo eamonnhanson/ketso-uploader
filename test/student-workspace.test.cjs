@@ -470,3 +470,27 @@ test('unknown auth actions cannot create unbounded per-action rate-limit keys',a
  assert.equal((await f.call('auth/arbitrary-action',{body:{email:'synthetic@example.test'}})).status,404);
  assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM student_rate_limits').get().n,0);
 });
+
+test('canonical registration persists a private intent, signs only verified handoff and preserves account isolation',async()=>{
+ const f=fixture();f.sqlite.exec(readFileSync(path.join(__dirname,'../docs/sql/003_student_registration_intents.sql'),'utf8'));
+ Object.assign(f.env,{ACADEMY_PORTAL_ENABLED:'true',ACADEMY_PORTAL_SECRET:'synthetic-service-secret-not-real-000000000',ACADEMY_PORTAL_ISSUER:'synthetic'});
+ const photo='data:image/jpeg;base64,'+Buffer.from([255,216,255,217]).toString('base64');
+ const body={email:'canonical@example.test',password,name:'Canonical Student',courses:['online_tree_planting','arboriculture_1'],publicProfileConsent:false,profilePhoto:photo};
+ assert.equal((await f.call('portal/register',{body})).status,202);
+ const intent=f.sqlite.prepare('SELECT * FROM student_registration_intents').get();assert.deepEqual(JSON.parse(intent.courses),[...body.courses].sort());assert.equal(intent.consent,0);assert.equal(f.objects.size,1);
+ assert.equal((await f.call('portal/complete',{body:{}})).status,401);
+ assert.equal((await f.call('portal/register',{body:{...body,courses:[]}})).status,202);
+ assert.equal(f.sqlite.prepare('SELECT count(*) n FROM student_registration_intents').get().n,1);
+ const token=f.mail.at(-1).text.match(/verify=([a-f0-9]+)/)[1];
+ assert.equal((await f.call('auth/verify',{body:{token,password,name:body.name}})).status,200);
+ const cookie=await f.login(body.email),original=global.fetch,calls=[];
+ global.fetch=async(url,options)=>{assert.equal(options.redirect,'manual');assert.match(options.headers['X-Academy-Signature'],/^[a-f0-9]{64}$/);const payload=JSON.parse(options.body);calls.push(payload);assert.equal(payload.subject,intent.account_id);assert.equal(payload.email,body.email);return Response.json({ok:true,student_id:'101',enrolments:body.courses.map(course_key=>({course_key,status:'active'}))});};
+ try{const result=await f.call('portal/complete',{cookie,body:{confirm:true,consent:false}});assert.equal(result.status,200);assert.equal(f.sqlite.prepare('SELECT legacy_student_id FROM student_accounts').get().legacy_student_id,'101');assert.equal(calls.length,1);}finally{global.fetch=original;}
+ assert.equal((await f.call('portal/photo')).status,401);
+ const another=await f.user('other-canonical@example.test');assert.equal((await f.call('portal/complete',{cookie:another,body:{}})).status,409);
+});
+
+test('canonical registration disabled email consumes no rate limits or private storage',async()=>{
+ const f=fixture();Object.assign(f.env,{ACADEMY_PORTAL_ENABLED:'true',ACADEMY_PORTAL_SECRET:'synthetic-service-secret-not-real-000000000',ACADEMY_PORTAL_ISSUER:'synthetic',STUDENT_EMAIL_ENABLED:'false'});
+ assert.equal((await f.call('portal/register',{body:{}})).status,503);assert.equal(f.objects.size,0);assert.equal(f.sqlite.prepare('SELECT count(*) n FROM student_rate_limits').get().n,0);
+});

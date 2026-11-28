@@ -4,12 +4,13 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'artifacts/portal-rev
 (async()=>{
  await fs.mkdir(out,{recursive:true});const browser=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
  try{for(const width of [360,390,1280]){
-  const context=await browser.newContext({viewport:{width,height:900}});let writes=0;
+  const context=await browser.newContext({viewport:{width,height:900}});let writes=0,enabled=false,registration;
   await context.route('**/*',async route=>{
    const r=route.request(),url=new URL(r.url());if(url.origin!=='https://portal.test')return route.abort();
    if(url.pathname.startsWith('/api/')){
     if(r.method()!=='GET')writes++;
-    if(url.pathname.endsWith('/portal/capabilities'))return route.fulfill({json:{registration_available:false,reason:'Registration is temporarily unavailable. You can browse courses or sign in.'}});
+    if(url.pathname.endsWith('/portal/capabilities'))return route.fulfill({json:{registration_available:enabled,reason:'Registration is temporarily unavailable. You can browse courses or sign in.'}});
+    if(url.pathname.endsWith('/portal/register')){registration=r.postDataJSON();return route.fulfill({status:202,json:{message:'Synthetic registration recorded.'}});}
     if(url.pathname.endsWith('/auth/login'))return route.fulfill({status:429,headers:{'Retry-After':'3600'},json:{error:'Too many attempts.',retry_after:3600,remaining_attempts:0}});
     return route.fulfill({status:401,json:{error:'Please sign in.'}});
    }
@@ -30,6 +31,12 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'artifacts/portal-rev
   await page.locator('#photoEditor').waitFor({state:'visible'});await page.locator('#adaptPhoto').click();await page.locator('#photoZoom').fill('1.5');
   assert.equal(await page.locator('#photoCanvas').evaluate(c=>c.width),600);
   await page.locator('#photoEditor').screenshot({path:path.join(out,'photo-crop-'+width+'.png')});
+  enabled=true;await page.reload();await page.locator('#registerAcademy:not([disabled])').waitFor();
+  await page.locator('input[name=name]').fill('Synthetic Learner');await page.locator('input[name=email]').fill('learner@example.invalid');await page.locator('input[name=password]').fill('Synthetic learner password 2026!');
+  await page.locator('input[name=courses]').nth(0).check();await page.locator('input[name=courses]').nth(2).check();
+  await page.locator('#profilePhoto').setInputFiles({name:'synthetic.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});await page.locator('#photoEditor').waitFor({state:'visible'});
+  await page.locator('#registerAcademy').click();await page.getByText(/Synthetic registration recorded/).waitFor();
+  assert.deepEqual(registration.courses,['online_tree_planting','donor_investor_funding']);assert.equal(registration.publicProfileConsent,false);assert.ok(registration.profilePhoto.startsWith('data:image/jpeg;base64,'));assert.equal(writes,1);
   for(const tab of R.entries){
    await page.goto('https://portal.test'+tab.href);await page.locator('nav[aria-label="Academy tabs"]').waitFor();
    assert.equal(await page.locator('nav[aria-label="Academy tabs"] a').count(),5);

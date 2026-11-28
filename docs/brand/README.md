@@ -1,6 +1,3 @@
-# Required brand guide — missing
+# Approved brand guide
 
-Expected file: docs/brand/KETSO_Short_Brand_Book_and_AI_Prompting_Guide.docx.
-It was not present in the available checkout. Brand review currently covers only
-the explicit colours, typeface/fallback, logo size and accessibility requirements
-provided in the task. Full guide compliance cannot be certified until it is supplied.
+KETSO_Short_Brand_Book_and_AI_Prompting_Guide.docx was read for the portal review. The portal uses the approved transparent PNG, forest headings, pale backgrounds and Book Antiqua with local serif fallbacks. See ../academy-portal-release.md for review evidence and limitations.
