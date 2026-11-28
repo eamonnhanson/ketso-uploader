@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KETSO upload</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+  <link rel="stylesheet" href="/styles.css?v=20260719-programme-selector-1">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="page-header">
+      <h1>KETSO upload</h1>
+      <p class="intro">Quickly send a selfie, photo, video or text update.</p>
+    </header>
+
+    <section class="staff-card" aria-labelledby="student-login-title">
+      <h2 id="student-login-title">Student login</h2>
+      <p>Five failed sign-in attempts cause a one-hour lockout. Password recovery remains independent.</p><form id="studentLoginForm">
+        <label>Email <input name="email" type="email" autocomplete="email" required></label>
+        <label>Password <input name="password" type="password" autocomplete="current-password" minlength="15" maxlength="128" required></label>
+        <button class="button button-dark" type="submit">Sign in to my workspace</button>
+      </form>
+      <p id="studentLoginStatus" role="status" aria-live="polite"></p>
+      <p><a href="/student-account/">Create an account, verify email or reset password</a> · <a href="/student-account/">Open my workspace</a></p>
+    </section>
+    <script src="/shared/student-login.js" defer></script>
+
+    <section id="studentBanner" class="student-banner" hidden aria-live="polite"></section>
+    <a id="extraCourseEnrolmentLink" class="button button-soft" href="#" target="_blank" rel="noopener" hidden>
+      Enrol in another course
+    </a>
+
+    <section id="programmeSelector" class="programme-selector" aria-labelledby="programme-title">
+      <div class="programme-heading">
+        <div>
+          <p class="eyebrow">Step 1</p>
+          <h2 id="programme-title">Choose your programme</h2>
+        </div>
+        <p>Select where your upload belongs.</p>
+      </div>
+
+      <div class="programme-grid" role="group" aria-label="Upload programme">
+        <button type="button" class="programme-card" data-programme="online_tree_planting" aria-pressed="false">
+          <span class="programme-icon" aria-hidden="true">🌱</span>
+          <span class="programme-copy">
+            <strong>Online Agroforestry Training</strong>
+            <small>Online lessons, onboarding and tutor questions</small>
+          </span>
+          <span class="programme-check" aria-hidden="true">✓</span>
+        </button>
+
+        <button type="button" class="programme-card" data-programme="arboriculture_1" aria-pressed="false">
+          <span class="programme-icon" aria-hidden="true">🎓</span>
+          <span class="programme-copy">
+            <strong>Distance Certificate Course Agroforestry</strong>
+            <small>Assignments for Modules 1–8</small>
+          </span>
+          <span class="programme-check" aria-hidden="true">✓</span>
+        </button>
+
+        <button type="button" class="programme-card" data-programme="donor_investor_funding" aria-pressed="false">
+          <span class="programme-icon" aria-hidden="true">↗</span>
+          <span class="programme-copy">
+            <strong>Communicate effectively with donors and investors</strong>
+            <small>Build a clear evidence story, impact summary and finances</small>
+          </span>
+          <span class="programme-check" aria-hidden="true">✓</span>
+        </button>
+
+        <button type="button" class="programme-card programme-card-staff" data-programme="staff" aria-pressed="false">
+          <span class="programme-icon" aria-hidden="true">🛠️</span>
+          <span class="programme-copy">
+            <strong>KETSO staff</strong>
+            <small>Fieldwork and project updates</small>
+          </span>
+          <span class="programme-check" aria-hidden="true">✓</span>
+        </button>
+      </div>
+    </section>
+
+    <section id="staffCard" class="staff-card" aria-labelledby="staff-title" hidden>
+      <details id="staffDetails">
+        <summary id="staff-title">KETSO staff</summary>
+        <div class="staff-login" id="staffLogin">
+          <label for="staffPassword">Staff password</label>
+          <div class="inline-form">
+            <input id="staffPassword" type="password" inputmode="numeric" autocomplete="off" placeholder="Enter password">
+            <button id="staffUnlockBtn" type="button" class="button button-dark">Unlock</button>
+          </div>
+          <p id="staffMessage" class="form-message" aria-live="polite"></p>
+        </div>
+
+        <div id="staffOptions" class="staff-options" hidden>
+          <label for="category">Category</label>
+          <select id="category">
+            <option value="forest_hero">Forest Hero</option>
+            <option value="nursery">Nursery</option>
+            <option value="training">Training</option>
+            <option value="vocational_training">Vocational training</option>
+            <option value="charcoal_making">Charcoal making</option>
+            <option value="truck">Truck</option>
+            <option value="wilde_ganzen">Wilde Ganzen</option>
+            <option value="hoorn_foundation">Hoorn Foundation</option>
+            <option value="josephina_foundation">Josephina Foundation</option>
+            <option value="care_international">Care International</option>
+            <option value="woord_en_daad">Woord en Daad</option>
+            <option value="plant_een_boom">Plant een Boom</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </details>
+    </section>
+
+    <section id="forestHeroSection" class="panel" hidden>
+      <label for="forestHeroSearch">Search Forest Hero / tree</label>
+      <input type="text" id="forestHeroSearch" placeholder="Type name, tree type, area, or tree code">
+      <p class="small">Example: Amara, mango, Makombeh, or tree code</p>
+      <div id="searchResults" class="search-results"></div>
+      <div id="selectedHero" class="selected-item" hidden></div>
+    </section>
+
+    <section id="primaryPanel" class="panel primary-panel" aria-labelledby="upload-title" hidden>
+      <p class="eyebrow">Step 2</p>
+      <h2 id="upload-title">Choose your assignment</h2>
+      <div id="studentPurposePanel" class="student-purpose">
+        <label for="studentPurpose">What is this upload for?</label>
+        <select id="studentPurpose">
+          <option value="onboarding">Selfie or photo to complete onboarding</option>
+          <option value="lesson_1_child_protection">Lesson 1: Child Protection</option>
+          <option value="lesson_2_climate_change">Lesson 2: Climate Change</option>
+          <option value="lesson_3_tree_health">Lesson 3: Tree Health</option>
+          <option value="lesson_4_tree_planting">Lesson 4: Tree Planting</option>
+          <option value="lesson_5_carbon_dioxide_increase">Lesson 5: Carbon Dioxide Increase</option>
+          <option value="lesson_6_soil_condition">Lesson 6: Soil Condition</option>
+          <option value="lesson_7_mulching">Lesson 7: Mulching</option>
+          <option value="lesson_8_erosion_control">Lesson 8: Erosion Control</option>
+          <option value="tutor_question">A question to the tutor</option>
+        </select>
+      </div>
+
+      <div id="questionModulePanel" class="student-purpose" hidden>
+        <label for="questionModule">Which lesson or module is your question about?</label>
+        <select id="questionModule"></select>
+      </div>
+
+      <section id="studentIdentityPanel" class="student-identity" hidden>
+        <label for="studentNameSearch">Student name</label>
+        <input id="studentNameSearch" type="text" autocomplete="name" placeholder="Start typing your first name">
+        <div id="studentSearchResults" class="search-results"></div>
+
+        <label for="studentEmail">Student email</label>
+        <input id="studentEmail" type="email" autocomplete="email" placeholder="The email used for KETSO Academy">
+
+        <div id="selectedStudent" class="selected-item" hidden></div>
+        <p class="small">For student uploads, choose your name from the search results and confirm the matching email before uploading.</p>
+      </section>
+
+      <div class="action-grid" role="group" aria-label="Upload type">
+        <label id="devicePhotoAction" for="devicePhotoInput" class="upload-action">I want to upload a photo</label>
+        <label id="selfieAction" for="selfieInput" class="upload-action upload-action-secondary">Take selfie</label>
+        <label id="cameraAction" for="backCameraInput" class="upload-action upload-action-secondary">Take photo</label>
+        <label for="fileInput" class="upload-action upload-action-dark">Upload video or document</label>
+        <button id="textModeBtn" type="button" class="upload-action upload-action-light">Type text</button>
+      </div>
+
+      <input id="devicePhotoInput" class="visually-hidden-file" type="file" accept="image/*">
+      <input id="selfieInput" class="visually-hidden-file" type="file" accept="image/*" capture="user">
+      <input id="backCameraInput" class="visually-hidden-file" type="file" accept="image/*" capture="environment">
+      <input id="fileInput" class="visually-hidden-file" type="file" accept="video/*,.mp4,.mov,.webm,.m4v,.pdf,.doc,.docx,.txt">
+
+      <p id="selectedFileInfo" class="selected-file" aria-live="polite"></p>
+    </section>
+
+    <section id="textPanel" class="panel" hidden>
+      <label for="textEntry">Text update</label>
+      <textarea id="textEntry" rows="7" maxlength="5000" placeholder="Type your update here"></textarea>
+      <p class="small">You can type here, or use the document upload button above.</p>
+    </section>
+
+    <section id="fileSummary" class="file-summary" hidden></section>
+
+    <section id="uploadSuccessPanel" class="panel upload-success" hidden aria-live="polite"></section>
+
+    <section id="recentUploadsPanel" class="panel recent-uploads" hidden>
+      <h2>My recent uploads</h2>
+      <p class="small">These uploads are saved in this browser while they wait for approval.</p>
+      <div id="recentUploadsList" class="recent-upload-list"></div>
+    </section>
+
+    <section id="cropSection" class="crop-section" hidden>
+      <div class="crop-note">
+        <strong>Crop your photo before uploading</strong>
+        <span>Photos are cropped automatically to 600 px. Use Adapt crop to adjust framing. Use JPG, PNG or WebP.</span>
+      </div>
+
+      <div id="cropWorkspace" class="crop-workspace">
+        <img id="image" alt="Selected image preview">
+      </div>
+
+      <div class="crop-toolbar" aria-label="Crop tools">
+        <button id="zoomOut" type="button" class="button button-soft" disabled>Zoom out</button>
+        <button id="zoomIn" type="button" class="button button-soft" disabled>Zoom in</button>
+        <button id="adaptCropBtn" type="button" class="button button-soft" disabled>Adapt crop</button>
+      </div>
+    </section>
+
+    <section class="sticky-actions" aria-label="Upload actions">
+      <button id="uploadBtn" type="button" class="button button-primary" disabled>Upload photo</button>
+      <p id="documentGuidance" hidden>Documents are uploaded unchanged. Check the selected file and remove private information before sharing.</p><button id="directUploadBtn" type="button" class="button button-primary" disabled hidden>Upload file</button>
+      <button id="textUploadBtn" type="button" class="button button-primary" disabled hidden>Upload text</button>
+    </section>
+
+    <p id="status" class="status" aria-live="polite"></p>
+
+
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+  <script src="/shared/academy-courses.js?v=20260727-tutor-questions-1"></script>
+  <script src="/app.js?v=20260727-tutor-questions-1" defer></script>
+</body>
+</html>

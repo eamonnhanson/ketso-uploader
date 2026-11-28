@@ -1,5 +1,6 @@
 import {isStudentStaging,allowedStagingHost,stagingDenied,secureStagingResponse} from './_shared/staging-policy.js';
 const assets=new Set([
+ '/shared/portal.css','/shared/portal-registry.js','/shared/portal-nav.js',
  '/shared/student-workspace.css','/shared/student-workspace.js','/shared/student-writing.js',
  '/shared/student-public-work.js','/shared/student-question-console.js',
  '/docs/templates/KETSO_Donor_Proposal_Writing_Template.pdf','/docs/templates/Template donor report.pdf'
@@ -9,7 +10,7 @@ function page(title,body,scripts) {
 }
 export async function onRequest(context) {
  const {request,env}=context;
- if(!isStudentStaging(request,env))return context.next();
+ if(!isStudentStaging(request,env)){const url=new URL(request.url);if((url.pathname==='/'||url.pathname==='/index.html')&&(url.searchParams.has('token')||url.searchParams.has('programme')))return new Response(null,{status:302,headers:{Location:'/uploader/'+url.search,'Cache-Control':'no-store','Referrer-Policy':'no-referrer'}});return context.next();}
  const finish=secureStagingResponse;
  if(!allowedStagingHost(request,env))return finish(stagingDenied('This Preview hostname is not authorized for student staging resources.'));
  let path;try{path=decodeURIComponent(new URL(request.url).pathname);}catch{return finish(stagingDenied());}

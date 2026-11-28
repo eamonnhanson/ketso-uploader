@@ -11,13 +11,15 @@ const emailSchema=readFileSync(path.join(__dirname,'../docs/sql/002_student_emai
 const password='A unique student password 123!';
 // Fail closed: this test file must never make real network requests.
 global.fetch=async()=>{throw Error('Unexpected network request blocked by test fixture');};
-function fixture(){
+function fixture({respectCooldown=false}={}){
  const sqlite=new DatabaseSync(':memory:');sqlite.exec(schema);sqlite.exec(schema);sqlite.exec(emailSchema);sqlite.exec(emailSchema);
  const db={prepare(sql){let args=[];return {bind(...values){args=values;return this;},async first(){return sqlite.prepare(sql).get(...args)||null;},async all(){return {results:sqlite.prepare(sql).all(...args)};},async run(){return sqlite.prepare(sql).run(...args);}};},async batch(statements){sqlite.exec('BEGIN');try{const result=[];for(const statement of statements)result.push(await statement.run());sqlite.exec('COMMIT');return result;}catch(e){sqlite.exec('ROLLBACK');throw e;}}};
  const mail=[],objects=new Map(),pending=[],transport={status:200,error:null};
  const env={STUDENT_DB:db,STUDENT_EMAIL_ENABLED:'true',STUDENT_EMAIL_ORIGIN:'https://ketso.test',STUDENT_ZAPIER_HOOK_URL:'https://hooks.zapier.com/hooks/catch/fixture-only/',STUDENT_EMAIL_CALLBACK_SECRET:'fixture-only-callback-secret-not-for-real-use-000',STUDENT_EMAIL_ENCRYPTION_KEY:Buffer.alloc(32,7).toString('base64'),STUDENT_PRIVATE_FILES:{async put(id,body){objects.set(id,await new Response(body).arrayBuffer());},async get(id){return objects.has(id)?{body:objects.get(id)}:null;},async delete(id){objects.delete(id);}}};
  let address=0;
  async function call(route,{body,method=body===undefined?'GET':'POST',cookie,headers={},origin='https://ketso.test'}={}){
+  // Older scenarios represent separate visits; targeted limiter tests keep real cooldowns.
+  if(!respectCooldown)sqlite.exec("UPDATE student_rate_limits SET expires=0 WHERE key LIKE 'auth-cooldown:%'");
   const {onRequest}=await import(moduleURL);const h={'CF-Connecting-IP':'test-'+(++address),...headers};if(origin)h.Origin=origin;if(cookie)h.Cookie=cookie;
   if(body!==undefined)h['Content-Type']='application/json';
   const priorFetch=global.fetch,work=[];
@@ -47,7 +49,7 @@ test('reset tokens expire, are single use, and revoke existing sessions',async()
  await f.call('auth/forgot',{body:{email:'student@example.test'}});token=f.mail.at(-1).text.match(/reset=([a-f0-9]+)/)[1];const newPassword='Another unique password 456!';assert.equal((await f.call('auth/reset',{body:{token,password:newPassword}})).status,200);assert.equal((await f.call('me',{cookie})).status,401);assert.equal((await f.call('auth/reset',{body:{token,password,name:'Verified Student'}})).status,400);await f.login('student@example.test',newPassword);
 });
 test('cross-origin mutations and missing or expired sessions are refused',async()=>{const f=fixture(),cookie=await f.user();assert.equal((await f.call('drafts/report',{cookie,method:'PUT',origin:'https://attacker.test',body:{}})).status,403);assert.equal((await f.call('me')).status,401);f.sqlite.exec('UPDATE student_sessions SET expires=0');assert.equal((await f.call('me',{cookie})).status,401);});
-test('email login rate limits work',async()=>{const f=fixture();for(let i=0;i<10;i++)assert.equal((await f.call('auth/login',{body:{email:'missing@example.test',password}})).status,401);assert.equal((await f.call('auth/login',{body:{email:'missing@example.test',password}})).status,429);});
+test('email login rate limits work',async()=>{const f=fixture();for(let i=0;i<4;i++)assert.equal((await f.call('auth/login',{body:{email:'missing@example.test',password}})).status,401);assert.equal((await f.call('auth/login',{body:{email:'missing@example.test',password}})).status,429);});
 test('drafts belong only to their owner, survive reload and reject stale saves',async()=>{
  const f=fixture(),a=await f.user(),b=await f.user('other@example.test');await f.draft(a);
  const first=await (await f.call('me',{cookie:a})).json();assert.equal(first.drafts[0].content.answers[0],'2025');assert.equal((await (await f.call('me',{cookie:b})).json()).drafts.length,0);
@@ -397,4 +399,74 @@ test('AI labels hypothetical numbers and handles provider blocks without display
   }}},{text:'Invent a grant confirmation'});
   assert.deepEqual(result,{status:'failed',answer:null});
  }
+});
+
+test('five failed logins lock for one hour without sliding; recovery is independent and restores access',async()=>{
+ const f=fixture({respectCooldown:true}),cookie=await f.user();
+ for(let n=1;n<=5;n++){
+  const r=await f.call('auth/login',{body:{email:'student@example.test',password:'Incorrect password 123!'}});
+  assert.equal(r.status,n===5?429:401);const body=await r.json();assert.equal(body.remaining_attempts,Math.max(0,5-n));
+  if(n===5){assert.ok(body.retry_after<=3600&&body.retry_after>=3590);assert.equal(r.headers.get('Retry-After'),String(body.retry_after));}
+ }
+ const locked=f.sqlite.prepare("SELECT * FROM student_rate_limits WHERE key LIKE 'login-failed:%'").get();
+ assert.equal((await f.call('auth/login',{body:{email:'student@example.test',password}})).status,429);
+ assert.deepEqual(f.sqlite.prepare("SELECT * FROM student_rate_limits WHERE key LIKE 'login-failed:%'").get(),locked);
+ assert.equal((await f.call('auth/forgot',{body:{email:'student@example.test'}})).status,202);
+ const token=f.mail.at(-1).text.match(/reset=([a-f0-9]+)/)[1];
+ assert.equal((await f.call('auth/reset',{body:{token,password}})).status,200);
+ assert.equal(f.sqlite.prepare("SELECT COUNT(*) n FROM student_rate_limits WHERE key LIKE 'login-failed:%'").get().n,0);
+ await f.login();assert.equal((await f.call('me',{cookie})).status,401);
+});
+test('successful login resets failures; unknown accounts get the same remaining-attempt policy',async()=>{
+ const f=fixture();await f.user();
+ for(const email of ['student@example.test','absent@example.test']){
+  const r=await f.call('auth/login',{body:{email,password:'wrong'}});assert.equal(r.status,401);assert.equal((await r.json()).remaining_attempts,4);
+ }
+ await f.login();
+ const r=await f.call('auth/login',{body:{email:'student@example.test',password:'wrong'}});assert.equal((await r.json()).remaining_attempts,4);
+ f.sqlite.exec("UPDATE student_rate_limits SET hits=5,expires=0 WHERE key LIKE 'login-failed:%'");
+ assert.equal((await f.call('auth/login',{body:{email:'student@example.test',password:'wrong'}})).status,401);
+});
+test('recovery permits six hourly requests with separate resend cooldown and does not consume disabled-email attempts',async()=>{
+ const f=fixture({respectCooldown:true});await f.user();
+ for(let i=0;i<6;i++){
+  assert.equal((await f.call('auth/forgot',{body:{email:'student@example.test'}})).status,202);
+  const cooldown=await f.call('auth/forgot',{body:{email:'student@example.test'}});assert.equal(cooldown.status,429);
+  // Cooldown denials must not consume the hourly recovery budget.
+  f.sqlite.exec("UPDATE student_rate_limits SET expires=0 WHERE key LIKE 'auth-cooldown:%'");
+ }
+});
+test('resend and password recovery use distinct hourly budgets',async()=>{
+ const f=fixture();await f.user();
+ for(let i=0;i<6;i++)assert.equal((await f.call('auth/forgot',{body:{email:'student@example.test'}})).status,202);
+ assert.equal((await f.call('auth/forgot',{body:{email:'student@example.test'}})).status,429);
+ assert.equal((await f.call('auth/resend',{body:{email:'student@example.test'}})).status,202);
+ await f.login();
+});
+test('disabled email and unavailable canonical registration create no accounts, counters or enrolment claims',async()=>{
+ const f=fixture({respectCooldown:true});f.env.STUDENT_EMAIL_ENABLED='false';
+ for(const action of ['register','forgot','resend']){
+  const r=await f.call('auth/'+action,{body:{email:'student@example.test',password,name:'Student'}});
+  assert.equal(r.status,503);assert.match((await r.json()).error,/temporarily unavailable/);
+ }
+ assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM student_rate_limits').get().n,0);
+ assert.equal((await f.call('portal/register',{body:{email:'student@example.test',courses:['online_tree_planting','arboriculture_1'],publicProfileConsent:true}})).status,503);
+ assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM student_accounts').get().n,0);
+});
+
+test('concurrent login failures cap at five and later blocked attempts preserve the deadline',async()=>{
+ const f=fixture(),{loginFailed,loginLimit}=await import('../functions/_shared/student-security.js');
+ const key='login-failed:synthetic';
+ const attempts=await Promise.allSettled(Array.from({length:12},()=>loginFailed(f.db,key)));
+ assert.ok(attempts.every(x=>x.status==='rejected'));
+ const row=f.sqlite.prepare('SELECT hits,expires FROM student_rate_limits WHERE key=?').get(key);assert.equal(row.hits,5);
+ const earlier=Math.floor(Date.now()/1000)+1800;f.sqlite.prepare('UPDATE student_rate_limits SET expires=? WHERE key=?').run(earlier,key);
+ await assert.rejects(()=>loginLimit(f.db,key),e=>e.status===429&&e.retry_after<=1800);
+ assert.equal(f.sqlite.prepare('SELECT expires FROM student_rate_limits WHERE key=?').get(key).expires,earlier);
+});
+
+test('unknown auth actions cannot create unbounded per-action rate-limit keys',async()=>{
+ const f=fixture({respectCooldown:true});
+ assert.equal((await f.call('auth/arbitrary-action',{body:{email:'synthetic@example.test'}})).status,404);
+ assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM student_rate_limits').get().n,0);
 });

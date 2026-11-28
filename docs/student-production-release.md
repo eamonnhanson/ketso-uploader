@@ -352,3 +352,35 @@ AI remains mandatory; Playground acceptance is not application acceptance.
 Workflow state for this release is controlled production deployment authorized,
 pending actual Cloudflare result and production acceptance. The task report records
 the actual merge SHA/deployment result; this pre-merge text does not assert success.
+
+## Controlled deployment result (recorded 28 November 2026)
+
+PR #37 was marked ready and merged after the owner-confirmed manual checks.
+Main/merge SHA: 87edd041942fe83838ed78ea7b79f3fae0304833.
+Cloudflare Pages check: completed/success for this exact SHA.
+Deployment ID: 05313109-3a29-4052-8254-6f98d84dca9a.
+Production origin: https://ketso-uploader.pages.dev.
+Rollback deployment: 1550d974-36f8-43fe-85ae-c2e0c5b0d6f1.
+Rollback source: 2526be404b35871791f6b5f57cce1b1b0055a6e6.
+
+Email false is owner-confirmed; no email settings or Zap actions were changed.
+No emails were sent. AI remains included and mandatory for acceptance.
+Read-only smoke requests to landing, workspace, gallery, Academy onboarding and
+tutor pages could not reach the site: this execution environment's proxy rejected
+the CONNECT tunnel with HTTP 403. This is NOT a KETSO application response and
+does not establish either success or failure of those live routes.
+
+Status: deployed, pending production acceptance; no public launch authorized.
+Outstanding: actual-application AI (including illustrative figures and adversarial
+grant request), production tutor authentication, profile linking, legacy uploader/
+gallery/course/points/tutor functionality, attachment privacy and staff correction.
+Residual security audits and unsigned webhook risk remain as recorded above;
+production email and Zap activation remain prohibited.
+
+This post-deployment record is local pending a future approved documentation sync;
+it does not trigger an additional production deployment.
+
+## Proposed Academy portal feature (not deployed)
+
+See [academy-portal-release.md](academy-portal-release.md). This draft does not
+replace the current deployment or authorize backend/email changes.

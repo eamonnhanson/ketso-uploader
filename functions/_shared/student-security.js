@@ -24,8 +24,8 @@ export async function account(request, db) {
 export async function rate(db, key, limit, seconds = 900) {
  const row = await db.prepare(`INSERT INTO student_rate_limits(key,hits,expires) VALUES (?,1,?)
  ON CONFLICT(key) DO UPDATE SET hits=CASE WHEN expires<=? THEN 1 ELSE hits+1 END,
- expires=CASE WHEN expires<=? THEN excluded.expires ELSE expires END RETURNING hits`).bind(key,now()+seconds,now(),now()).first();
- check(row.hits<=limit,'Too many attempts. Please try again later.',429);
+ expires=CASE WHEN expires<=? THEN excluded.expires ELSE expires END RETURNING hits,expires`).bind(key,now()+seconds,now(),now()).first();
+ if(row.hits>limit)throw retryError(row.expires);
 }
 export function sameOrigin(request) {
  check(request.headers.get('Origin') === new URL(request.url).origin,'Request origin is not allowed.',403);
@@ -41,3 +41,23 @@ export async function readJSON(request, maximum = 100000) {
 }
 export function publicAccount(a) { return {id:a.id,name:a.name,legacy_student_id:a.legacy_student_id}; }
 export function validatePassword(value) { check(typeof value==='string' && value.length>=15 && value.length<=128,'Use a password of 15–128 characters.'); }
+
+
+export function retryError(expires, remaining) {
+ const e=new Error('Too many attempts. Please try again after the countdown.');
+ e.status=429;e.retry_after=Math.max(1,expires-now());if(remaining!==undefined)e.remaining_attempts=remaining;return e;
+}
+export async function loginLimit(db,key) {
+ const row=await db.prepare('SELECT hits,expires FROM student_rate_limits WHERE key=?').bind(key).first();
+ if(row&&row.hits>=5&&row.expires>now())throw retryError(row.expires,0);
+}
+export async function loginFailed(db,key) {
+ const time=now();
+ const row=await db.prepare(`INSERT INTO student_rate_limits(key,hits,expires) VALUES (?,1,?)
+ ON CONFLICT(key) DO UPDATE SET
+ hits=CASE WHEN expires<=? THEN 1 WHEN hits<5 THEN hits+1 ELSE hits END,
+ expires=CASE WHEN expires<=? OR hits=4 THEN ? ELSE expires END RETURNING hits,expires`).bind(key,time+3600,time,time,time+3600).first();
+ if(row.hits>=5)throw retryError(row.expires,0);
+ const e=new Error('Email or password incorrect, or email not verified.');
+ e.status=401;e.remaining_attempts=5-row.hits;throw e;
+}

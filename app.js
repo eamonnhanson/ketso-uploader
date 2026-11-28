@@ -570,6 +570,7 @@ function renderRecentStudentUploads(options = {}) {
 }
 
 function resetSelection() {
+  const guidance=document.getElementById("documentGuidance");if(guidance)guidance.hidden=true;
   croppedBlob = null;
   selectedImageFile = null;
   selectedDirectFile = null;
@@ -843,6 +844,7 @@ function handleDirectFileSelected(event) {
 
   const kind = getFileKind(file);
   selectedUploadKind = kind === "video" ? "video" : kind === "text" ? "text" : "document";
+  const guidance=document.getElementById("documentGuidance");if(guidance)guidance.hidden=selectedUploadKind!=="document";
   selectedDirectFile = file;
   el.selectedFileInfo.textContent = `File selected: ${file.name || "uploaded file"}`;
   el.fileSummary.hidden = false;

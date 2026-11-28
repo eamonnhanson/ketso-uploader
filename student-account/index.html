@@ -1,5 +1,5 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>My KETSO workspace</title><link rel="stylesheet" href="/shared/student-workspace.css"></head><body><main>
-<a href="/">← KETSO uploader</a><h1>My KETSO workspace</h1><p>KETSO is an educational platform, not a donor. KETSO does not promise funding or jobs.</p>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>My KETSO workspace</title><link rel="stylesheet" href="/shared/student-workspace.css"><link rel="stylesheet" href="/shared/portal.css"></head><body><div data-portal-nav></div><main>
+<a href="/">← KETSO Academy</a><h1>My KETSO workspace</h1><p><a data-extra-course>Enrol in another course</a></p><p>Your Academy courses, photograph, progress and achievements stay with your existing Academy profile. Continue using your personal course link while the central profile connection is being completed.</p><p>KETSO is an educational platform, not a donor. KETSO does not promise funding or jobs.</p>
 <p id="status" role="status" aria-live="polite"></p>
 <section id="auth"><h2>Student account</h2><form id="authForm">
 <label>Action<select id="authAction"><option value="login">Sign in</option><option value="register">Create account</option><option value="forgot">Reset password by email</option><option value="resend">Resend verification email</option></select></label>
@@ -7,7 +7,7 @@
 <label id="emailLabel">Email<input id="email" type="email" autocomplete="email" maxlength="254" required></label>
 <label id="passwordLabel">Password (15–128 characters)<input id="password" type="password" autocomplete="current-password" minlength="15" maxlength="128" required></label>
 <p id="verifyNote" hidden>Confirm your name and your own chosen password to activate your account. This replaces any password entered before email ownership was verified.</p>
-<button id="authSubmit">Continue</button></form>
+<p>Five failed sign-in attempts cause a one-hour temporary lockout. Password recovery remains available separately.</p><p id="authRetry" role="status" aria-live="polite"></p><button id="authSubmit">Continue</button></form>
 <div id="emailDelivery" hidden><p id="emailDeliveryStatus" role="status" aria-live="polite"></p><button id="checkEmailDelivery" type="button">Check email request</button><button id="retryEmailDelivery" type="button" disabled>Retry email request</button><p>Keep this page open to check this request. A retry uses the same expiring link. If the link expires, request a new email using the form.</p></div></section>
 <section id="workspace" hidden><p id="identity"></p><a id="profileLink">View my public profile</a> <button id="logout">Sign out</button>
 <details id="courseProfileLink"><summary>Connect my existing course profile</summary><p>Enter the token from your personal course link. The course record must have the same email you verified here. If you do not have a link or your email has changed, contact KETSO staff. Your existing points, courses and galleries stay with that record.</p><form id="linkForm"><label>Personal course token<input id="courseToken" type="password" required autocomplete="off"></label><button>Connect profile</button></form></details>
@@ -20,4 +20,4 @@
 <p id="saveStatus" role="status" aria-live="polite"></p>
 <section><h3>Submit</h3><p id="disclosure"></p><label><input id="publicConsent" type="checkbox"> I choose to publish this text, guided answers, and attached files on my public student profile. For questions, the AI answer and staff replies will also be public.</label><p>Public means anyone with the link can read or download the work. Remove private contact details and sensitive information first. Making it private later cannot recall copies others saved.</p><button id="submit">Submit work</button></section>
 </div><h2>My submitted work and answers</h2><button id="refresh">Refresh answers</button><div id="submissions"></div>
-</section><section id="printOutput"></section></main><script src="/shared/student-writing.js"></script><script src="/shared/student-workspace.js" defer></script></body></html>
+</section><section id="printOutput"></section></main><script src="/shared/student-writing.js"></script><script src="/shared/student-workspace.js" defer></script><script src="/shared/portal-registry.js"></script><script src="/shared/portal-nav.js"></script></body></html>

@@ -1,0 +1,16 @@
+:root{--forest:#203A29;--orange:#CF6600;--bark:#7D552C;--mist:#E8EFEA;--paper:#F7F5EF;--ink:#1E211E}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:"Book Antiqua",Palatino,"Palatino Linotype","URW Palladio L",Georgia,serif;line-height:1.55}
+.portal-header{background:var(--forest);color:white;padding:1rem max(1rem,calc((100vw - 1100px)/2));display:flex;gap:1rem;align-items:center}
+.portal-header a{color:white}.portal-logo{width:180px;min-width:140px;display:block}.portal-header p{margin:0}
+.portal-main{max-width:1100px;margin:auto;padding:1.2rem}.portal-lead{font-size:1.2rem;max-width:65ch}
+.portal-grid,.portal-tabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:.8rem;padding:1rem 0}
+.portal-destination{display:block;border:2px solid var(--tab-color);border-top:8px solid var(--tab-color);border-radius:.4rem;padding:1rem;background:white;color:var(--ink);text-decoration:none}
+.portal-destination strong{display:block}.portal-destination:hover,.portal-destination[aria-current=page]{background:var(--mist);text-decoration:underline}.portal-destination[data-id=donors]{border-color:var(--orange);color:var(--ink)}
+.portal-card{padding:1.2rem;background:white;border:1px solid #b8c9bc;border-radius:.5rem;margin:1rem 0}
+.portal-form{max-width:640px}label{display:block;margin:.7rem 0}input:not([type=checkbox]):not([type=range]),select,textarea{box-sizing:border-box;width:100%;font:inherit;padding:.65rem;border:1px solid #65776b;border-radius:.2rem}input[type=checkbox]{width:1.2rem;height:1.2rem;vertical-align:middle}
+button,.portal-action{font:inherit;background:var(--forest);color:white;border:0;border-radius:.3rem;padding:.7rem 1rem;min-height:44px;cursor:pointer}button:disabled{opacity:.65;cursor:not-allowed}
+a{color:var(--forest)}:focus-visible{outline:3px solid var(--orange);outline-offset:3px}
+fieldset{border:1px solid #819488;margin:1rem 0;padding:1rem}legend{font-weight:bold}
+.portal-status{padding:.8rem;background:var(--mist)}.portal-crop canvas{width:min(100%,300px);height:auto}.portal-crop{max-width:480px}.portal-two{display:grid;grid-template-columns:3fr 2fr;gap:1rem}
+[hidden]{display:none!important}img{max-width:100%}main,section,form{min-width:0}
+@media(max-width:650px){.portal-two{grid-template-columns:1fr}.portal-tabs{grid-template-columns:1fr}.portal-header{align-items:flex-start;flex-direction:column}.portal-main{padding:1rem}}

@@ -8,7 +8,7 @@ const encode = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes)));
 const decode = text => Uint8Array.from(atob(text), c => c.charCodeAt(0));
 
 export function emailReady(env) {
- check(env.STUDENT_EMAIL_ENABLED === 'true', 'Student email is not enabled. Please contact KETSO staff.',503);
+ check(env.STUDENT_EMAIL_ENABLED === 'true', 'Registration verification and password recovery are temporarily unavailable because student email is disabled. Existing sign-in remains available.',503);
  check(env.STUDENT_STAGING!=='true'||env.STUDENT_EMAIL_ORIGIN===stagingOrigin(env),'Staging email origin must match the isolated application.',503);
  let hook,origin,key;
  try {hook=new URL(env.STUDENT_ZAPIER_HOOK_URL);origin=new URL(env.STUDENT_EMAIL_ORIGIN);key=decode(env.STUDENT_EMAIL_ENCRYPTION_KEY);}
