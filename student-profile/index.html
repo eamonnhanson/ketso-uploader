@@ -167,6 +167,17 @@ if (!studentId) {
 }
 
 async function loadProfile(id) {
+  try {
+    const r=await fetch('/api/student/portal/public-profile/'+encodeURIComponent(id),{cache:'no-store'});
+    if(r.ok){const data=await r.json();if(data.managed){
+      app.replaceChildren();
+      if(!data.visible){app.textContent='This Academy profile is private. Individually published work has separate permissions.';return;}
+      const name=document.createElement('h1'),photo=document.createElement('img'),courses=document.createElement('p');
+      name.textContent=data.student.full_name;photo.src='/api/student/portal/public-photo/'+encodeURIComponent(id);photo.alt='Profile photograph';photo.width=180;
+      courses.textContent=data.courses.map(key=>window.KETSO_ACADEMY_COURSES?.[key]?.name||key).join(' · ');app.append(name,photo,courses);return;
+    }}
+  } catch { /* Legacy records keep their existing public flow. */ }
+
   const [profileResult, questions] = await Promise.all([
     loadStudentProfile(id),
     loadPublicTutorQuestions(id)

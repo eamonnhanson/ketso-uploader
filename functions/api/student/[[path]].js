@@ -132,10 +132,10 @@ export async function onRequest(context){
    const object=await env.STUDENT_PRIVATE_FILES.get(file.id);check(object,'File not found.',404);
    return new Response(object.body,{headers:{'Content-Type':fileType(file.name),'Content-Disposition':`attachment; filename*=UTF-8''${encodedFilename(file.name)}`,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"sandbox"}});
   }
-  if(path[0]==='portal'&&method==='GET'&&['public-profiles','public-photo'].includes(path[1])){
+  if(path[0]==='portal'&&method==='GET'&&['public-profiles','public-profile','public-photo'].includes(path[1])){
    check(portalReady(env,staging),'Academy integration is unavailable.',503);
    const data=await academyCall(env,'00000000-0000-0000-0000-000000000000',path[1],{course:url.searchParams.get('course'),student_id:path[2]});
-   if(path[1]==='public-profiles')return response(data);
+   if(path[1]!=='public-photo')return response(data);
    const object=await env.STUDENT_PRIVATE_FILES.get(data.photo_key);check(object,'Photograph not found.',404);
    return new Response(object.body,{headers:{'Content-Type':'image/jpeg','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
   }
