@@ -42,5 +42,5 @@ test('student handler blocks production linking and uses only a separate staging
 });
 test('disabled email dispatch neither claims jobs nor invokes the webhook',async()=>{
  const {dispatchEmail}=await import('../functions/_shared/student-email.js');
- await assert.rejects(()=>dispatchEmail({STUDENT_EMAIL_ENABLED:'false',STUDENT_DB:{prepare(){assert.fail('database accessed');}}},'fixture'),/not enabled/);
+ await assert.rejects(()=>dispatchEmail({STUDENT_EMAIL_ENABLED:'false',STUDENT_DB:{prepare(){assert.fail('database accessed');}}},'fixture'),/temporarily unavailable/);
 });

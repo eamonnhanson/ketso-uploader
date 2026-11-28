@@ -1,5 +1,6 @@
+import {portalReady,registrationIntent,saveIntent,portalAccount,academyCall} from '../../_shared/academy-portal.js';
 import {isStudentStaging,allowedStagingHost,stagingDenied} from '../../_shared/staging-policy.js';
-import {account,check,cookie,digest,now,passwordHash,publicAccount,randomToken,rate,readJSON,sameOrigin,sessionToken,validatePassword} from '../../_shared/student-security.js';
+import {account,check,cookie,loginLimit,loginFailed,digest,now,passwordHash,publicAccount,randomToken,rate,readJSON,sameOrigin,sessionToken,validatePassword} from '../../_shared/student-security.js';
 import {AREAS,validateContent,ownedFiles,answerQuestion} from '../../_shared/student-content.js';
 import {emailReady,queueEmail,dispatchEmail,emailCallback,emailRequest} from '../../_shared/student-email.js';
 const LEGACY='https://ptb-tree-map.onrender.com';
@@ -38,24 +39,32 @@ export async function onRequest(context){
   const db=env.STUDENT_DB,url=new URL(request.url),path=url.pathname.replace(/^\/api\/student\/?/,'').split('/').filter(Boolean);
   const method=request.method;
   if(!['GET','POST','PUT','DELETE'].includes(method))return response({error:'Method not allowed.'},405);
+  if(path.join('/')==='portal/capabilities'&&method==='GET')return response({registration_available:portalReady(env,staging)&&env.STUDENT_EMAIL_ENABLED==='true',reason:'Academy registration is temporarily unavailable. You can browse courses or sign in.',email_enabled:env.STUDENT_EMAIL_ENABLED==='true'});
+  const centralRegistration=path.join('/')==='portal/register'&&method==='POST';
+  if(centralRegistration)check(portalReady(env,staging),'Academy registration is temporarily unavailable. No account or enrolment was created.',503);
   if(path.join('/')==='email/callback')return response(await emailCallback(request,env));
   if(method!=='GET')sameOrigin(request);
   if(path[0]==='email'&&path.length===2&&method==='POST')return response(await emailRequest(request,env,path[1],context));
-  if(path[0]==='auth' && method==='POST'){
-   const body=await readJSON(request,2000),action=path[1];
+  if((path[0]==='auth'||centralRegistration) && method==='POST'){
+   const body=await readJSON(request,centralRegistration?460000:2000),action=centralRegistration?'register':path[1];
+   check(['register','login','forgot','resend','verify','reset','logout'].includes(action),'Unknown action.',404);
    const email=typeof body.email==='string'?body.email.trim().toLowerCase():'';
    const ip=request.headers.get('CF-Connecting-IP')||'local';
-   await rate(db,'auth-ip:'+await digest(ip),30);
+   if(['register','forgot','resend'].includes(action))emailReady(env);
+   await rate(db,'auth-ip:'+action+':'+await digest(ip),action==='login'?100:60,3600);
    if(['register','login','forgot','resend'].includes(action)){
     check(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)&&email.length<=254,'Enter a valid email.');
-    await rate(db,'auth-email:'+await digest(email),10);
+    if(action!=='login'){await rate(db,'auth-cooldown:'+action+':'+await digest(email),1,60);await rate(db,'auth-email:'+action+':'+await digest(email),6,3600);}
    }
    if(action==='register'){
+    check(centralRegistration||(!body.courses?.length&&!body.profilePhoto&&!body.publicProfileConsent),'Academy registration is temporarily unavailable. Course browsing and existing sign-in remain available.',503);
     emailReady(env);
     validatePassword(body.password);check(typeof body.name==='string'&&body.name.trim().length>=2&&body.name.length<=150,'Enter your name.');
+    const intent=centralRegistration?registrationIntent(body):null;
     const salt=randomToken(),hash=await passwordHash(body.password,salt);
-    await db.prepare('INSERT OR IGNORE INTO student_accounts(id,email,name,password_hash,salt,created_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),email,body.name.trim(),hash,salt,now()).run();
+    const inserted=await db.prepare('INSERT OR IGNORE INTO student_accounts(id,email,name,password_hash,salt,created_at) VALUES(?,?,?,?,?,?) RETURNING id').bind(crypto.randomUUID(),email,body.name.trim(),hash,salt,now()).first();
     const a=await db.prepare('SELECT * FROM student_accounts WHERE email=?').bind(email).first();
+    if(intent&&inserted)await saveIntent(env,a,intent);
     const delivery=await queueEmail(env,!a.verified?a:null,'verify');
     context.waitUntil(dispatchEmail(env,delivery.id));
     return response({message:'Request recorded. If eligible, email processing is pending. No delivery has been confirmed.',email_receipt:delivery.receipt},202);
@@ -73,17 +82,21 @@ export async function onRequest(context){
     const salt=randomToken(),hash=await passwordHash(body.password,salt);
     const t=await db.prepare('DELETE FROM student_tokens WHERE hash=? AND purpose=? AND expires>? RETURNING account_id').bind(await digest(body.token),action,now()).first();
     check(t,'Invalid or expired link.');
+    const recovered=await db.prepare('SELECT email FROM student_accounts WHERE id=?').bind(t.account_id).first();
     await db.batch([
+     db.prepare('DELETE FROM student_rate_limits WHERE key=?').bind('login-failed:'+await digest(recovered.email)),
      db.prepare('UPDATE student_accounts SET verified=1,password_hash=?,salt=?,name=COALESCE(?,name),password_version=password_version+1 WHERE id=?').bind(hash,salt,action==='verify'?body.name.trim():null,t.account_id),
      db.prepare('DELETE FROM student_tokens WHERE account_id=?').bind(t.account_id),
      db.prepare('DELETE FROM student_sessions WHERE account_id=?').bind(t.account_id)]);
     return response({message:'Your password is saved and email verified. Please sign in.'});
    }
    if(action==='login'){
-    validatePassword(body.password);
+    const failureKey='login-failed:'+await digest(email);await loginLimit(db,failureKey);
+    check(typeof body.password==='string'&&body.password.length<=128,'Enter your password.');
     const a=await db.prepare('SELECT * FROM student_accounts WHERE email=?').bind(email).first();
     const hash=await passwordHash(body.password,a?.salt||'dummy-salt-for-unknown-account');
-    check(a&&a.verified&&hash===a.password_hash,'Email or password incorrect, or email not verified.',401);
+    if(!(a&&a.verified&&hash===a.password_hash))await loginFailed(db,failureKey);
+    await db.prepare('DELETE FROM student_rate_limits WHERE key=?').bind(failureKey).run();
     const token=randomToken();
     await db.prepare('INSERT INTO student_sessions(hash,account_id,password_version,expires) VALUES(?,?,?,?)').bind(await digest(token),a.id,a.password_version,now()+28800).run();
     return response({account:publicAccount(a)},200,{'Set-Cookie':cookie(token)});
@@ -119,8 +132,22 @@ export async function onRequest(context){
    const object=await env.STUDENT_PRIVATE_FILES.get(file.id);check(object,'File not found.',404);
    return new Response(object.body,{headers:{'Content-Type':fileType(file.name),'Content-Disposition':`attachment; filename*=UTF-8''${encodedFilename(file.name)}`,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"sandbox"}});
   }
+  if(path[0]==='portal'&&method==='GET'&&['public-profiles','public-profile','public-photo'].includes(path[1])){
+   check(portalReady(env,staging),'Academy integration is unavailable.',503);
+   const data=await academyCall(env,'00000000-0000-0000-0000-000000000000',path[1],{course:url.searchParams.get('course'),student_id:path[2]});
+   if(path[1]!=='public-photo')return response(data);
+   const object=await env.STUDENT_PRIVATE_FILES.get(data.photo_key);check(object,'Photograph not found.',404);
+   return new Response(object.body,{headers:{'Content-Type':'image/jpeg','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
+  }
   const a=await account(request,db);
   if(method!=='GET')await rate(db,'write:'+a.id,120,60);
+  if(path[0]==='portal'&&path[1]==='photo'&&method==='GET'){
+   check(portalReady(env,staging),'Academy integration is unavailable.',503);
+   const profile=url.searchParams.has('pending')?await db.prepare('SELECT photo_key FROM student_registration_intents WHERE account_id=?').bind(a.id).first():await academyCall(env,a.id,'profile');check(profile?.photo_key,'Photograph not found.',404);
+   const object=await env.STUDENT_PRIVATE_FILES.get(profile.photo_key);check(object,'Photograph not found.',404);
+   return new Response(object.body,{headers:{'Content-Type':'image/jpeg','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
+  }
+  if(path[0]==='portal'){check(portalReady(env,staging),'Academy integration is unavailable.',503);return response(await portalAccount(request,env,a,path[1]));}
   if(path[0]==='me'&&method==='GET'){
    const drafts=await db.prepare('SELECT area,content,revision FROM student_drafts WHERE account_id=?').bind(a.id).all();
    const submissions=await db.prepare('SELECT * FROM student_submissions WHERE account_id=? ORDER BY created_at DESC').bind(a.id).all();
@@ -176,5 +203,5 @@ export async function onRequest(context){
    const row=await db.prepare('UPDATE student_submissions SET public=? WHERE id=? AND account_id=? RETURNING id').bind(body.publish?1:0,body.id,a.id).first();check(row,'Submission not found.',404);return response({ok:true});
   }
   check(false,'Not found.',404);
- }catch(e){return response({error:e.status?e.message:'The student service could not complete this request. Please try again.'},e.status||503);}
+ }catch(e){return response({error:e.status?e.message:'The student service could not complete this request. Please try again.',...(e.retry_after?{retry_after:e.retry_after}:{}),...(e.remaining_attempts!==undefined?{remaining_attempts:e.remaining_attempts}:{})},e.status||503,e.retry_after?{'Retry-After':String(e.retry_after)}:{});}
 }

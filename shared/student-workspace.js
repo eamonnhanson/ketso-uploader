@@ -7,9 +7,12 @@ const linkToken=linkAction?fragment.get(linkAction):null;
 if(linkAction)history.replaceState(null,'',location.pathname);
 async function api(path,body,method='POST'){
  const r=await fetch('/api/student/'+path,{method,headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
- const data=await r.json();if(!r.ok)throw Error(data.error||'Request failed.');return data;
+ const data=await r.json();if(!r.ok){const error=new Error(data.error||'Request failed.');error.retry_after=Number(data.retry_after||r.headers.get('Retry-After')||0);error.remaining_attempts=data.remaining_attempts;throw error;}return data;
 }
-function message(error){$('status').textContent=error.message||error;}
+let retryTimer;
+function message(error){$('status').textContent=(error.message||error)+(error.remaining_attempts!==undefined?' Remaining sign-in attempts: '+error.remaining_attempts+'.':'');
+ if(error.retry_after){clearInterval(retryTimer);const end=Date.now()+error.retry_after*1000;const update=()=>{const seconds=Math.max(0,Math.ceil((end-Date.now())/1000));$('authRetry').textContent=seconds?'Try this action again in '+Math.floor(seconds/60)+'m '+seconds%60+'s. Password recovery is independent of sign-in lockouts.':'You can try this action again.';if(!seconds)clearInterval(retryTimer);};update();retryTimer=setInterval(update,1000);}
+}
 function actionFields(){const action=linkAction||$('authAction').value;
  $('nameLabel').hidden=!['register','verify'].includes(action);$('name').required=!$('nameLabel').hidden;
  $('passwordLabel').hidden=['forgot','resend'].includes(action);$('password').required=!$('passwordLabel').hidden;

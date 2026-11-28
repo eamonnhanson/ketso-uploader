@@ -31,7 +31,7 @@ test("shared config exposes the donor course under its canonical identifier", ()
 });
 
 test("uploader, gallery and profile pass the donor course through the existing flow", () => {
-  const startPage = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const startPage = fs.readFileSync(path.join(root, "uploader", "index.html"), "utf8");
   const app = fs.readFileSync(path.join(root, "app.js"), "utf8");
   const uploader = fs.readFileSync(path.join(root, "academy-onboarding", "index.html"), "utf8");
   const gallery = fs.readFileSync(path.join(root, "student-gallery", "index.html"), "utf8");
@@ -68,7 +68,7 @@ assert.match(
 });
 
 test("extra-course enrolment link is token-gated and opens safely", () => {
-  const startPage = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const startPage = fs.readFileSync(path.join(root, "uploader", "index.html"), "utf8");
   const app = fs.readFileSync(path.join(root, "app.js"), "utf8");
 
   assert.match(startPage, /id="extraCourseEnrolmentLink"[\s\S]*target="_blank"[\s\S]*rel="noopener"[\s\S]*hidden/);
